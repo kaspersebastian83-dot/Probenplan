@@ -1,6 +1,6 @@
 # Prüfprotokoll – Probenplan 1.0
 
-Stand: 12. Oktober 2026. Lokaler Produktionsbuild unter `http://localhost:4173`, Windows. Keine Veröffentlichung.
+Erstprüfung: 12. Oktober 2026. Lokaler Produktionsbuild unter `http://localhost:4173`, Windows; zu diesem Zeitpunkt keine Veröffentlichung.
 
 ## Erfolgreich geprüft
 
@@ -67,3 +67,7 @@ node tests/edge-cases.mjs
 ```
 
 Die Randfalltests verwenden die Projektdateien des Haupttests und werden deshalb danach ausgeführt.
+
+## Vorbereitung für GitHub Pages
+
+12. Oktober 2026: Produktionsbuild mit relativen Assetpfaden erfolgreich. Die 16 Hauptprüfungen und fünf Randfallprüfungen wurden erneut unter `http://127.0.0.1:4175/Probenplan/` bestanden, einschließlich Offline-Neustart und Bildexport in Chrome und Edge. Damit wurde der Unterverzeichnisbetrieb für GitHub Pages lokal überprüft. Der Service-Worker-Cache ist auf seinen jeweiligen Anwendungspfad begrenzt. Die echten Safari-/iOS-Geräteprüfungen bleiben ausstehend.

@@ -2,6 +2,12 @@
 
 Lokale Webapp für beschriftete Grundrisse nach Brandschäden. TypeScript + Vite, ohne UI-Framework, Serverdatenbank, Konten oder externe Dienste.
 
+## Online öffnen und installieren
+
+**https://kaspersebastian83-dot.github.io/Probenplan/**
+
+Die App vollständig laden und auf „Offline bereit“ warten. Auf iPhone/iPad in Safari öffnen und über **Teilen → Zum Home-Bildschirm** installieren. Gebäudedaten werden im Browser verarbeitet und nicht hochgeladen. Vorhandene Projekte aus der lokalen App als `.probenplan` speichern und auf der neuen Adresse wieder öffnen: Der Browserspeicher ist an die Adresse gebunden.
+
 ## Start unter Windows
 
 1. **`Start-Probenplan.cmd` doppelklicken.** Das Fenster geöffnet lassen.
@@ -45,7 +51,7 @@ Die SVG wird beim Export neu gerendert. Eingebettete Schriften und Rasterbilder 
 
 **Windows-PC:** Die App zunächst vollständig unter `http://localhost:4173` laden. Nach „Offline bereit“ können Chrome/Edge die App über ihre Installationsfunktion installieren. Der Offline-Test erfolgte mit deaktiviertem Browsernetzwerk einschließlich Neuladen und Bildexport. Für den regulären lokalen Start und App-Updates das Startfenster verwenden. Ein noch nicht eingerichteter Browser benötigt den laufenden lokalen Server.
 
-**iPhone/iPad:** Für die spätere Installation ist eine vom Gerät erreichbare **HTTPS-Adresse** nötig. Diese in Safari öffnen, vollständig laden und dann **Teilen → Zum Home-Bildschirm** verwenden. `localhost` auf dem iPhone bezeichnet das iPhone selbst, nicht den Windows-PC. Eine einfache unverschlüsselte Windows-LAN-Adresse ermöglicht keine reguläre Service-Worker-Installation. Diese erste Version enthält **keine externe Bereitstellung**. Eine spätere HTTPS-Bereitstellung muss separat eingerichtet werden; importierte Pläne bleiben auch dann im jeweiligen Browser.
+**iPhone/iPad:** Für die spätere Installation ist eine vom Gerät erreichbare **HTTPS-Adresse** nötig. Diese in Safari öffnen, vollständig laden und dann **Teilen → Zum Home-Bildschirm** verwenden. `localhost` auf dem iPhone bezeichnet das iPhone selbst, nicht den Windows-PC. Eine einfache unverschlüsselte Windows-LAN-Adresse ermöglicht keine reguläre Service-Worker-Installation. Die HTTPS-Bereitstellung erfolgt über GitHub Pages unter der oben genannten Adresse; importierte Pläne bleiben im jeweiligen Browser.
 
 Offlinebereitschaft kann durch das Löschen von Browserdaten oder automatische Speicherbereinigung verloren gehen. Auf Mobilgeräten bei Exportproblemen von 4.600 auf 3.500 px wechseln. Wenn das Betriebssystem den Tab wegen Speichermangel komplett beendet, kann die App keine Fehlermeldung mehr anzeigen; Projektdateien bieten zusätzliche Sicherheit.
 
@@ -75,3 +81,9 @@ node tests/edge-cases.mjs
 Die Tests benötigen installierte Desktopversionen von Google Chrome und Microsoft Edge sowie die originale ZIP im Projektordner oder unter `beispiele/`. Ergebnisse liegen ausschließlich im ignorierten Ordner `.test-output/`. Die ZIP, Projektdateien, Testbilder, Abhängigkeiten und Buildausgabe sind aus Git ausgeschlossen.
 
 **Noch ausstehend:** echte iPhone-/iPad-Geräte und Safari/WebKit, Installation über HTTPS auf diesen Geräten, reale Speichermangelsituationen. Eine mobile Chromium-Emulation ersetzt diese Tests nicht.
+
+## GitHub Pages veröffentlichen
+
+In den Repository-Einstellungen unter **Pages → Build and deployment → Source** die Option **GitHub Actions** auswählen. Der Workflow `.github/workflows/pages.yml` installiert die gesperrten Abhängigkeiten, prüft TypeScript, baut die App und veröffentlicht ausschließlich `dist/`. Jeder Push auf `main` aktualisiert die Website. Grundrisse, Projektdateien und Testausgaben sind ausgeschlossen.
+
+Vite verwendet relative Assetpfade. Die App funktioniert dadurch sowohl lokal als auch im GitHub-Pages-Unterverzeichnis `/Probenplan/`.
