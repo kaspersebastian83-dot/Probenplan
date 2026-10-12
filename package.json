@@ -1,15 +1,27 @@
 {
   "name": "probenplan",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "tsc --noEmit && vite build && node scripts/build-sw.mjs",
+    "dev": "node scripts/pdf-assets.mjs && vite --host 127.0.0.1",
+    "build": "node scripts/pdf-assets.mjs && tsc --noEmit && vite build && node scripts/build-sw.mjs",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "node tests/browser.mjs"
+    "test": "node tests/browser.mjs && node tests/edge-cases.mjs && node tests/import-preparation.mjs && node tests/scoped-pdf.mjs"
   },
-  "dependencies": { "dompurify": "^3.3.0", "fflate": "^0.8.2" },
-  "devDependencies": { "typescript": "^5.9.3", "vite": "^7.1.12", "@playwright/test": "^1.56.0" },
-  "pnpm": { "onlyBuiltDependencies": ["esbuild"] }
+  "dependencies": {
+    "dompurify": "^3.3.0",
+    "fflate": "^0.8.2",
+    "pdfjs-dist": "6.4.299"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.12"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
 }

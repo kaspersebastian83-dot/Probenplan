@@ -1,4 +1,60 @@
-# Prüfprotokoll – Probenplan 1.0
+# Prüfprotokoll – Probenplan 1.1
+
+Prüfung: 12. Oktober 2026, Windows. Feature-Branch `codex/feature/probenplan-1-1-import`. Lokaler Produktionsbuild auf `http://localhost:4181`; die produktive Website wird durch diesen Branch nicht geändert.
+
+## Version 1.1: Implementierung und neue Prüfungen
+
+| Bereich | Prüfung und Ergebnis |
+| --- | --- |
+| Build | TypeScript-Prüfung und Produktionsbuild einschließlich lokal gebündeltem PDF.js 6.4.299 erfolgreich. Gesamtgröße der ausgelieferten App-Dateien etwa 6,6 MB. |
+| PDF-Import | Einseitige PDF direkt übernommen; mehrseitige PDF mit Vorschau, Vor-/Zurück, direkter Seiteneingabe und Abbrechen. Eine ausgewählte Seite je Projekt. |
+| Auflösung | Synthetische 600 × 800-Punkte-Seite auf einem simulierten Desktop mit ausreichend Speicher als 3450 × 4600 px gerendert. Mobile Renderfläche auf höchstens 9 Megapixel begrenzt. |
+| Rotation | Links/rechts jeweils 90°, zweimal 180°, Undo/Redo. Originalbilddaten bleiben unverändert. |
+| Zuschnitt | Aufziehen, Abbrechen, Übernehmen, Undo/Redo. Zuschnitt mit außerhalb liegenden Probenpunkten wird abgewiesen. |
+| Markertransformation | Punkte und separat versetzte Schilder nach Drehung und Zuschnitt rechnerisch geprüft; danach Proben und Brandherde setzen sowie Punkte verschieben. |
+| Export | Bearbeitete PDF-Seite als PNG mit 3500 px und JPG mit 4600 px exportiert, Abmessungen kontrolliert und beide Bilder visuell geöffnet. Planzeichnung, Marker, Hinweislinie und Legende vollständig und lesbar. |
+| Projektdateien | Schema 2 mit PDF-Seite, Originalbild, Rotation und Zuschnitt gespeichert, wieder geöffnet und nach Neuladen aus IndexedDB vollständig wiederhergestellt. Synthetische Schema-1-Datei einschließlich Marker, Notiz und Metadaten korrekt übernommen. |
+| Offline | Chrome und Edge: Netzwerk deaktiviert, App neu geladen, weitere PDF lokal importiert und exportiert. WebKit: ebenfalls Offline-PDF-Import und PNG-Ausgabe. |
+| GitHub-Pages-Pfade | Separater lokaler HTTP-Test unter `/Probenplan/`: vollständig gecachte App offline neu geladen, PDF erstmals importiert und exportiert. Worker, PDF-Chunk, Fonts und Ressourcen blieben im Unterverzeichnis; keine externen Requests. |
+| Smartphone-Bilder | Synthetische JPG- und PNG-Dateien mit je 24 Megapixeln (6000 × 4000) ohne erneute Kompression übernommen; PNG gedreht. JPEG mit EXIF-Orientierung 6 korrekt als Hochformat und im Export dargestellt. |
+| Fehlerfälle | Beschädigte PDF, PDF über 60 MB, HEIC und Rasterheader mit mehr als 50 Megapixeln verständlich abgewiesen; bestehendes Projekt blieb erhalten. Canvas-Fehler bei PDF-Rendering simuliert: automatischer erfolgreicher Versuch innerhalb 3000 px / 6 Megapixel. |
+| Browser | Neue Abläufe in Google Chrome und Microsoft Edge automatisiert geprüft; zusätzliche Playwright-WebKit-Prüfung unter Windows. |
+| Touch | Chromium mit iPhone-13-Emulation: Seitenauswahl, Drehen, Zuschnitt mit Touch-Geste und Touch-Bestätigung, genau ein Undo/Redo-Schritt sowie Probenmarker per Touch. Keine horizontale Überbreite. |
+| Echte Vorlage | Originale Polycam-PDF aus der lokalen, unveränderten ZIP gerendert und als PNG exportiert; nur ignorierte lokale Testdateien. |
+| Speicher | Undo-Snapshots teilen die unveränderlichen Bilddaten, statt sie bei jedem Schritt erneut zu kopieren. Vorschaubilder werden nacheinander gerendert; PDF-Worker und Render-Canvas werden nach Nutzung freigegeben. |
+
+Die bisherigen Kernabläufe wurden zusätzlich mit den bestehenden Tests erneut geprüft: Polycam-ZIP/SVG mit eingebetteter Schrift und Grafik, PNG/JPG, P-/B-Kennungen, Löschen ohne Umnummerierung, Startnummer, Markerverschiebung und separate Beschriftung, Zoom, Undo/Redo, Gutachtennummer/Datum, Legende, Projektdatei und Autosicherung sowie Offline-Neustart. Die bestehenden Sicherheits- und Exportfehlerprüfungen bestanden ebenfalls.
+
+## Während der Prüfung behoben
+
+- Bei direkter Eingabe einer PDF-Seitennummer konnte ein zusätzlicher Blur-`change` die Vorschau erneut starten und den ersten Übernehmen-Klick verlieren. Derselbe Seitenindex wird nun nicht erneut geladen; Abbrechen und erneutes Öffnen sind ebenfalls geprüft.
+- Die Touch-Emulation lieferte nach einer erfassten Zuschneidegeste teilweise keinen normalen Button-Klick. Bestätigung und Abbrechen verwenden bei einem abgeschlossenen Touch-Tipp eine einmalige Ersatzaktivierung, wenn der normale Klick ausbleibt. Die normale Klickbedienung bleibt erhalten; die mobile Undo-Prüfung kontrolliert, dass ein Zuschnitt nur einmal angewandt wird.
+
+## Lokale Nachweise und Wiederholung
+
+`.test-output/v1.1/` enthält die synthetisch erzeugten Test-PDFs, `results.json`, PNG/JPG-Exporte der bearbeiteten Seiten, Projektdateien, mobile Screenshots, EXIF-Testexporte, `real-polycam-pdf.png` und `scoped-offline.png`. Der gesamte Ordner ist aus Git ausgeschlossen. Die neue SVG-/PDF-/Bild-Testgeometrie im Testcode ist synthetisch; reale Objektunterlagen werden nicht committed. Auch der vorhandene entpackte Polycam-Ordner ist nun explizit ignoriert.
+
+Mit laufendem Produktionsserver alle Prüfungen ausführen:
+
+```powershell
+npm test
+```
+
+Für die in diesem Arbeitslauf verwendete separate Vorschau zuerst `$env:TEST_URL='http://localhost:4181'` setzen. WebKit bei Bedarf mit `node node_modules/@playwright/test/cli.js install webkit` installieren. Der Unterverzeichnis-Test startet und beendet einen eigenen lokalen Testserver. Die ursprünglichen Regressionstests benötigen die Polycam-ZIP lokal im Projektordner oder unter `beispiele/`.
+
+## Grenzen und iPhone-/iPad-Prüfung
+
+- **Keine physischen iPhones/iPads getestet.** WebKit unter Windows und iPhone-Emulation in Chromium sind automatisierte Browserprüfungen, keine tatsächlichen Safari-/iOS-/iPadOS- oder Home-Bildschirm-Installationstests.
+- Nach Freigabe und Installation der Version 1.1 auf einem echten Gerät: Fotoimport aus Fotos/Dateien (Hoch-/Querformat), PDF-Seitenauswahl, wiederholtes Drehen/Zuschneiden, Touch-Ziehen von Punkt und Beschriftung, Undo/Redo, PNG/JPG-Downloads und `.probenplan`-Dateien über die Dateien-App testen. Anschließend Flugmodus aktivieren, App neu starten und eine lokal verfügbare PDF importieren und exportieren.
+- Reales Beenden eines Tabs durch Speichermangel wurde nicht provoziert. Die App begrenzt Renderflächen und bietet verständliche Fehler bzw. eine kleinere PDF-Renderstufe; ein vom Betriebssystem beendeter Tab kann selbst keine Meldung mehr anzeigen.
+- PDFs werden als Rastervorlage übernommen. Bei technisch begrenzter Ausgangsauflösung ergänzt ein größerer Bildexport keine weiteren Details. Maximal 500 Seiten je PDF; passwortgeschützte PDFs benötigen eine ungeschützte Kopie.
+- Kein HEIC/HEIF, keine perspektivische Entzerrung, kein DXF/CSV. Ein PDF-Seitenwechsel erfolgt durch erneuten Import, nicht innerhalb des bestehenden markierten Projekts.
+- **Projektdateien bewahren die unbeschnittene Vorlage.** Aus einem zugeschnittenen Projekt können ursprüngliche Bildränder ausgelesen werden; fertige PNG/JPG-Dateien enthalten den bestätigten Ausschnitt und die außerhalb liegenden Marker/Legende. Alle Projekt- und Planinhalte bleiben im Browser bzw. in heruntergeladenen lokalen Dateien.
+- Der Pages-Workflow veröffentlicht nur `main` oder einen bewusst ausgelösten manuellen Lauf. Dieser Feature-Branch wird ausschließlich als Pull Request zur Freigabe bereitgestellt und nicht gemergt.
+
+---
+
+# Historisches Prüfprotokoll – Probenplan 1.0
 
 Erstprüfung: 12. Oktober 2026. Lokaler Produktionsbuild unter `http://localhost:4173`, Windows; zu diesem Zeitpunkt keine Veröffentlichung.
 

@@ -1,6 +1,8 @@
-# Probenplan
+# Probenplan 1.1
 
 Lokale Webapp für beschriftete Grundrisse nach Brandschäden. TypeScript + Vite, ohne UI-Framework, Serverdatenbank, Konten oder externe Dienste.
+
+Version 1.1 ergänzt lokalen PDF-Import mit Seitenauswahl sowie verlustfreie Bildvorbereitung durch Drehen und Zuschneiden. Die Freigabe erfolgt über einen Pull Request; der Feature-Branch wird nicht auf die produktive Website bereitgestellt.
 
 ## Online öffnen und installieren
 
@@ -14,7 +16,7 @@ Die App vollständig laden und auf „Offline bereit“ warten. Auf iPhone/iPad 
 2. **http://localhost:4173** in Chrome oder Edge öffnen.
 3. Warten, bis oben **„Offline bereit“** erscheint.
 
-Die Startdatei nutzt vorhandenes Node.js oder die auf diesem PC vorhandene Codex-Laufzeit. Abhängigkeiten liegen bereits im Projekt. Auf einem neuen PC Node.js ab Version 22.12 installieren; beim ersten Start benötigt die Installation der Abhängigkeiten Internet. Danach erfolgen Start und Verarbeitung lokal.
+Die Startdatei nutzt vorhandenes Node.js oder die auf diesem PC vorhandene Codex-Laufzeit. Abhängigkeiten liegen bereits im Projekt. Auf einem neuen PC Node.js ab Version 22.13 installieren; beim ersten Start benötigt die Installation der Abhängigkeiten Internet. Danach erfolgen Start und Verarbeitung lokal. Beim Build werden PDF.js-Worker, Fonts, CMaps und Dekoder aus dem lokal installierten Paket mitgeliefert.
 
 Ist Port 4173 bereits belegt, läuft eventuell schon die Vorschau: zuerst die Adresse öffnen. Server beenden: Strg+C im Startfenster. Bitte immer dieselbe Adresse verwenden: `localhost` und `127.0.0.1` besitzen getrennte Browserspeicher.
 
@@ -30,7 +32,7 @@ Zur Entwicklung `npm run dev`. Die Offlinefunktion ist für den **Produktionsbui
 
 ## Bedienung
 
-1. **Plan laden:** Polycam-ZIP, SVG, PNG oder JPG auswählen. Bei mehreren Dateien erscheint eine Auswahl; SVG steht oben und ist empfohlen. PDF, DXF und CSV werden ignoriert. Der Originalexport wird nicht verändert.
+1. **Plan laden:** PDF, Polycam-ZIP, SVG, PNG oder JPG auswählen. Bei mehrseitigen PDFs mit den Pfeilen oder der Seitennummer einen Grundriss in der Vorschau wählen und „Diese Seite übernehmen“ antippen. Pro Projekt wird eine Seite verarbeitet. Bei ZIP-Dateien erscheint eine Auswahl; SVG steht oben und ist empfohlen. PDFs bitte direkt auswählen; DXF und CSV bleiben ausgeschlossen.
 2. **Markieren:** „Probe setzen“ bzw. „Brandherd setzen“ wählen und in den Plan klicken/tippen. Proben bekommen P1, P2 usw., Brandherde B1, B2 usw. Die nächste Probennummer ist einstellbar. Bereits belegte Kennungen werden übersprungen. Löschen nummeriert keine anderen Marker um.
 3. **Bearbeiten:** In der Liste oder im Werkzeug „Markierung bearbeiten“ einen Marker wählen. Kennung und optionale Notiz ändern. Kennungen sind projektweit eindeutig, auch bei unterschiedlicher Groß-/Kleinschreibung. Punkt ziehen, um ihn zu verschieben. „Beschriftung versetzen“ löst das Schild vom Punkt; danach Schild und Punkt separat ziehen. Eine Linie verbindet beide. „Zurück an Punkt“ verbindet sie wieder. „Löschen“ entfernt den ausgewählten Marker.
 4. **Navigieren:** „Ansicht bewegen“ wählen und ziehen. Mausrad, Plus/Minus oder zwei Finger zoomen. „Einpassen“ zeigt den gesamten Plan samt Markierungen. Mausrad und Zweifinger-Zoom sind in jedem Werkzeug möglich; dabei werden keine neuen Marker gesetzt.
@@ -39,11 +41,27 @@ Zur Entwicklung `npm run dev`. Die Offlinefunktion ist für den **Produktionsbui
 
 Die SVG wird beim Export neu gerendert. Eingebettete Schriften und Rasterbilder bleiben erhalten. Eine PNG-/JPG-Vorlage bleibt dagegen eine Rastervorlage; höhere Ausgabeauflösung ergänzt dort keine Details. Beide Formate haben einen weißen Hintergrund, JPG verwendet hohe Qualität. Die Legende unterscheidet runde Probenmarker und rautenförmige Brandherdmarker auch ohne Farbe. **Notizen werden nur im Projekt gespeichert, nicht im Bild abgedruckt.**
 
+## Drehen und Zuschneiden
+
+Am einfachsten den Plan unmittelbar nach dem Import vorbereiten, anschließend markieren:
+
+- **Links/Rechts drehen:** je Klick 90°, zweimal ergibt 180°. Probenpunkte, Brandherde und versetzte Beschriftungen werden mitgedreht; ihre Schilder bleiben lesbar ausgerichtet.
+- **Zuschneiden:** im Plan mit Maus oder einem Finger einen rechteckigen Ausschnitt aufziehen. Zum Ändern einfach einen neuen Bereich ziehen. Danach **„Zuschnitt übernehmen“** oder **„Abbrechen“**. Escape bricht ebenfalls ab.
+- Bei vorhandenen Markierungen muss der Ausschnitt alle tatsächlichen Probenpunkte und Brandherde enthalten. Sonst erscheint ein Hinweis und die App wartet auf einen passenden Bereich. Beschriftungen dürfen weiterhin außerhalb des Bildausschnitts liegen und werden vollständig exportiert.
+- Rotation und Zuschnitt sind mit den bestehenden Undo/Redo-Schaltflächen rückgängig machbar. Auch mehrfaches Drehen und Zuschneiden speichert nur Transformationsdaten; JPG/PNG werden dabei nicht erneut komprimiert. Die Originaldatei bleibt unverändert.
+- Eine perspektivische Entzerrung fotografierter Pläne ist nicht enthalten. Schräg fotografierte Fluchtpläne möglichst frontal erneut aufnehmen.
+
+PDF-Seiten werden zunächst als PNG gerendert: bis 4.600 Pixel an der längsten Seite und höchstens 16 Megapixel, auf Mobilgeräten oder bei wenig gemeldetem Gerätespeicher höchstens 9 Megapixel. Bei einem Renderfehler folgt ein Versuch mit bis zu 3.000 Pixeln / 6 Megapixeln. Die tatsächlichen Planabmessungen sind unter der Arbeitsfläche sichtbar. Ein späterer 4.600-px-Export kann eine begrenzte PDF-Rastervorlage hochskalieren. Für zusätzliche PDF-Seiten ein eigenes Projekt anlegen. PDFs mit Passwortschutz bitte als ungeschützte Kopie bereitstellen.
+
+Smartphone-JPGs werden einschließlich EXIF-Ausrichtung verarbeitet, Hoch-/Querformat und Originalauflösung erhalten. Geprüft wurden unter anderem JPG und PNG mit jeweils 24 Megapixeln. Die Grenze von 50 Megapixeln / 18.000 Pixeln pro Seite schützt vor sehr großen Speicherbelegungen; sie wird nach Möglichkeit bereits anhand der Bildheader geprüft. HEIC/HEIF ist nicht Bestandteil von 1.1: als JPG exportieren oder auf dem iPhone **Einstellungen → Kamera → Formate → Maximale Kompatibilität** wählen.
+
 ## Projekte speichern
 
 - Die App sichert Änderungen automatisch in IndexedDB in diesem Browser. Nach erneutem Öffnen erscheint das zuletzt gespeicherte Projekt.
 - **„Projekt speichern“** lädt eine `.probenplan`-Datei herunter: Grundriss, Kennungen, Notizen, Positionen, nächste Nummern, Gutachtennummer und Datum. Die Datei enthält die Gebäudedaten vollständig und kann selbst verwahrt werden.
 - **„Projekt öffnen“** lädt eine solche Datei zur weiteren Bearbeitung. Vor dem Ersetzen bietet die App das Sichern des bisherigen Projekts an.
+- Dateien aus Probenplan 1.0 (Schema 1) bleiben lesbar. PDF-Seiten oder bearbeitete Grundrisse verwenden Schema 2 mit ausgewählter Seitennummer, Auflösung, Originalbild, Rotation und Zuschnitt. Diese Dateien benötigen zum Öffnen Probenplan 1.1 oder neuer. Der PDF-Dateiinhalt wird nach dem Rendern verworfen; die gewählte Seite bleibt als eingebettetes Planbild bearbeitbar. Die Seitennummer wird zur Dokumentation gespeichert, ein späterer Seitenwechsel benötigt erneuten PDF-Import.
+- **Ein Zuschnitt entfernt Ränder aus dem Bildexport. Die `.probenplan`-Datei enthält für weitere Bearbeitung und Undo weiterhin die unbeschnittene Bildvorlage bzw. vollständig gerenderte PDF-Seite.** Bei Weitergabe einer Projektdatei können diese ursprünglichen Bildinformationen eingesehen werden.
 - Exportierte PNG/JPG-Dateien sind fertige Bilder. Für weitere Bearbeitung zusätzlich eine Projektdatei aufbewahren.
 - Automatische Sicherung ist browser- und adressgebunden. Gelöschte Browserdaten, privater Modus oder Speicherbereinigung können sie entfernen. Bei Speicherfehlern zeigt die App einen Hinweis; dann eine Projektdatei speichern.
 
@@ -62,12 +80,17 @@ Offlinebereitschaft kann durch das Löschen von Browserdaten oder automatische S
 - `src/import.ts`: ZIP-Auswahl, SVG-Bereinigung, Projektvalidierung.
 - `src/export.ts`: hochauflösender Canvas-Export mit separatem Beschriftungsbereich.
 - `src/storage.ts`: IndexedDB und Dateidownloads.
+- `src/pdf.ts`: lokaler PDF.js-Worker, Seitendarstellung, Rendergrenzen und Fehlerbehandlung.
+- `src/preparation.ts`: Bildmatrix und Transformation von Punkten, Beschriftungen und Ausschnitten.
+- `scripts/pdf-assets.mjs`: lokale PDF-Ressourcen aus der gesperrten Abhängigkeit für Offlinebetrieb.
 - `scripts/build-sw.mjs`: Service Worker mit vollständig lokalem Assetcache.
-- `public/`: ausschließlich App-Icons und Manifest, **keine Beispielpläne**.
+- `public/`: App-Icons, Manifest und generierte lokale PDF-Bibliotheksressourcen, **keine Beispielpläne**.
 
 DOMPurify und eine zusätzliche Ressourcenprüfung entfernen Skripte, Ereignisattribute, Fremdinhalte und externe Referenzen aus importierten SVGs. Zulässig bleiben interne Referenzen und eingebettete Font-/Rasterdaten. Eine Content Security Policy begrenzt zusätzliche Quellen. Keine CDN-Schriften, Uploads, Analyse-Dienste oder API-Schlüssel. Nur App-Dateien werden vom lokalen Server abgerufen.
 
-ZIP/Plan-Dateien sind auf 60 MB begrenzt, ZIP-Inhalte zusätzlich auf 100 unterstützte Dateien und 60 MB entpackte Bilddaten; Rasterbilder auf 50 Megapixel. Projektdateien akzeptieren höchstens 3.000 Marker. Die SVG-Bereinigung kann aktive oder extern verknüpfte SVG-Sonderfunktionen entfernen. Getestet wurde insbesondere der vorhandene Polycam-Export.
+ZIP/Plan/PDF-Dateien sind auf 60 MB begrenzt, ZIP-Inhalte zusätzlich auf 100 unterstützte Dateien und 60 MB entpackte Bilddaten; Rasterbilder auf 50 Megapixel / 18.000 px pro Seite. PDF-Dokumente dürfen höchstens 500 Seiten enthalten. Projektdateien akzeptieren höchstens 3.000 Marker und sind auf 85 MB begrenzt. Die SVG-Bereinigung kann aktive oder extern verknüpfte SVG-Sonderfunktionen entfernen. Getestet wurde insbesondere der vorhandene Polycam-Export.
+
+PDF.js wird nur zur lokalen Seitendarstellung verwendet; JavaScript aus PDFs, Links und Dateianhänge werden nicht ausgeführt oder geöffnet. Die Content Security Policy erlaubt zusätzlich lokale Font-Blobs und WebAssembly für die gebündelten PDF-Dekoder, ohne JavaScript-`eval` freizugeben. Bei öffentlichen App-Adressen lädt der Hostinganbieter die App-Dateien aus und kann dabei normale Zugriffsdaten erhalten; importierte Pläne gelangen nicht dorthin. PDF-Ressourcen sind Teil des Offlinecaches (insgesamt ungefähr 6,6 MB App-Dateien; paketabhängig). Weitere technische Optionen sind in der [offiziellen PDF.js-Dokumentation](https://mozilla.github.io/pdf.js/api/draft/module-pdfjsLib.html) beschrieben.
 
 ## Prüfung
 
@@ -75,15 +98,18 @@ Details siehe `PRUEFPROTOKOLL.md`. Mit laufendem Produktionsserver:
 
 ```powershell
 npm test
-node tests/edge-cases.mjs
 ```
 
 Die Tests benötigen installierte Desktopversionen von Google Chrome und Microsoft Edge sowie die originale ZIP im Projektordner oder unter `beispiele/`. Ergebnisse liegen ausschließlich im ignorierten Ordner `.test-output/`. Die ZIP, Projektdateien, Testbilder, Abhängigkeiten und Buildausgabe sind aus Git ausgeschlossen.
 
-**Noch ausstehend:** echte iPhone-/iPad-Geräte und Safari/WebKit, Installation über HTTPS auf diesen Geräten, reale Speichermangelsituationen. Eine mobile Chromium-Emulation ersetzt diese Tests nicht.
+Die Haupttests prüfen Chrome und Edge. Zusätzlich wird eine lokale Playwright-WebKit-Testlaufzeit verwendet (`node node_modules/@playwright/test/cli.js install webkit`, falls noch nicht vorhanden). Die neuen Test-PDFs enthalten ausschließlich synthetische Geometrie und werden unter `.test-output/v1.1/` erzeugt. Die ursprünglichen Tests benötigen die echte Polycam-ZIP lokal; sie wird nicht in Git aufgenommen.
+
+**Noch ausstehend:** echte iPhone-/iPad-Geräte, Safari/PWA-Installation unter iOS/iPadOS und reale Speichermangelsituationen. WebKit unter Windows und mobile Chromium-Emulation ersetzen diese Tests nicht. Auf dem iPhone nach Freigabe der neuen Version besonders PDF-Auswahl, Touch-Zuschnitt, Proben/Schilder ziehen, JPG-/PNG-Downloads, Projektdateien über die Dateien-App und Offline-Neustart mit anschließendem PDF-Import prüfen.
 
 ## GitHub Pages veröffentlichen
 
 In den Repository-Einstellungen unter **Pages → Build and deployment → Source** die Option **GitHub Actions** auswählen. Der Workflow `.github/workflows/pages.yml` installiert die gesperrten Abhängigkeiten, prüft TypeScript, baut die App und veröffentlicht ausschließlich `dist/`. Jeder Push auf `main` aktualisiert die Website. Grundrisse, Projektdateien und Testausgaben sind ausgeschlossen.
 
 Vite verwendet relative Assetpfade. Die App funktioniert dadurch sowohl lokal als auch im GitHub-Pages-Unterverzeichnis `/Probenplan/`.
+
+Für Version 1.1 wird ausschließlich `codex/feature/probenplan-1-1-import` gepusht. Der bestehende Pages-Workflow veröffentlicht nur Pushes auf `main` (oder einen ausdrücklich ausgelösten manuellen Lauf). Den Pull Request erst nach Freigabe mergen; dadurch wird die automatische Veröffentlichung ausgelöst.
