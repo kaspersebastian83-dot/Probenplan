@@ -1,4 +1,4 @@
-import {chromium,webkit} from '@playwright/test';
+import {chromium,webkit} from './runtime.mjs';
 import assert from 'node:assert/strict';
 const base=process.env.TEST_URL||'http://localhost:4173';
 const fixture={format:'probenplan',version:3,plan:{name:'test.svg',width:600,height:800,vector:true,data:'data:image/svg+xml;base64,'+Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800"><rect width="600" height="800" fill="white"/></svg>').toString('base64')},markers:[{id:'sample',kind:'sample',label:'P1',note:'Probe mit Notiz',x:100,y:100,lx:130,ly:120},{id:'fire',kind:'fire',label:'B1',note:'Brandherd mit Notiz',x:300,y:300,lx:330,ly:320}],areas:[{id:'area',label:'Z1',name:'Brandbereich',color:'#d34c42',opacity:.45,points:[{x:50,y:50},{x:200,y:50},{x:200,y:200},{x:50,y:200}]}],nextSample:2,nextFire:2,nextArea:2,report:'Test',date:'2026-10-12'};

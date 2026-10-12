@@ -1,4 +1,4 @@
-import {chromium,webkit,devices} from '@playwright/test';
+import {chromium,webkit,devices,savedProject,downloadedProject} from './runtime.mjs';
 import assert from 'node:assert/strict';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -28,7 +28,7 @@ await check('Undo/Redo: Erstellen, Name, Kennung, Farbe, Deckkraft, Eckpunkt, Ve
  for(const change of [p=>addArea(p,square,PALETTE[0].color,.3,'Bereich'),p=>p.areas[0].name='Anderer Bereich',p=>p.areas[0].label='Z_B',p=>p.areas[0].color=PALETTE[1].color,p=>p.areas[0].opacity=.5,p=>p.areas[0].points[0].x+=5,p=>p.areas[0].points.forEach(pt=>{pt.x+=10;pt.y+=10;}),p=>p.areas=[]]){h.push(current);change(current);snapshots.push(clone(current));}
  for(let i=snapshots.length-2;i>=0;i--){current=h.undo(current);assert.deepEqual(current,snapshots[i]);}for(let i=1;i<snapshots.length;i++){current=h.redo(current);assert.deepEqual(current,snapshots[i]);}
 });
-async function state(page){const d=page.waitForEvent('download');await page.locator('#save-project').click();return JSON.parse(await readFile(await (await d).path(),'utf8'));}
+const state=savedProject;
 async function coord(page,p){await page.locator('#drawing').scrollIntoViewIfNeeded();return page.locator('#drawing').evaluate((el,p)=>{const q=new DOMPoint(p.x,p.y).matrixTransform(el.getScreenCTM());return{x:q.x,y:q.y};},p);}
 async function tap(page,p,touch=false){const q=await coord(page,p);if(touch)await page.touchscreen.tap(q.x,q.y);else await page.mouse.click(q.x,q.y);}
 async function draw(page,pts,name='Brandbereich',color=PALETTE[0].color,touch=false){await page.locator('[data-mode="area-draw"]').click();await page.locator('#draft-color').selectOption(color);for(const p of pts)await tap(page,p,touch);await page.locator('#area-finish').click();await page.locator('#new-area-name').fill(name);await page.locator('#area-dialog-save').click();await page.locator('#area-dialog').waitFor({state:'hidden'});}
@@ -36,8 +36,8 @@ async function change(page,id,value){await page.locator(`#${id}`).fill(value);aw
 async function replace(page,p){await page.locator('#project-file').setInputFiles({name:'test.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))});await page.locator('#replace-yes').click();await page.locator('#replace-dialog').waitFor({state:'hidden'});await page.locator('#import-status').waitFor({state:'hidden'});}
 async function exportFile(page,name,format='png',quality=3500){await page.locator('#format').selectOption(format);await page.locator('#quality').selectOption(String(quality));const d=page.waitForEvent('download');await page.locator('#export').click();const path=resolve(out,name);await (await d).saveAs(path);return path;}
 async function drag(page,a,b){a=await coord(page,a);b=await coord(page,b);await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y,{steps:10});await page.mouse.up();}
-for(const engine of (process.env.AREA_ENGINE?[process.env.AREA_ENGINE]:['chrome','msedge','webkit'])){
- const browser=await (engine==='webkit'?webkit.launch():chromium.launch({channel:engine}));
+for(const engine of (process.env.AREA_ENGINE?[process.env.AREA_ENGINE]:['chromium','webkit'])){
+ const browser=await (engine==='webkit'?webkit.launch():chromium.launch());
  try{const context=await browser.newContext({viewport:{width:1500,height:1050},acceptDownloads:true}),page=await context.newPage(),errors=[],external=[];page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(/^https?:/.test(r.url())&&!r.url().startsWith(base))external.push(r.url());});await page.goto(base);await page.locator('#offline.ready').waitFor();
  await page.locator('#file').setInputFiles({name:'synthetisch.svg',mimeType:'image/svg+xml',buffer:Buffer.from(svg)});await page.locator('#import-status').waitFor({state:'hidden'});
  await check(`${engine}: Entwurf, Mindestpunkte, Entfernen, Abbrechen, Selbstkreuzung`,async()=>{
@@ -59,7 +59,7 @@ for(const engine of (process.env.AREA_ENGINE?[process.env.AREA_ENGINE]:['chrome'
   await page.locator('#area-delete').click();assert.equal((await state(page)).areas.length,1);await page.locator('#undo').click();assert.equal((await state(page)).areas.length,2);
  });
  await check(`${engine}: Vorbereitung, Roundtrip und Autosicherung`,async()=>{
-  const before=await state(page);await page.locator('#rotate-right').click();let p=await state(page);assert.ok(Math.abs(p.areas[0].points[0].x-(800-before.areas[0].points[0].y))<(engine==='webkit'?2:.01));await page.locator('#undo').click();assert.deepEqual((await state(page)).areas,before.areas);
+  const before=await downloadedProject(page);assert.deepEqual(before,await state(page));await page.locator('#rotate-right').click();let p=await state(page);assert.ok(Math.abs(p.areas[0].points[0].x-(800-before.areas[0].points[0].y))<(engine==='webkit'?2:.01));await page.locator('#undo').click();assert.deepEqual((await state(page)).areas,before.areas);
   await page.locator('#crop-start').click();await drag(page,{x:50,y:50},{x:550,y:750});await page.locator('#crop-confirm').click();p=await state(page);assert.ok(Math.abs(p.areas[0].points[0].x-(before.areas[0].points[0].x-50))<(engine==='webkit'?2:.01));await page.locator('#undo').click();await replace(page,before);assert.deepEqual(await state(page),before);await page.locator('#saved').filter({hasText:'Lokal gesichert'}).waitFor();await page.reload();await page.locator('.area-row').first().waitFor();assert.deepEqual(await state(page),before);await page.locator('.area-row').first().click();assert.equal(await page.locator('.area-handles [data-vertex]').count(),4);
  });
  await check(`${engine}: Automatische Legende, sechs Farben, Varianten, Langtext, PNG/JPG und Anordnung`,async()=>{
@@ -81,7 +81,7 @@ for(const engine of (process.env.AREA_ENGINE?[process.env.AREA_ENGINE]:['chrome'
  });assert.deepEqual(errors,[]);assert.deepEqual(external,[]);await context.close();
  }finally{await browser.close();}
 }
-const browser=await chromium.launch({channel:'chrome'});try{const context=await browser.newContext({...devices['iPhone 13'],acceptDownloads:true}),page=await context.newPage();await page.goto(base);await page.locator('#file').setInputFiles({name:'touch.svg',mimeType:'image/svg+xml',buffer:Buffer.from(svg)});await page.locator('#import-status').waitFor({state:'hidden'});
+const browser=await chromium.launch();try{const context=await browser.newContext({...devices['iPhone 13'],acceptDownloads:true}),page=await context.newPage();await page.goto(base);await page.locator('#file').setInputFiles({name:'touch.svg',mimeType:'image/svg+xml',buffer:Buffer.from(svg)});await page.locator('#import-status').waitFor({state:'hidden'});
  await check('Mobile Chromium: Eckpunkt per Touch ziehen, Undo/Redo und Mehrfinger-Abbruch',async()=>{
   await draw(page,square,'Touchbearbeitung',PALETTE[0].color,true);let before=await state(page);let a=await coord(page,before.areas[0].points[0]),b=await coord(page,{x:100,y:120});const cdp=await context.newCDPSession(page);
   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:a.x,y:a.y,id:1}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:b.x,y:b.y,id:1}]});await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});assert.ok(Math.abs((await state(page)).areas[0].points[0].x-100)<2);await page.locator('#undo').click();assert.deepEqual((await state(page)).areas,before.areas);await page.locator('#redo').click();before=await state(page);

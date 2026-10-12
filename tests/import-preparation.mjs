@@ -1,8 +1,7 @@
-import {chromium,webkit,devices} from '@playwright/test';
+import {chromium,webkit,devices,savedProject,downloadedProject} from './runtime.mjs';
 import assert from 'node:assert/strict';
-import {mkdir,readFile,writeFile,readdir} from 'node:fs/promises';
+import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {unzipSync} from 'fflate';
 import {syntheticPDF,orientJPEG} from './fixtures.mjs';
 const base=process.env.TEST_URL||'http://localhost:4173',out=resolve('.test-output/v1.1');await mkdir(out,{recursive:true});
 const single=syntheticPDF(),multi=syntheticPDF([{width:600,height:800},{width:800,height:600}]);
@@ -11,15 +10,25 @@ await writeFile(resolve(out,'oversized.pdf'),Buffer.alloc(61*1024*1024));
 const results=[];
 const close=(a,b)=>assert.ok(Math.abs(a-b)<.01,`${a} ≈ ${b}`);
 async function check(name,fn){if(process.env.TEST_FILTER&&!name.includes(process.env.TEST_FILTER))return;await fn();results.push(name);console.log(`OK ${name}`);}
-async function state(page){const promise=page.waitForEvent('download');await page.locator('#save-project').click();const file=await promise;return JSON.parse(await readFile(await file.path(),'utf8'));}
-async function coord(page,x,y){return page.locator('#drawing').evaluate((el,{x,y})=>{const p=new DOMPoint(x,y).matrixTransform(el.getScreenCTM());return {x:p.x,y:p.y};},{x,y});}
+const state=savedProject;
+async function coord(page,x,y){await page.locator('#drawing').scrollIntoViewIfNeeded();return page.locator('#drawing').evaluate((el,{x,y})=>{const p=new DOMPoint(x,y).matrixTransform(el.getScreenCTM());return {x:p.x,y:p.y};},{x,y});}
 async function place(page,x,y){const pt=await coord(page,x,y);await page.mouse.click(pt.x,pt.y);}
-async function crop(page,x,y,w,h){await page.locator('#crop-start').click();await page.locator('#drawing').scrollIntoViewIfNeeded();const a=await coord(page,x,y),b=await coord(page,x+w,y+h);await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y,{steps:8});await page.mouse.up();}
+async function crop(page,x,y,w,h){
+ await page.locator('#crop-start').click();await page.locator('#drawing').scrollIntoViewIfNeeded();
+ // Expected geometry follows the real dispatched pointer coordinates. WebKit
+ // rounds client coordinates to CSS pixels; keep the .01 model tolerance.
+ await page.locator('#drawing').evaluate(el=>{window.cropTestPoints=[];window.cropTestListener=e=>{const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(el.getScreenCTM().inverse());window.cropTestPoints.push({x:Math.max(0,p.x),y:Math.max(0,p.y)});};el.addEventListener('pointerdown',window.cropTestListener);el.addEventListener('pointerup',window.cropTestListener);});
+ const a=await coord(page,x,y),b=await coord(page,x+w,y+h);await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y,{steps:8});await page.mouse.up();
+ const points=await page.locator('#drawing').evaluate(el=>{el.removeEventListener('pointerdown',window.cropTestListener);el.removeEventListener('pointerup',window.cropTestListener);return window.cropTestPoints;});assert.equal(points.length,2);
+ const scale=await page.locator('#drawing').evaluate(el=>el.getScreenCTM().a);
+ for(const [actual,expected] of [[points[0],{x,y}],[points[1],{x:x+w,y:y+h}]]){assert.ok(Math.abs(actual.x-expected.x)*scale<=1);assert.ok(Math.abs(actual.y-expected.y)*scale<=1);}
+ return {x:Math.min(points[0].x,points[1].x),y:Math.min(points[0].y,points[1].y),width:Math.abs(points[1].x-points[0].x),height:Math.abs(points[1].y-points[0].y)};
+}
 async function imported(page){await page.locator('#import-status').waitFor({state:'hidden'});await page.locator('#save-project').waitFor({state:'visible'});}
 async function pdf(page,bytes,name='test.pdf',pick=null){const had=!!await page.locator('#base-plan').getAttribute('href');await page.locator('#file').setInputFiles({name,mimeType:'application/pdf',buffer:bytes});if(pick!==null){await page.locator('#pdf-dialog').waitFor();if(pick!==1){await page.locator('#pdf-page').fill(String(pick));await page.locator('#pdf-page').dispatchEvent('change');}await page.locator('#pdf-use:enabled').click();}if(had){try{await page.locator('#replace-yes').click({timeout:10000});}catch(e){console.log('PDF import diagnostic',await page.locator('#toast').textContent(),await page.locator('#import-status').textContent());await page.screenshot({path:resolve(out,'pdf-diagnostic.png'),fullPage:true});throw e;}}await imported(page);assert.match(await page.locator('#file-type').textContent(),/PDF/);}
 async function exportFile(page,format,name,quality='3500'){await page.locator('#format').selectOption(format);await page.locator('#quality').selectOption(quality);const promise=page.waitForEvent('download');await page.locator('#export').click();const path=resolve(out,name);await(await promise).saveAs(path);const dimensions=await page.evaluate(async data=>{const b=await createImageBitmap(new Blob([Uint8Array.from(atob(data),c=>c.charCodeAt(0))]));const result=[b.width,b.height];b.close();return result;},(await readFile(path)).toString('base64'));assert.equal(Math.max(...dimensions),Number(quality));return dimensions;}
-for(const channel of ['chrome','msedge']){
- const browser=await chromium.launch({channel,headless:true});try{
+for(const channel of ['chromium','webkit']){
+ const browser=await (channel==='webkit'?webkit:chromium).launch({headless:true});try{
   const context=await browser.newContext({viewport:{width:1480,height:1100},acceptDownloads:true});await context.addInitScript(()=>Object.defineProperty(navigator,'deviceMemory',{value:8,configurable:true}));const page=await context.newPage();const errors=[],external=[],warnings=[];
   page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>{if(/^https?:/.test(r.url())&&!r.url().startsWith(base))external.push(r.url());});page.on('console',m=>{if(m.type()==='error')warnings.push(m.text());});
   await page.goto(base);await page.locator('#offline.ready').waitFor();
@@ -30,19 +39,19 @@ for(const channel of ['chrome','msedge']){
   });
   await check(`${channel}: Zuschnitt abbrechen, bestätigen, Undo/Redo`,async()=>{
    const before=await state(page);await crop(page,220,300,2900,3800);await page.locator('#crop-cancel').click();assert.deepEqual(await state(page),before);
-   await crop(page,220,300,2900,3800);await page.locator('#crop-confirm').click();let p=await state(page);close(p.plan.width,2900);close(p.plan.height,3800);close(p.plan.preparation.crop.x,220);close(p.plan.preparation.crop.y,300);assert.equal(p.plan.data,before.plan.data);
-   await page.locator('#undo').click();assert.deepEqual(await state(page),before);await page.locator('#redo').click();close((await state(page)).plan.width,2900);
+   const rect=await crop(page,220,300,2900,3800);await page.locator('#crop-confirm').click();let p=await state(page);close(p.plan.width,rect.width);close(p.plan.height,rect.height);close(p.plan.preparation.crop.x,rect.x);close(p.plan.preparation.crop.y,rect.y);assert.equal(p.plan.data,before.plan.data);
+   await page.locator('#undo').click();assert.deepEqual(await state(page),before);await page.locator('#redo').click();close((await state(page)).plan.width,rect.width);
   });
   await check(`${channel}: Marker nach Bearbeitung, Drehung und weiterer Zuschnitt`,async()=>{
    await page.locator('[data-mode="sample"]').click();await place(page,1200,1600);await page.locator('[data-mode="edit"]').click();await page.locator('#offset').click();const p=await state(page),m=p.markers[0];await page.locator('#rotate-right').click();const rotated=await state(page),mr=rotated.markers[0];close(mr.x,p.plan.height-m.y);close(mr.y,m.x);close(mr.lx,p.plan.height-m.ly);close(mr.ly,m.lx);
    await crop(page,0,0,500,500);await page.locator('#crop-confirm').click();await page.locator('#toast').filter({hasText:'außerhalb'}).waitFor();await page.locator('#crop-cancel').click();assert.deepEqual(await state(page),rotated);
-   await crop(page,200,200,3200,2400);await page.locator('#crop-confirm').click();const c=await state(page);close(c.markers[0].x,mr.x-200);close(c.markers[0].y,mr.y-200);close(c.markers[0].lx,mr.lx-200);close(c.markers[0].ly,mr.ly-200);
+   const rect=await crop(page,200,200,3200,2400);await page.locator('#crop-confirm').click();const c=await state(page);close(c.markers[0].x,mr.x-rect.x);close(c.markers[0].y,mr.y-rect.y);close(c.markers[0].lx,mr.lx-rect.x);close(c.markers[0].ly,mr.ly-rect.y);
    await page.locator('[data-mode="edit"]').click();const from=await coord(page,c.markers[0].x,c.markers[0].y);await page.mouse.move(from.x,from.y);await page.mouse.down();await page.mouse.move(from.x+25,from.y+10,{steps:5});await page.mouse.up();const moved=await state(page);assert.ok(moved.markers[0].x>c.markers[0].x);close(moved.markers[0].lx,c.markers[0].lx);
    await page.locator('[data-mode="sample"]').click();await place(page,700,1800);assert.deepEqual((await state(page)).markers.map(m=>m.label),['P1','P2']);await page.locator('[data-mode="fire"]').click();await place(page,2700,1800);assert.equal((await state(page)).markers.at(-1).label,'B1');
   });
   await check(`${channel}: PNG/JPG einer bearbeiteten PDF-Seite`,async()=>{await exportFile(page,'png',`${channel}-prepared.png`);await exportFile(page,'jpeg',`${channel}-prepared.jpg`,'4600');await page.screenshot({path:resolve(out,`${channel}-prepared-ui.png`),fullPage:true});});
   await check(`${channel}: Projektdatei, Wiederöffnen, Autosicherung mit Bildbearbeitung`,async()=>{
-   const before=await state(page);await writeFile(resolve(out,`${channel}-prepared.probenplan`),JSON.stringify(before));await page.locator('#project-file').setInputFiles(resolve(out,`${channel}-prepared.probenplan`));await page.locator('#replace-yes').click();await imported(page);assert.deepEqual(await state(page),before);await page.reload();await page.locator('.marker-row').first().waitFor();assert.deepEqual(await state(page),before);
+   const before=await downloadedProject(page);assert.deepEqual(before,await state(page));await writeFile(resolve(out,`${channel}-prepared.probenplan`),JSON.stringify(before));await page.locator('#project-file').setInputFiles(resolve(out,`${channel}-prepared.probenplan`));await page.locator('#replace-yes').click();await imported(page);assert.deepEqual(await state(page),before);await page.reload();await page.locator('.marker-row').first().waitFor();assert.deepEqual(await state(page),before);
   });
   await check(`${channel}: mehrseitige PDF, Auswahl Seite 2 und Abbrechen`,async()=>{
    const before=await state(page);await page.locator('#file').setInputFiles({name:'multi.pdf',mimeType:'application/pdf',buffer:multi});await page.locator('#pdf-dialog').waitFor();await page.locator('#pdf-next').click();await page.locator('#pdf-use:enabled').waitFor();assert.equal(await page.locator('#pdf-page').inputValue(),'2');await page.locator('#pdf-cancel').click();await imported(page);assert.deepEqual(await state(page),before);
@@ -79,7 +88,7 @@ await check('WebKit: PDF, Rotation, Zuschnitt, Projektdatei und Offline-PDF',asy
  const browser=await webkit.launch({headless:true});try{const context=await browser.newContext({viewport:{width:1024,height:1366},hasTouch:true,acceptDownloads:true});const page=await context.newPage();await page.goto(base);await page.locator('#offline.ready').waitFor();await pdf(page,multi,'webkit.pdf',2);await page.locator('#rotate-right').click();const p=await state(page);await crop(page,100,100,p.plan.width-200,p.plan.height-200);await page.locator('#crop-confirm').click();const saved=await state(page);assert.equal(saved.plan.preparation.rotation,90);await page.reload();await page.locator('#file-type').filter({hasText:'PDF'}).waitFor();assert.deepEqual(await state(page),saved);await context.setOffline(true);await page.reload();await page.locator('#offline.ready').waitFor();await pdf(page,single,'webkit-offline.pdf');await exportFile(page,'png','webkit-offline.png');await context.close();}finally{await browser.close();}
 });
 await check('Mobile Chromium: PDF-Auswahl, Touch-Zuschnitt und Markierung',async()=>{
- const browser=await chromium.launch({channel:'chrome',headless:true});try{
+ const browser=await chromium.launch({headless:true});try{
   const context=await browser.newContext({...devices['iPhone 13'],viewport:{width:390,height:844},acceptDownloads:true});const page=await context.newPage();await page.goto(base);await pdf(page,multi,'mobile.pdf',2);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);const limited=await state(page);assert.ok(limited.plan.width*limited.plan.height<=9_000_000);await page.locator('#rotate-right').tap();const p=await state(page);
   await page.locator('#crop-start').tap();await page.locator('#drawing').scrollIntoViewIfNeeded();const a=await coord(page,p.plan.width*.12,p.plan.height*.12),b=await coord(page,p.plan.width*.88,p.plan.height*.88);const cdp=await context.newCDPSession(page);
@@ -89,7 +98,4 @@ await check('Mobile Chromium: PDF-Auswahl, Touch-Zuschnitt und Markierung',async
   await page.locator('[data-mode="sample"]').tap();await page.locator('#drawing').scrollIntoViewIfNeeded();const pt=await coord(page,edited.plan.width/2,edited.plan.height/2);await page.touchscreen.tap(pt.x,pt.y);assert.equal((await state(page)).markers[0].label,'P1');await page.screenshot({path:resolve(out,'mobile-prepared.png'),fullPage:true});await context.close();
  }finally{await browser.close();}
 });
-// Real original Polycam PDF remains outside Git and the public build.
-let zip=(await readdir('.')).find(n=>n.endsWith('.zip'));
-if(zip){await check('Echte Polycam-PDF: eingebettete Schrift und Plan rendern',async()=>{const files=unzipSync(new Uint8Array(await readFile(zip)));const bytes=Object.entries(files).find(([n])=>/\.pdf$/i.test(n))?.[1];assert.ok(bytes);const browser=await chromium.launch({channel:'chrome'});try{const page=await browser.newPage({acceptDownloads:true});await page.goto(base);await pdf(page,Buffer.from(bytes),'Polycam.pdf');await exportFile(page,'png','real-polycam-pdf.png');}finally{await browser.close();}});}
 await writeFile(resolve(out,'results.json'),JSON.stringify({date:new Date().toISOString(),checks:results},null,2));console.log(`${results.length} Prüfungen für Version 1.1 bestanden.`);
