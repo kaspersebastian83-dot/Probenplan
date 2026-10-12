@@ -12,6 +12,8 @@ if (-not (Test-Path -LiteralPath 'node_modules\vite')) {
   else { throw 'Kein Paketmanager gefunden. Bitte Node.js mit npm installieren.' }
   if ($LASTEXITCODE -ne 0) { throw 'Installation fehlgeschlagen.' }
 }
+& $nodePath scripts/pdf-assets.mjs
+if ($LASTEXITCODE -ne 0) { throw 'PDF-Ressourcen konnten nicht vorbereitet werden.' }
 & $nodePath node_modules/typescript/bin/tsc --noEmit
 if ($LASTEXITCODE -ne 0) { throw 'TypeScript-Pruefung fehlgeschlagen.' }
 & $nodePath node_modules/vite/bin/vite.js build

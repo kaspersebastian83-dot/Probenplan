@@ -3,6 +3,9 @@ import {addMarker,bounds,clone,createProject,escape,History,markerSize,markerSVG
 import {candidates,readPlan,validateProject,type Candidate} from './import';
 import {download,restoreLocal,saveLocal} from './storage';
 import {exportImage,exportLayout} from './export';
+import {cropProject,planMatrix,preparation,rotateProject} from './preparation';
+import type {LocalPDF} from './pdf';
+import type {Rect} from './model';
 
 document.querySelector<HTMLDivElement>('#app')!.innerHTML=`
 <header class="header"><a class="brand" href="./" aria-label="Probenplan Start"><span class="brand-icon">P<span>·</span></span><span>Probenplan<small>BRANDSCHADENDOKUMENTATION</small></span></a><div class="header-status"><span id="offline" class="status">● Offline wird vorbereitet</span><span class="privacy">Nur auf diesem Gerät</span></div></header>
@@ -23,7 +26,19 @@ const input=(id:string)=>$<HTMLInputElement>(id);
 const svg=$('drawing') as unknown as SVGSVGElement;
 const image=$('base-plan') as unknown as SVGImageElement;
 const marks=$('marks') as unknown as SVGGElement;
+document.querySelector('#welcome p')!.innerHTML='Öffnen Sie eine PDF, einen Polycam-Export oder ein Planbild.<br>Ihre Gebäudedaten bleiben im Browser.';
+document.querySelector('#help-dialog ol li')!.innerHTML='<b>Plan laden:</b> PDF, Polycam-ZIP, SVG, PNG oder JPG auswählen. Bei mehrseitigen PDFs eine Seite in der Vorschau wählen. Bei Polycam möglichst SVG verwenden.';
+document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Plan vorbereiten</h3><p>Unter „Plan vorbereiten“ jeweils 90° links/rechts drehen oder einen Bildausschnitt mit Maus/Finger aufziehen. Zuschnitt übernehmen oder abbrechen. Alle gesetzten Probenpunkte und Brandherde müssen im Ausschnitt liegen; ihre Positionen und versetzten Beschriftungen werden korrekt umgerechnet. Drehen und Zuschneiden sind rückgängig machbar. Die Originaldaten bleiben erhalten; eine perspektivische Entzerrung ist nicht enthalten.</p><p>PDF-Seiten werden lokal in hoher Auflösung gerendert (bis 4.600 px, auf Mobilgeräten/speicherarmen Geräten sinnvoll begrenzt). Bei Speicherproblemen wird eine kleinere Stufe versucht. JPG-/PNG-Originale werden beim Drehen und Zuschneiden nicht neu komprimiert. HEIC/HEIF bitte zuvor als JPG exportieren.</p>');
+input('file').accept='.zip,.svg,.png,.jpg,.jpeg,.pdf,.heic,.heif,application/pdf,image/png,image/jpeg';
+$('plan-name').textContent='PDF, Polycam-ZIP, SVG, PNG oder JPG';
+document.querySelector('.brand small')!.textContent='BRANDSCHADENDOKUMENTATION · 1.1';
+input('project-file').insertAdjacentHTML('afterend',`<div id="preparation" hidden><span class="eyebrow">PLAN VORBEREITEN</span><div class="preparation-buttons"><button id="rotate-left" title="90° nach links drehen">↶ Links drehen</button><button id="rotate-right" title="90° nach rechts drehen">↷ Rechts drehen</button><button id="crop-start">⌗ Zuschneiden</button></div><p class="tiny">Bei Bedarf ausrichten und Bildränder entfernen.</p><div id="crop-actions" hidden><p>Ziehen Sie im Plan einen neuen Bildausschnitt auf. Alle Probenpunkte müssen darin liegen.</p><button id="crop-confirm" class="primary" disabled>Zuschnitt übernehmen</button><button id="crop-cancel">Abbrechen</button></div></div><div id="import-status" role="status" hidden>Plan wird geladen …</div>`);
+document.body.insertAdjacentHTML('beforeend',`<dialog id="pdf-dialog"><form method="dialog"><button class="close" aria-label="PDF-Auswahl abbrechen">×</button></form><span class="eyebrow">PDF · SEITENAUSWAHL</span><h2>Welchen Grundriss übernehmen?</h2><p id="pdf-name"></p><div class="pdf-navigation"><button id="pdf-prev" aria-label="Vorherige PDF-Seite">←</button><label>Seite <input id="pdf-page" type="number" min="1" value="1"></label><span id="pdf-count"></span><button id="pdf-next" aria-label="Nächste PDF-Seite">→</button></div><div class="pdf-preview"><img id="pdf-preview" alt="Vorschau der ausgewählten PDF-Seite"><p id="pdf-status" role="status">Vorschau wird geladen …</p></div><div class="dialog-actions"><button id="pdf-cancel">Abbrechen</button><button id="pdf-use" class="primary" disabled>Diese Seite übernehmen</button></div><p class="tiny">Eine Seite pro Projekt. Die gewählte Seite wird in hoher Auflösung übernommen.</p></dialog>`);
+const ns='http://www.w3.org/2000/svg',planGroup=document.createElementNS(ns,'g'),clip=document.createElementNS(ns,'clipPath'),clipRect=document.createElementNS(ns,'rect');
+clip.id='plan-clip';clip.append(clipRect);svg.prepend(clip);image.before(planGroup);planGroup.append(image);planGroup.setAttribute('clip-path','url(#plan-clip)');
+const cropLayer=document.createElementNS(ns,'g');cropLayer.id='crop-overlay';cropLayer.setAttribute('pointer-events','none');svg.append(cropLayer);
 let project:Project|null=null,selected:string|null=null,mode='navigate',history=new History(),busy=false;
+let cropping=false,cropRect:Rect|null=null,cropDrag:{id:number;start:{x:number;y:number}}|null=null;
 let camera={x:0,y:0,width:1000,height:1000},fitWidth=1000,saveRevision=0,exportURL='';
 let saveQueue:Promise<void>=Promise.resolve();
 let toastTimer=0;
@@ -33,31 +48,83 @@ function persist(){if(!project)return;const p=clone(project),revision=++saveRevi
 function changed(){render();persist();}
 function mutate(fn:(p:Project)=>void){if(!project)return;history.push(project);fn(project);changed();}
 function selectedMarker(){return project?.markers.find(m=>m.id===selected);}
-function updateCamera(){svg.setAttribute('viewBox',`${camera.x} ${camera.y} ${camera.width} ${camera.height}`);$('zoom-value').textContent=`${Math.round(fitWidth/camera.width*100)} %`;renderMarkers();}
+function updateCamera(){svg.setAttribute('viewBox',`${camera.x} ${camera.y} ${camera.width} ${camera.height}`);$('zoom-value').textContent=`${Math.round(fitWidth/camera.width*100)} %`;renderMarkers();renderCrop();}
 function fit(){if(!project)return;const b=bounds(project),rect=svg.getBoundingClientRect(),ratio=rect.width/rect.height||1;let w=b.width*1.14,h=b.height*1.14;if(w/h<ratio)w=h*ratio;else h=w/ratio;camera={x:b.x+(b.width-w)/2,y:b.y+(b.height-h)/2,width:w,height:h};fitWidth=w;updateCamera();}
 function point(e:{clientX:number;clientY:number}){const matrix=svg.getScreenCTM();if(!matrix)return{x:0,y:0};const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(matrix.inverse());return{x:p.x,y:p.y};}
 function zoom(factor:number,anchor?:{x:number;y:number}){if(!project)return;const ratio=Math.min(20,Math.max(.25,fitWidth/(camera.width*factor)));factor=fitWidth/(ratio*camera.width);const c=anchor||{x:camera.x+camera.width/2,y:camera.y+camera.height/2};camera={x:c.x-(c.x-camera.x)*factor,y:c.y-(c.y-camera.y)*factor,width:camera.width*factor,height:camera.height*factor};updateCamera();}
 function setMode(next:string){mode=next;document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(b=>{b.classList.toggle('active',b.dataset.mode===mode);b.setAttribute('aria-pressed',String(b.dataset.mode===mode));});$('stage').dataset.mode=mode;$('mode-hint').textContent=({navigate:'Ansicht bewegen · Mausrad oder zwei Finger zum Zoomen',sample:'In den Plan tippen, um eine Probe zu setzen',fire:'In den Plan tippen, um einen Brandherd zu setzen',edit:'Markierung wählen · Punkt oder Beschriftung ziehen'} as Record<string,string>)[mode];}
 function renderMarkers(){if(project)marks.innerHTML=project.markers.map(m=>markerSVG(project!,m,m.id===selected,camera.width/Math.max(1,svg.clientWidth)*12)).join('');}
 function dimensions(){if(!project)return;const l=exportLayout(project,Number(input('quality').value));$('dimensions').textContent=`${l.pixelWidth.toLocaleString('de-DE')} × ${l.pixelHeight.toLocaleString('de-DE')} px`;}
+function renderCrop(){
+  if(!cropping||!project){cropLayer.replaceChildren();return;}
+  const w=project.plan.width,h=project.plan.height,c=cropRect||{x:0,y:0,width:0,height:0},stroke=camera.width/Math.max(1,svg.clientWidth)*2;
+  cropLayer.innerHTML=`<path d="M0 0H${w}V${h}H0Z M${c.x} ${c.y}V${c.y+c.height}H${c.x+c.width}V${c.y}Z" fill="#17392c" fill-opacity=".48" fill-rule="evenodd"/><rect x="${c.x}" y="${c.y}" width="${c.width}" height="${c.height}" fill="none" stroke="white" stroke-width="${stroke*2}"/><rect x="${c.x}" y="${c.y}" width="${c.width}" height="${c.height}" fill="none" stroke="#1c7457" stroke-width="${stroke}" stroke-dasharray="${stroke*4} ${stroke*3}"/>`;
+}
+function endCrop(){cropping=false;cropRect=null;cropDrag=null;$('crop-actions').hidden=true;setMode('navigate');renderCrop();render();}
+function cropPoint(e:PointerEvent){const p=point(e);return {x:Math.min(project!.plan.width,Math.max(0,p.x)),y:Math.min(project!.plan.height,Math.max(0,p.y))};}
+$('rotate-left').onclick=()=>{if(project&&!busy&&!cropping){mutate(p=>rotateProject(p,-1));fit();}};
+$('rotate-right').onclick=()=>{if(project&&!busy&&!cropping){mutate(p=>rotateProject(p,1));fit();}};
+$('crop-start').onclick=()=>{if(!project||busy)return;cropping=true;cropRect=null;selected=null;setMode('navigate');fit();$('stage').dataset.mode='crop';$('mode-hint').textContent='Zuschneiden · Bildausschnitt mit Maus oder Finger aufziehen';$('crop-actions').hidden=false;$<HTMLButtonElement>('crop-confirm').disabled=true;render();renderCrop();};
+$('crop-cancel').onclick=endCrop;
+$('crop-confirm').onclick=()=>{if(!project||!cropRect)return;try{const next=clone(project);cropProject(next,cropRect);history.push(project);project=next;endCrop();fit();persist();toast('Plan zugeschnitten. Rückgängig stellt den vorherigen Ausschnitt wieder her.');}catch(e){fail(e);}};
+// Preserve normal button clicks. If a touch engine omits the compatibility click
+// immediately after a captured drag, activate a completed tap once as a fallback.
+for(const id of ['crop-confirm','crop-cancel']){
+  const button=$<HTMLButtonElement>(id);let tap:{id:number;x:number;y:number}|null=null,clicks=0;
+  button.addEventListener('click',()=>clicks++,{capture:true});
+  button.onpointerdown=e=>{if(e.pointerType==='touch')tap={id:e.pointerId,x:e.clientX,y:e.clientY};};
+  button.onpointercancel=()=>{tap=null;};
+  button.onpointerup=e=>{const start=tap;tap=null;if(start?.id!==e.pointerId||Math.hypot(e.clientX-start.x,e.clientY-start.y)>=10)return;const rect=cropRect,seen=clicks;setTimeout(()=>{if(cropping&&cropRect===rect&&clicks===seen&&!button.disabled)button.click();},80);};
+}
+svg.addEventListener('pointerdown',e=>{if(!cropping||!project)return;if(cropDrag||e.button>0)return;svg.setPointerCapture(e.pointerId);const start=cropPoint(e);cropDrag={id:e.pointerId,start};cropRect={...start,width:0,height:0};$<HTMLButtonElement>('crop-confirm').disabled=true;renderCrop();},{capture:true});
+svg.addEventListener('pointermove',e=>{if(!cropping||!project||cropDrag?.id!==e.pointerId)return;const pt=cropPoint(e),start=cropDrag.start;cropRect={x:Math.min(start.x,pt.x),y:Math.min(start.y,pt.y),width:Math.abs(pt.x-start.x),height:Math.abs(pt.y-start.y)};$<HTMLButtonElement>('crop-confirm').disabled=cropRect.width<1||cropRect.height<1;renderCrop();},{capture:true});
+svg.addEventListener('pointerup',e=>{if(cropping&&cropDrag?.id===e.pointerId)cropDrag=null;},{capture:true});
+svg.addEventListener('pointercancel',e=>{if(cropping&&cropDrag?.id===e.pointerId){cropDrag=null;cropRect=null;$<HTMLButtonElement>('crop-confirm').disabled=true;renderCrop();}},{capture:true});
+window.addEventListener('keydown',e=>{if(e.key==='Escape'&&cropping)endCrop();});
 function render(){
   const p=project; $('welcome').hidden=!!p;$('mode-hint').hidden=!p;
   ['save-project','export','next','report','date'].forEach(id=>($<HTMLButtonElement>(id).disabled=!p));
   document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(b=>b.disabled=!p&&b.dataset.mode!=='navigate');
   $<HTMLButtonElement>('undo').disabled=!history.past.length;$<HTMLButtonElement>('redo').disabled=!history.future.length;
+  $('preparation').hidden=!p;
+  ['rotate-left','rotate-right','crop-start'].forEach(id=>$<HTMLButtonElement>(id).disabled=busy||cropping||!p);
+  ['load','open-project','save-project'].forEach(id=>$<HTMLButtonElement>(id).disabled=busy||cropping||(id==='save-project'&&!p));
+  document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(b=>b.disabled=cropping||(!p&&b.dataset.mode!=='navigate'));
+  $<HTMLButtonElement>('undo').disabled=cropping||!history.past.length;$<HTMLButtonElement>('redo').disabled=cropping||!history.future.length;
+  $<HTMLButtonElement>('export').disabled=busy||cropping||!p;
   if(!p)return;
+  const source=preparation(p.plan);image.setAttribute('href',p.plan.data);image.setAttribute('width',String(source.sourceWidth));image.setAttribute('height',String(source.sourceHeight));image.setAttribute('transform',`matrix(${planMatrix(p.plan).join(' ')})`);clipRect.setAttribute('width',String(p.plan.width));clipRect.setAttribute('height',String(p.plan.height));
   $('file-type').textContent=p.plan.vector?'SVG · VEKTOR':'RASTERBILD';$('plan-name').textContent=p.plan.name;$('canvas-name').textContent=p.plan.name.replace(/\.[^.]+$/,'');$('source-info').textContent=`${Math.round(p.plan.width)} × ${Math.round(p.plan.height)} · ${p.plan.vector?'Vektorgrundlage':'Rastergrundlage'}`;
+  if(p.plan.pdf){$('file-type').textContent=`PDF · SEITE ${p.plan.pdf.page}`;$('source-info').textContent=`${Math.round(p.plan.width)} × ${Math.round(p.plan.height)} · PDF-Seite ${p.plan.pdf.page}/${p.plan.pdf.totalPages}`;}
   input('next').value=String(p.nextSample);input('report').value=p.report;input('date').value=p.date;
   $('count').textContent=String(p.markers.length);
   $('marker-list').innerHTML=p.markers.length?p.markers.map(m=>`<button class="marker-row ${m.id===selected?'selected':''}" data-select="${m.id}"><span class="marker-badge ${m.kind}">${escape(m.label)}</span><span>${m.kind==='sample'?'Probenahmestelle':'Brandherd'}${m.note?`<small>${escape(m.note)}</small>`:''}</span><span class="row-arrow">›</span></button>`).join(''):'<p class="muted empty-list">Noch keine Markierungen gesetzt.</p>';
   const m=selectedMarker();$('inspector').hidden=!m;if(m){input('label').value=m.label;input('note').value=m.note;}
   renderMarkers();dimensions();
 }
-function install(p:Project){project=p;selected=null;history.clear();image.setAttribute('href',p.plan.data);image.setAttribute('width',String(p.plan.width));image.setAttribute('height',String(p.plan.height));setMode('navigate');render();fit();persist();$('export-result').hidden=true;}
+function install(p:Project){project=p;selected=null;history.clear();cropping=false;cropRect=null;setMode('navigate');render();fit();persist();$('export-result').hidden=true;}
 function saveProject(){if(project)void download(new Blob([JSON.stringify(project)],{type:'application/json'}),`${project.report||'Probenplan'}.probenplan`);}
 async function allowReplace(){if(!project)return true;return new Promise<boolean>(resolve=>{const d=$<HTMLDialogElement>('replace-dialog');const finish=(ok:boolean)=>{d.close();resolve(ok);};$('replace-cancel').onclick=()=>finish(false);$('replace-yes').onclick=()=>finish(true);$('replace-save').onclick=()=>{saveProject();finish(true);};d.oncancel=()=>resolve(false);d.showModal();});}
 async function choose(items:Candidate[]):Promise<Candidate|null>{if(items.length===1)return items[0];return new Promise(resolve=>{const d=$<HTMLDialogElement>('choose-dialog');$('choices').replaceChildren();items.forEach((item,i)=>{const b=document.createElement('button');b.className='choice';b.textContent=`${/\.svg$/i.test(item.name)?'◇ SVG · empfohlen':'▧ Bild'} — ${item.name}`;b.onclick=()=>{d.close();resolve(item);};$('choices').append(b);if(i===0)b.autofocus=true;});d.onclose=()=>resolve(null);d.showModal();});}
-async function importFile(file:File,isProject=false){if(busy)return;busy=true;try{if(file.size>85*1024*1024)throw Error('Die Datei ist zu groß.');let next:Project;if(isProject){next=await validateProject(JSON.parse(await file.text()));}else{const c=await choose(await candidates(file));if(!c)return;next=createProject(await readPlan(c.name,c.bytes));}if(!await allowReplace())return;install(next);toast('Plan geladen. Wählen Sie ein Markierungswerkzeug.');}catch(e){fail(e);}finally{busy=false;}}
+async function choosePDF(pdf:LocalPDF):Promise<number|null>{
+  if(pdf.pages===1)return 1;
+  return new Promise(resolve=>{
+    const d=$<HTMLDialogElement>('pdf-dialog');let number=0,closed=false,revision=0,queue:Promise<void>=Promise.resolve();
+    $('pdf-name').textContent=pdf.name;$('pdf-count').textContent=`von ${pdf.pages}`;input('pdf-page').max=String(pdf.pages);
+    const show=(n:number)=>{n=Math.max(1,Math.min(pdf.pages,n));input('pdf-page').value=String(n);if(n===number)return;number=n;$<HTMLButtonElement>('pdf-prev').disabled=number===1;$<HTMLButtonElement>('pdf-next').disabled=number===pdf.pages;$<HTMLButtonElement>('pdf-use').disabled=true;$('pdf-status').hidden=false;$('pdf-status').textContent='Vorschau wird geladen …';const current=++revision,page=number;
+      queue=queue.catch(()=>{}).then(async()=>{if(closed||current!==revision)return;try{const data=await pdf.preview(page);if(closed||current!==revision)return;$<HTMLImageElement>('pdf-preview').src=data;$('pdf-status').hidden=true;$<HTMLButtonElement>('pdf-use').disabled=false;}catch(e){if(current===revision)$('pdf-status').textContent=e instanceof Error?e.message:'Vorschau konnte nicht geladen werden.';}});
+    };
+    const finish=(value:number|null)=>{if(closed)return;closed=true;d.close();void queue.finally(()=>{ $<HTMLImageElement>('pdf-preview').removeAttribute('src');resolve(value);});};
+    $('pdf-prev').onclick=()=>show(number-1);$('pdf-next').onclick=()=>show(number+1);input('pdf-page').onchange=()=>{const n=Number(input('pdf-page').value);show(Number.isInteger(n)?n:number);};$('pdf-use').onclick=()=>finish(number);$('pdf-cancel').onclick=()=>finish(null);d.querySelector<HTMLButtonElement>('.close')!.onclick=e=>{e.preventDefault();finish(null);};d.oncancel=e=>{e.preventDefault();finish(null);};d.showModal();show(1);
+  });
+}
+async function importFile(file:File,isProject=false){if(busy||cropping)return;busy=true;$('import-status').hidden=false;$('import-status').textContent=/\.pdf$/i.test(file.name)?'PDF wird lokal verarbeitet …':'Plan wird geladen …';render();let pdf:LocalPDF|null=null;
+  try{if(file.size>85*1024*1024)throw Error('Die Datei ist zu groß. Bitte eine kleinere Datei verwenden.');let next:Project;
+    if(isProject){try{next=await validateProject(JSON.parse(await file.text()));}catch(e){if(e instanceof SyntaxError)throw Error('Die Projektdatei enthält keine gültigen Projektdaten.');throw e;}}
+    else if(/\.pdf$/i.test(file.name)||file.type==='application/pdf'){if(file.size>60*1024*1024)throw Error('Die PDF ist zu groß (maximal 60 MB). Bitte nur die benötigten Seiten als eigene PDF speichern.');const {openPDF}=await import('./pdf');pdf=await openPDF(file.name,new Uint8Array(await file.arrayBuffer()));const page=await choosePDF(pdf);if(page===null)return;$('import-status').textContent=`Seite ${page} wird in hoher Auflösung gerendert …`;next=createProject(await pdf.plan(page));}
+    else{const c=await choose(await candidates(file));if(!c)return;next=createProject(await readPlan(c.name,c.bytes));}
+    if(!await allowReplace())return;install(next);toast(next.plan.pdf?`PDF-Seite ${next.plan.pdf.page} geladen (${next.plan.width} × ${next.plan.height} px). Bei Bedarf drehen oder zuschneiden.`:'Plan geladen. Bei Bedarf drehen oder zuschneiden.');
+  }catch(e){fail(e);}finally{if(pdf)await pdf.close().catch(()=>{});busy=false;$('import-status').hidden=true;render();}}
 $('load').onclick=$('welcome-load').onclick=()=>input('file').click();
 input('file').onchange=()=>{const f=input('file').files?.[0];if(f)void importFile(f);input('file').value='';};
 $('open-project').onclick=()=>input('project-file').click();input('project-file').onchange=()=>{const f=input('project-file').files?.[0];if(f)void importFile(f,true);input('project-file').value='';};
@@ -71,15 +138,15 @@ for(const id of ['report','date'] as const)input(id).onchange=()=>mutate(p=>p[id
 $('delete').onclick=()=>{if(selected)mutate(p=>{p.markers=p.markers.filter(m=>m.id!==selected);selected=null;});};
 $('offset').onclick=()=>{const m=selectedMarker();if(m)mutate(p=>{m.lx=m.x+markerSize(p)*3;m.ly=m.y-markerSize(p)*3;});};
 $('recenter').onclick=()=>{const m=selectedMarker();if(m)mutate(()=>{m.lx=m.x;m.ly=m.y;});};
-function undo(){if(project){project=history.undo(project);changed();}}function redo(){if(project){project=history.redo(project);changed();}}
+function undo(){if(project&&!cropping){const old=project.plan;project=history.undo(project);changed();if(old.width!==project.plan.width||old.height!==project.plan.height)fit();}}function redo(){if(project&&!cropping){const old=project.plan;project=history.redo(project);changed();if(old.width!==project.plan.width||old.height!==project.plan.height)fit();}}
 $('undo').onclick=undo;$('redo').onclick=redo;
 window.addEventListener('keydown',e=>{if((e.target as HTMLElement).closest('input,textarea,select,dialog'))return;if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo();}});
 $('zoom-in').onclick=()=>zoom(.8);$('zoom-out').onclick=()=>zoom(1.25);$('fit').onclick=fit;
-svg.addEventListener('wheel',e=>{if(!project)return;e.preventDefault();zoom(Math.exp(e.deltaY*.0015),point(e));},{passive:false});
+svg.addEventListener('wheel',e=>{if(!project)return;e.preventDefault();if(cropDrag)return;zoom(Math.exp(e.deltaY*.0015),point(e));},{passive:false});
 const pointers=new Map<number,{clientX:number;clientY:number}>();
 type Drag={id:number;start:{x:number;y:number};screen:{x:number;y:number};camera:typeof camera;marker?:Marker;part?:string;original?:Marker;before?:Project;moved:boolean};
 let drag:Drag|null=null,pinch:{distance:number;camera:typeof camera;anchor:{x:number;y:number}}|null=null;
-svg.addEventListener('pointerdown',e=>{if(!project||e.button>0)return;svg.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{clientX:e.clientX,clientY:e.clientY});if(pointers.size===2){if(drag?.before&&drag.original&&drag.marker)Object.assign(drag.marker,drag.original);drag=null;const [a,b]=[...pointers.values()];pinch={distance:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),camera:{...camera},anchor:point({clientX:(a.clientX+b.clientX)/2,clientY:(a.clientY+b.clientY)/2})};renderMarkers();return;}
+svg.addEventListener('pointerdown',e=>{if(!project||cropping||e.button>0)return;svg.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{clientX:e.clientX,clientY:e.clientY});if(pointers.size===2){if(drag?.before&&drag.original&&drag.marker)Object.assign(drag.marker,drag.original);drag=null;const [a,b]=[...pointers.values()];pinch={distance:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),camera:{...camera},anchor:point({clientX:(a.clientX+b.clientX)/2,clientY:(a.clientY+b.clientY)/2})};renderMarkers();return;}
   const target=e.target as Element,m=project.markers.find(m=>m.id===target.closest('[data-id]')?.getAttribute('data-id'));
   if(m&&mode!=='navigate'){selected=m.id;render();}
   drag={id:e.pointerId,start:point(e),screen:{x:e.clientX,y:e.clientY},camera:{...camera},moved:false};
@@ -93,7 +160,7 @@ svg.addEventListener('pointermove',e=>{if(!project||!pointers.has(e.pointerId))r
     renderMarkers();
   }
 });
-function endPointer(e:PointerEvent,cancel=false){pointers.delete(e.pointerId);if(pinch){if(pointers.size===0)pinch=null;drag=null;return;}if(!drag||drag.id!==e.pointerId||!project)return;const d=drag;drag=null;if(cancel){if(d.marker&&d.original)Object.assign(d.marker,d.original);renderMarkers();return;}
+function endPointer(e:PointerEvent,cancel=false){if(cropping)return;pointers.delete(e.pointerId);if(pinch){if(pointers.size===0)pinch=null;drag=null;return;}if(!drag||drag.id!==e.pointerId||!project)return;const d=drag;drag=null;if(cancel){if(d.marker&&d.original)Object.assign(d.marker,d.original);renderMarkers();return;}
   if(d.marker&&d.moved&&d.before){history.push(d.before);changed();}
   else if(!d.moved&&(mode==='sample'||mode==='fire')){const hit=document.elementFromPoint(e.clientX,e.clientY)?.closest('[data-id]');if(hit)return;const pt=point(e);if(pt.x<0||pt.y<0||pt.x>project.plan.width||pt.y>project.plan.height){toast('Bitte innerhalb des Grundrisses markieren.');return;}mutate(p=>{selected=addMarker(p,mode==='sample'?'sample':'fire',pt.x,pt.y).id;});}
 }

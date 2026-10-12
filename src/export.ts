@@ -1,5 +1,6 @@
 import {bounds, markerSize, markerSVG, type Project} from './model';
 import {loadImage} from './import';
+import {planMatrix,preparation} from './preparation';
 export function exportLayout(p:Project,longSide:number){
   const b=bounds(p),unit=Math.max(b.width,b.height),pad=unit*.028;
   const width=Math.max(b.width+2*pad,unit*.6),height=b.height+2*pad+unit*.12;
@@ -13,7 +14,8 @@ export async function exportImage(p:Project,longSide:number,format:'png'|'jpeg')
     ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.scale(l.scale,l.scale);
     ctx.save();ctx.translate(l.pad-l.b.x,l.pad-l.b.y);
     // The original, sanitized SVG is decoded here at output scale by the canvas renderer.
-    const base=await loadImage(p.plan.data);ctx.drawImage(base,0,0,p.plan.width,p.plan.height);
+    ctx.beginPath();ctx.rect(0,0,p.plan.width,p.plan.height);ctx.clip();ctx.transform(...planMatrix(p.plan));
+    const source=preparation(p.plan),base=await loadImage(p.plan.data);ctx.drawImage(base,0,0,source.sourceWidth,source.sourceHeight);
     ctx.restore();
     const overlay=`<svg xmlns="http://www.w3.org/2000/svg" width="${l.pixelWidth}" height="${l.pixelHeight}" viewBox="0 0 ${l.width} ${l.height}"><g transform="translate(${l.pad-l.b.x} ${l.pad-l.b.y})">${p.markers.map(m=>markerSVG(p,m)).join('')}</g></svg>`;
     const url=URL.createObjectURL(new Blob([overlay],{type:'image/svg+xml'}));
