@@ -1,13 +1,13 @@
 {
   "name": "probenplan",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "node scripts/pdf-assets.mjs && vite --host 127.0.0.1",
     "build": "node scripts/pdf-assets.mjs && tsc --noEmit && vite build && node scripts/build-sw.mjs",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "node tests/browser.mjs && node tests/edge-cases.mjs && node tests/import-preparation.mjs && node tests/scoped-pdf.mjs"
+    "test": "node tests/browser.mjs && node tests/edge-cases.mjs && node tests/import-preparation.mjs && node tests/scoped-pdf.mjs && node tests/areas.mjs"
   },
   "dependencies": {
     "dompurify": "^3.3.0",
