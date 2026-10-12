@@ -1,4 +1,57 @@
-# Prüfprotokoll – Probenplan 1.1
+# Prüfprotokoll – Probenplan 1.2.0
+
+Prüfung: 12. Oktober 2026, Windows. Feature-Branch `codex/feature/probenplan-1-2-areas`, lokaler Produktionsbuild auf `http://127.0.0.1:4182/`.
+
+## Ausgangspunkt und Veröffentlichungsgrenze
+
+Der tatsächliche Remote-`main` wurde vor der Entwicklung gelesen: `fdce376`, „Probenplan 1.1: lokaler PDF-Import, Rotation und Zuschnitt (#1)“. Version 1.1 war per Squash-Merge enthalten; die Dateibäume des vorherigen 1.1-Featurestands und von `origin/main` waren identisch. Der neue Branch basiert unmittelbar auf diesem Main-Commit. Lokaler Main, Remote-Main und Pages-Workflow wurden nicht verändert; gepusht wird ausschließlich der neue Feature-Branch. Kein automatischer Merge oder manueller Deployment-Aufruf.
+
+## Implementierung und Ergebnisse
+
+| Bereich | Prüfung und Ergebnis |
+| --- | --- |
+| Build | TypeScript und Produktionsbuild erfolgreich, Version 1.2.0. Keine zusätzlichen Abhängigkeiten, Frameworks, Laufzeit-CDNs oder Uploads. Lokaler Assetcache enthält die neue App und die bisherige PDF-Verarbeitung. |
+| Polygonmodell | Mindestens 3, höchstens 200 Eckpunkte pro Fläche; maximal 100 Flächen. Einfache konkave Polygone zulässig; doppelte Punkte, Kollinearität, Selbstkreuzung, Selbstberührung, ungültige/außerhalb liegende Koordinaten abgewiesen. Ein innerer Scanline-Anker platziert die Kennung auch bei konkaven Konturen innerhalb der Fläche. |
+| Zeichnen | Farbe wählen, Eckpunkte setzen, letzten entfernen, abbrechen, abschließen und freie Bezeichnung speichern. Default 30 %, Bereich 5–70 %. Vorschläge sind ausschließlich manuelle Dokumentation; keine chemische Bewertung oder automatische Freigabe. |
+| Editieren | Kennung/Bezeichnung/Farbe/Deckkraft ändern, Eckpunkte ziehen, ganze Fläche innerhalb des Plans verschieben und löschen. Ungültige Kontur nach Ziehen stellt die vorherige gültige Geometrie wieder her. |
+| Undo/Redo | Erstellen, Umbenennen, Kennung, Farbe, Deckkraft, Eckpunkt, gesamte Verschiebung und Löschen als unabhängig wiederherstellbare Schritte geprüft. Auch Rotation/Zuschnitt mit Flächen unterstützt. Bilddaten werden weiter in History-Snapshots geteilt, Polygonpunkte unabhängig kopiert. |
+| Navigation | Zoom und Pan verändern gespeicherte Geometrie nicht. Entwürfe bleiben beim Wechsel zur Navigation erhalten. Zweifinger-Zoom erzeugt keine Eckpunkte; eine zweite Berührung bricht einen laufenden Flächendrag ohne bleibende Änderung ab. Unfertige Entwürfe müssen vor Dateisicherung, Import, Vorbereitung oder Export abgeschlossen/abgebrochen werden. |
+| Ebenen | Grundriss → alle transparenten Füllungen → alle Konturen → Flächenkennungen → Proben-/Brandherdmarker. DOM-Reihenfolge automatisiert geprüft, überlappende farbige Flächen sowie P/B visuell kontrolliert. |
+| Legende | Nur verwendete Bezeichnungen, Gruppierung unabhängig von Groß-/Kleinschreibung und überflüssigen Leerzeichen; Name einmal je Kategorie. Unterschiedliche Farben/Deckkräfte innerhalb einer Kategorie erscheinen mit zugehörigen Kennungen. Sechs Farben, Konturmuster, lange Wörter/Bezeichnungen und nicht verwendete Kategorien geprüft. |
+| Export | Weißer Legendenbereich rechts beim Hochformat und unterhalb beim Querformat. PNG mit 3500 px, JPG mit 3500/4600 px; identische Farbdarstellung anhand zahlreicher farbiger Pixel mit mittlerer JPEG-Abweichung unter 5/255 geprüft. Separate P/B-Legende, Metadaten, vollständige Flächen und lange Legendentexte in PNG/JPG visuell geöffnet. Bei übermäßiger Legendenmenge wird ein Export, dessen kleinste Legendenschrift auf A4 selbst bei optimaler Hoch-/Querformatanpassung unter 8 pt läge, verständlich abgewiesen. |
+| Vorbereitung/PDF | Flächen nach Rotation und bestätigtem Zuschnitt rechnerisch/UI-seitig korrekt; Zuschnitt muss alle Eckpunkte enthalten. Lokal importierte PDF mit Flächen versehen und offline exportiert. Originalbilddaten bleiben erhalten. |
+| Speicherung | Schema 3 enthält Kennung, Beschreibung, Farbe, Deckkraft, Punkte und nächsten Z-Zähler. Dateiroundtrip, IndexedDB-Neuladen und erneutes Editieren geprüft. Schema-1-/Schema-2-Dateien ohne Flächen bleiben unverändert lesbar. Fehlerhafte Schema-3-Dateien lassen das vorherige Projekt bestehen. Kennungen/IDs sind projektweit eindeutig. |
+| Browser/Touch | Neue Abläufe in Chrome, Edge und Playwright-WebKit unter Windows. Mobile Chromium mit iPhone-13-Emulation: Fläche per Touch setzen/abschließen, Eckpunkt ziehen, Undo/Redo, Mehrfinger-Abbruch und Zoom, keine horizontale Überbreite. |
+| Offline/Datenschutz | Neustart ohne Netz, Flächen bearbeiten, neuer lokaler PDF-Import und Export in allen drei Engines. Keine externen Requests. Reale Polycam-Unterlagen bleiben ausschließlich lokal in ignorierten Dateien. |
+
+**Automatisierte Nachweise:** 26 neue Prüfgruppen in `tests/areas.mjs`. Der vollständige bestehende Regressionssatz wurde erneut ausgeführt: 16 Hauptnachweise, 5 Randfallprüfungen, 27 Prüfgruppen für 1.1 sowie der separate Offline-Erstimport unter `/Probenplan/`. Sämtliche Prüfungen bestanden. Nach der letzten Anpassung des weißen Abstands unter der Exportlegende wurden die 26 Flächenprüfgruppen erneut ausgeführt; der Exportpfad ohne Flächen blieb unverändert.
+
+## Während der Prüfung behoben
+
+- Die längere Werkzeugleiste konnte die Planfläche über die Bildschirmhöhe hinaus strecken. Die Desktopfläche behält jetzt eine passende Höhe und bleibt beim Scrollen der Werkzeugleiste sichtbar.
+- Ein Werkzeugwechsel löschte vorübergehend die Auswahl eines Probenmarkers. Die bisherige Auswahl beim Wechsel zwischen Markerwerkzeugen bleibt erhalten; der vollständige PDF-/Marker-Regressionstest besteht wieder.
+- Flächenkennungen wurden für die Ausgabe vergrößert, und der Markerlegende bei Projekten mit Flächen zusätzlicher weißer Abstand zugeteilt.
+- WebKit rundet simulierte Mauspositionen auf Bildschirmpixel. Koordinatenprüfungen verwenden dort eine entsprechend kleine Toleranz; Transformationen und gespeicherte Geometrie werden weiterhin vollständig verglichen.
+
+## Grenzen und echte Geräteprüfung
+
+- Keine Polygonlöcher, Freihandkonturen, geometrische Vereinigung oder nachträgliches Hinzufügen/Entfernen einzelner Ecken einer fertigen Fläche. Komplexe Bereiche in mehrere einfache Konturen derselben Kategorie teilen. Sehr große Legenden können zugunsten der Drucklesbarkeit abgewiesen werden.
+- Flächenkennungen können sich bei überlappenden Flächen bzw. unter Probenmarkern überlagern. Die Liste bleibt zur gezielten Auswahl verfügbar; Kennungen/Kategorien sind in der Legende dokumentiert.
+- Echte iPhone-/iPad-Geräte, Safari/PWA-Installation, Dateien-App-Downloads und realer Speichermangel stehen weiterhin aus. Playwright-WebKit unter Windows und Chromium-Touch-Emulation sind kein Ersatz.
+- Vor endgültiger Freigabe auf iPhone/iPad prüfen: über HTTPS laden/installieren, Flächen per Touch zeichnen/abschließen, bei Zoom Eckpunkte ziehen, Farbe/Deckkraft ändern, PNG/JPG mit Legende speichern, Schema-3-Datei über Dateien-App wieder öffnen, Offline-Neustart und anschließenden PDF-Import/Export. Große Exporte bei Bedarf mit 3500 px verwenden.
+- Dateisicherung enthält weiterhin das vollständige ursprüngliche Planbild; ein Zuschnitt entfernt diese ursprünglichen Bilddaten nicht aus der Projektdatei. Schema 3 benötigt Version 1.2 oder neuer. Autosicherung ersetzt keine Projektdatei.
+
+**Freigabeempfehlung:** technisch für die PR-Prüfung bereit. Vor endgültiger mobiler Freigabe die genannten echten Safari-/iOS-Tests durchführen. Der PR wird nicht selbständig gemergt.
+
+## Wiederholung und lokale Nachweise
+
+Mit laufendem Produktionsserver `npm test` ausführen; bei anderem Port `TEST_URL` setzen. `tests/edge-cases.mjs` folgt dem Haupttest, da es dessen Roundtrip-Datei nutzt. Der neue Flächentest braucht ausschließlich synthetische Vorlagen; die alten Tests benötigen weiterhin die lokale originale Polycam-ZIP. `.test-output/v1.2/` enthält `results.json`, PNG/JPG in Hoch-/Querformat, Offline-/PDF-Exporte und Desktop-/Touch-Screenshots. Der gesamte Ordner bleibt aus Git ausgeschlossen.
+
+## Historische Protokolle
+
+Die folgenden Protokolle beschreiben den jeweiligen älteren Versionsstand. Dort genannte damalige Funktionsgrenzen (z. B. kein PDF in 1.0) gelten nicht für Version 1.2.
+
+### Prüfprotokoll – Probenplan 1.1
 
 Prüfung: 12. Oktober 2026, Windows. Feature-Branch `codex/feature/probenplan-1-1-import`. Lokaler Produktionsbuild auf `http://localhost:4181`; die produktive Website wird durch diesen Branch nicht geändert.
 

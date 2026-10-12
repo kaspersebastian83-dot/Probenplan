@@ -1,6 +1,7 @@
 import DOMPurify from 'dompurify';
 import { unzipSync } from 'fflate';
 import { type Plan, type Project, type Preparation, validLabel } from './model';
+import {MAX_AREAS,MAX_POINTS,PALETTE,cleanName,polygonError} from './areas';
 const MAX=60*1024*1024;
 const safeData=(s:string)=>/^data:(?:image\/(?:png|jpeg|webp|gif)|font\/(?:woff2?|ttf|otf)|application\/(?:font-woff|x-font-ttf|vnd.ms-fontobject|octet-stream))(?:;charset=[\w-]+)?;base64,[a-z0-9+/=\s]+$/i.test(s);
 function safeCSS(css:string){
@@ -65,7 +66,7 @@ export async function candidates(file:File):Promise<Candidate[]>{
 }
 export async function validateProject(value:unknown):Promise<Project>{
   const p=value as Project;
-  if(!p||p.format!=='probenplan'||![1,2].includes(p.version)||!p.plan||typeof p.plan.data!=='string'||!Array.isArray(p.markers)||p.markers.length>3000)throw Error('Ungültige oder nicht unterstützte Projektdatei.');
+  if(!p||p.format!=='probenplan'||![1,2,3].includes(p.version)||!p.plan||typeof p.plan.data!=='string'||!Array.isArray(p.markers)||p.markers.length>3000)throw Error('Ungültige oder nicht unterstützte Projektdatei.');
   if(typeof p.plan.name!=='string'||typeof p.report!=='string'||p.report.length>100||typeof p.date!=='string'||(p.date!==''&&!/^\d{4}-\d{2}-\d{2}$/.test(p.date)))throw Error('Ungültige Projektdaten.');
   if(p.plan.data.length>MAX*1.5)throw Error('Die Projektdatei enthält einen zu großen Plan.');
   let plan:Plan;
@@ -87,9 +88,13 @@ export async function validateProject(value:unknown):Promise<Project>{
   }
   const ids=new Set<string>();const labels=new Set<string>();
   for(const m of p.markers){
-    if(!m||!['sample','fire'].includes(m.kind)||typeof m.id!=='string'||!/^[\w-]{1,80}$/.test(m.id)||ids.has(m.id)||typeof m.label!=='string'||!validLabel({...p,markers:[]},m.label,m.id)||labels.has(m.label.toLocaleUpperCase())||typeof m.note!=='string'||m.note.length>500||![m.x,m.y,m.lx,m.ly].every(n=>Number.isFinite(n)&&Math.abs(n)<1_000_000))throw Error('Ungültige oder doppelte Markierungen in der Projektdatei.');
+    if(!m||!['sample','fire'].includes(m.kind)||typeof m.id!=='string'||!/^[\w-]{1,80}$/.test(m.id)||ids.has(m.id)||typeof m.label!=='string'||!validLabel({...p,markers:[],areas:[]},m.label,m.id)||labels.has(m.label.toLocaleUpperCase())||typeof m.note!=='string'||m.note.length>500||![m.x,m.y,m.lx,m.ly].every(n=>Number.isFinite(n)&&Math.abs(n)<1_000_000))throw Error('Ungültige oder doppelte Markierungen in der Projektdatei.');
     ids.add(m.id);labels.add(m.label.toLocaleUpperCase());
   }
   if(![p.nextSample,p.nextFire].every(n=>Number.isSafeInteger(n)&&n>=1&&n<1e9))throw Error('Ungültige Startnummer.');
-  return {format:'probenplan',version:plan.pdf||plan.preparation?2:p.version,plan,markers:p.markers.map(m=>({id:m.id,kind:m.kind,label:m.label,note:m.note,x:m.x,y:m.y,lx:m.lx,ly:m.ly})),nextSample:p.nextSample,nextFire:p.nextFire,report:p.report,date:p.date};
+  if(p.version===3){
+    if(!Array.isArray(p.areas)||p.areas.length>MAX_AREAS||!Number.isSafeInteger(p.nextArea)||p.nextArea!<1||p.nextArea!>=1e9)throw Error('Ungültige Flächendaten in der Projektdatei.');
+    for(const a of p.areas){if(!a||typeof a.id!=='string'||!/^[\w-]{1,80}$/.test(a.id)||ids.has(a.id)||typeof a.label!=='string'||!validLabel({...p,markers:[],areas:[]},a.label,a.id)||labels.has(a.label.toLocaleUpperCase())||typeof a.name!=='string'||!cleanName(a.name)||a.name.length>160||!PALETTE.some(c=>c.color===a.color)||!Number.isFinite(a.opacity)||a.opacity<.05||a.opacity>.7||!Array.isArray(a.points)||a.points.length>MAX_POINTS||polygonError(a.points,plan)||polygonError(a.points.map(pt=>({x:Math.max(0,Math.min(plan.width,pt.x)),y:Math.max(0,Math.min(plan.height,pt.y))})),plan))throw Error('Ungültige Fläche: Kennung, Farbe, Deckkraft oder Polygonkoordinaten fehlerhaft.');ids.add(a.id);labels.add(a.label.toLocaleUpperCase());}
+  }else if(p.areas!==undefined||p.nextArea!==undefined)throw Error('Flächen benötigen das Projektformat der Version 1.2.');
+  return {format:'probenplan',version:p.version===3?3:plan.pdf||plan.preparation?2:p.version,plan,markers:p.markers.map(m=>({id:m.id,kind:m.kind,label:m.label,note:m.note,x:m.x,y:m.y,lx:m.lx,ly:m.ly})),nextSample:p.nextSample,nextFire:p.nextFire,report:p.report,date:p.date,...(p.version===3?{areas:p.areas!.map(a=>({id:a.id,label:a.label,name:cleanName(a.name),color:a.color,opacity:a.opacity,points:a.points.map(pt=>({x:Math.max(0,Math.min(plan.width,pt.x)),y:Math.max(0,Math.min(plan.height,pt.y))}))})),nextArea:p.nextArea}:{})};
 }
