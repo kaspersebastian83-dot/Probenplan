@@ -1,0 +1,15 @@
+{
+  "name": "probenplan",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build && node scripts/build-sw.mjs",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node tests/browser.mjs"
+  },
+  "dependencies": { "dompurify": "^3.3.0", "fflate": "^0.8.2" },
+  "devDependencies": { "typescript": "^5.9.3", "vite": "^7.1.12", "@playwright/test": "^1.56.0" },
+  "pnpm": { "onlyBuiltDependencies": ["esbuild"] }
+}

@@ -1,0 +1,2 @@
+/* All application assets are local. System fonts avoid remote requests. */
+html{color-scheme:light}button,input,textarea,select{touch-action:manipulation}a{color:inherit}
