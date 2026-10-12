@@ -180,7 +180,20 @@ $('offset').onclick=()=>{const m=selectedMarker();if(m)mutate(p=>{m.lx=m.x+marke
 $('recenter').onclick=()=>{const m=selectedMarker();if(m)mutate(()=>{m.lx=m.x;m.ly=m.y;});};
 function undo(){if(project&&!cropping&&requireFinished()){const old=project.plan;project=history.undo(project);changed();if(old.width!==project.plan.width||old.height!==project.plan.height)fit();}}function redo(){if(project&&!cropping&&requireFinished()){const old=project.plan;project=history.redo(project);changed();if(old.width!==project.plan.width||old.height!==project.plan.height)fit();}}
 $('undo').onclick=undo;$('redo').onclick=redo;
-window.addEventListener('keydown',e=>{if((e.target as HTMLElement).closest('input,textarea,select,dialog'))return;if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo();}});
+window.addEventListener('keydown',e=>{
+  const editing=(target:EventTarget|null)=>target instanceof Element&&(!!target.closest('input,textarea,select,dialog,[role="dialog"],[role="textbox"]')||(target instanceof HTMLElement&&target.isContentEditable));
+  if(e.defaultPrevented||e.isComposing||editing(e.target)||editing(document.activeElement)||document.querySelector('dialog[open],[role="dialog"][aria-modal="true"]'))return;
+  if(e.key==='Escape'&&(selected||selectedArea)){e.preventDefault();selected=null;selectedArea=null;render();return;}
+  if((e.key==='Delete'||e.key==='Backspace')&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
+    // Backspace must not navigate away from the plan, even without a selection.
+    e.preventDefault();
+    if(busy||cropping)return;
+    const button=selectedMarker()?$('delete'):selectedPolygon()?$('area-delete'):null;
+    if(button)button.click();
+    return;
+  }
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();redo();}
+});
 $('zoom-in').onclick=()=>zoom(.8);$('zoom-out').onclick=()=>zoom(1.25);$('fit').onclick=fit;
 svg.addEventListener('wheel',e=>{if(!project)return;e.preventDefault();if(cropDrag)return;zoom(Math.exp(e.deltaY*.0015),point(e));},{passive:false});
 const pointers=new Map<number,{clientX:number;clientY:number}>();
