@@ -34,7 +34,7 @@ export function addArea(p:Project,points:Point[],color:string,opacity:number,nam
   let n=p.nextArea||1;while(!validLabel(p,`Z${n}`,''))n++;
   if(!Number.isSafeInteger(n)||n<1||n>=999999999)throw Error('Der Flächenzähler ist ausgeschöpft. Bitte ein neues Projekt verwenden.');
   const area={id:crypto.randomUUID(),label:`Z${n}`,name:cleanName(name),color,opacity,points:points.map(pt=>({...pt}))};
-  (p.areas||= []).push(area);p.nextArea=n+1;p.version=3;return area;
+  (p.areas||= []).push(area);p.nextArea=n+1;p.version=p.version===4?4:3;return area;
 }
 export function contains(points:Point[],p:Point){let inside=false;for(let i=0,j=points.length-1;i<points.length;j=i++){const a=points[i],b=points[j];if(((a.y>p.y)!==(b.y>p.y))&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x)inside=!inside;}return inside;}
 export function areaAnchor(points:Point[]):Point{

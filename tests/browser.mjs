@@ -50,7 +50,7 @@ for(const channel of ['chromium','webkit']){
     const png=await exportDownload(page,'png',3500,resolve(out,`${channel}-plan-3500.png`));const jpg=await exportDownload(page,'jpeg',4600,resolve(out,`${channel}-plan-4600.jpg`));summary.push(`${channel}: PNG ${png.width}×${png.height}, JPG ${jpg.width}×${jpg.height}`);await page.locator('#fit').click();await page.screenshot({path:resolve(out,`${channel}-workspace.png`),fullPage:true});
   });
   await checkpoint(`${channel}: Netzwerk deaktiviert, Offline-Neustart und Export`,async()=>{
-    await context.setOffline(true);await page.reload();await page.locator('.marker-row').first().waitFor();assert.match(await page.locator('#offline').textContent(),/Offline bereit/);await exportDownload(page,'png',3500,resolve(out,`${channel}-offline.png`));await context.setOffline(false);
+    await context.setOffline(true);await page.reload();await page.locator('.marker-row').first().waitFor();await page.locator('#offline.ready').waitFor();assert.match(await page.locator('#offline').textContent(),/Offline bereit/);await exportDownload(page,'png',3500,resolve(out,`${channel}-offline.png`));await context.setOffline(false);
   });
   assert.deepEqual(errors,[],'Keine JS-Fehler');assert.deepEqual(external,[],'Keine externen Netzwerkanfragen');
   await context.close();

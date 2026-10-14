@@ -1,4 +1,46 @@
-# Prüfprotokoll – Probenplan 1.2.0
+# Prüfprotokoll – Probenplan 1.3.0
+
+## Laborbericht-Import (14. Oktober 2026)
+
+Feature-Branch `codex/feature/lab-report-import`, Basis Remote-`main` `e84a868` einschließlich des Pan-Features. Keine Änderung an Main, CSP, Hosting-Workflow oder Laufzeitabhängigkeiten.
+
+| Bereich | Prüfung und Verhalten |
+| --- | --- |
+| XML | Browser-DOMParser, lokale Namen unabhängig vom Namespace, CRLF/Unbekanntes, SampleOrder, Referenz/Beschreibung/Art mit Matrix-Fallback, Labor-Nr., Bericht, Auftragsreferenz und Batch. Datumswerte mit Offset werden auf den Kalendertag in Europe/Berlin umgerechnet. DTD/Entitäten werden abgewiesen. Analysenparameter, unveränderte Result-/Unit-/LOQ-Zeichenketten sind separat im Parserergebnis verfügbar. |
+| PDF | Bestehender PDF.js-Worker und lokale Ressourcen, `getTextContent()` mit transformierten x/y-Positionen. Cover und Probenanzahl, transponierte Ergebnisreferenzen mit Datum/geteilten Labor-IDs sowie Beschreibungstabelle unter „Weitere Erläuterungen“. 2–3-zeilige Beschreibungen, Fortsetzung mit/ohne Header, gebrochene Header und Varianten „Proben-Nr.“/„Probenbezeichnung“ geprüft. Keine OCR. |
+| Vergleich | XML bevorzugt, Abweichungen in Bericht, Referenzen, Beschreibung und Menge als Warnung. Zusätzliche PDF-Beschreibungszeilen werden zur Prüfung ergänzt; keine Labornummern aus Lücken abgeleitet. Ergebnistabellen/Description-Abgleich in beide Richtungen. |
+| Prüftabelle | Alle sechs Probenfelder und Herkunftsangaben editierbar; Ergänzen, Entfernen, ↑/↓. Abbrechen lässt das Projekt unverändert. Unbekannte Referenzen bleiben als Zeile mit leerer P-Nummer erhalten. Duplikate/ungültige Nummern verhindern Übernahme; Projektabweichung warnt ohne zu blockieren. Dateiwerte werden als Text in DOM-Elementen eingesetzt, die bestehende HTML-Marker-Liste zusätzlich mit DOMPurify bereinigt. |
+| Konflikte | Explizite Entscheidung je belegter Kennung: überspringen, vorhandenen Probenmarker aktualisieren oder nächste freie P-Nummer. Updates ändern ausschließlich Notiz/Labordaten; Position, separate Beschriftung und Markerart bleiben erhalten. Offene Proben und Flächenkennungen sind reserviert. |
+| Platzierung | Maus-Drag in Chromium/WebKit sowie echte Touch-/Pen-Pointer-Ereignisse in Chromium. Alternative Auswahl + Klick/Tippen. Offene Liste schrumpft, Zähler passt sich an; Import/Platzierung/Update unterstützen Undo/Redo. Die Auswahl ist an die Kennung gebunden, damit Undo keinen anderen Listeneintrag platziert. Spätere manuelle Nummern beginnen hinter der höchsten importierten Nummer. |
+| Speicherung | Optionales `Marker.lab` und `Project.pending` in Format 4, ohne weitere Projektfelder. Labordaten und offene Liste werden unabhängig in Undo-Snapshots kopiert. IndexedDB-Neustart, `.probenplan`-Roundtrip, Formate 1–4 ohne Zusatzfelder und ungültige Datensätze geprüft. Drehen/Zuschneiden/Flächenbearbeitung erhalten Version 4. |
+| JSON | Exakte `mosaik-probenliste`-Felder, Dateiname aus Projektnummer, UTF-8, nativer Speicherdialog (mit kontrolliertem Picker-Stub geprüft) und echter Download-Fallback. Offene und platzierte Proben des gewählten Berichts, keine doppelte Nummer. Herkunftsangaben nach Projekt-Neustart im Dialog ergänzen; externe Projektordner werden nicht geraten. |
+| Offline | App neu geladen ohne Netzwerk, vorhandene offene Laborprobe per Klick platziert. Keine externen Requests bei den Labor-Browserprüfungen. Vorhandene Suite prüft weiterhin lokalen PDF-Erstimport aus dem Offlinecache. |
+
+### Getrennte manuelle Originaldateiprüfung
+
+Die ausdrücklich bereitgestellten Eurofins-Dateien wurden ausschließlich aus ihrem externen Originalpfad gelesen. Extraktionen und Screenshots liegen im ignorierten `.manual-checks/`, außerhalb aller automatisierten Test-/CI-Diagnosen. Keine Originaldatei, reale Probenbeschreibung oder Projektdatei wird committed.
+
+| Import | Beobachtetes Ergebnis |
+| --- | --- |
+| XML-only | 9 Zeilen, P1–P9, Beschreibungen vollständig, Datum 08.10.2026. Bericht und Auftragsreferenz korrekt erkannt; keine Warnung. |
+| PDF-only | 9 Zeilen, P1–P9, mehrzeilige Beschreibungen einschließlich der dreizeiligen P8 vollständig. Alle Beschreibungen und Probenfelder stimmen mit XML überein; kein Eingangstag als Probenahmedatum verwechselt. |
+| XML + PDF | 9 Zeilen, keine Vergleichswarnung. Berichtsnummer, Auftragsreferenz, Referenzen, Beschreibungen und Daten stimmen überein. |
+
+Die Kontrollwerte aus dem Auftrag (Auftragsreferenz, P8-Beschreibung und Kalendertag) wurden exakt verglichen. Prüftabelle sowie die Beschreibungstabelle der Original-PDF wurden visuell geöffnet. Nach der Sichtprüfung wurde die Labor-Nr.-Spalte verbreitert, damit die entscheidenden Endziffern sichtbar bleiben, und die Dialogaktionen beim Scrollen erreichbar gehalten.
+
+### Grenzen und Entscheidungen
+
+- Grundriss zuerst laden; ein Laborbericht ersetzt die Planvorlage nicht. Keine automatische chemische Beurteilung oder Schadstoffdarstellung.
+- XML maximal 10 MB; PDF maximal 60 MB / 100 Seiten / 2 Millionen Textzeichen; höchstens 1000 offene und 3000 gesamte Marker/Reservierungen, Beschreibung höchstens 500 Zeichen. Unbekannte Layouts und PDFs ohne Textschicht liefern eine klare Warnung und leere manuell ergänzbare Liste.
+- Nur die verlangten optionalen Projektfelder werden eingeführt. Laborname, Auftragsreferenz, Batch/Quelle und rohe Analysenwerte bleiben im aktuellen Parser-/Review-Ergebnis; nach Projekt-Neustart sind Herkunftsangaben für den gemeinsamen JSON-Export zu ergänzen. Probenfelder und Berichtsnummer bleiben vollständig gespeichert.
+- Der JSON-Dialog schlägt einen Dateinamen vor und merkt sich im nativen Browserdialog die zuletzt gewählte Ablage; der externe „Laborergebnisse“-Ordner kann ohne zusätzliche Zugriffsberechtigung nicht automatisch gefunden werden. Safari nutzt bei fehlender File-System-Access-API den Download.
+- Touch-/Pen-Events wurden automatisiert geprüft; echte iPhone-/iPad-Dateiauswahl, Downloads, native Ordnerauswahl und Speichermangel weiterhin manuell prüfen. Auf kleinen Displays die Auswahl-/Tipp-Alternative nutzen.
+
+Automatisierte Nachweise: 22 Laborprüfgruppen in `tests/labreport.mjs` mit synthetischen XML/PDFs in `tests/lab-fixtures.mjs`. TypeScript und `pnpm build` erfolgreich. Der abschließende `pnpm test` bestand in allen acht Suites mit Exit-Code 0; vollständiger Nachweis unter `.test-output/summary.json`. Sämtliche bisherigen Regressionen bestanden. Nach Projekt-Neustart wird die gemeinsame JSON-Liste nach P-Nummer geordnet; solange die aktuelle Prüfung verfügbar ist, wird deren Reihenfolge berücksichtigt.
+
+Während der Wiederholung behoben/abgeklärt: Der bestehende Offline-Test prüfte den Status unmittelbar nach Projektrestore, bevor die asynchrone Offline-Initialisierung fertig war; er wartet nun auf „Offline bereit“, ohne die Aussage abzuschwächen. Ein Playwright-WebKit-Unterprozess unter Windows blieb einmal beim Schließen hängen (leere Browserfehlerkonsole); nur der verifizierte eigene Testprozess wurde beendet. Der nachfolgende vollständige Lauf einschließlich aller 26 PDF-/Vorbereitungsprüfungen schloss erfolgreich und ohne Abbruch ab.
+
+## Historischer Stand 1.2 und Nachprüfungen
 
 ## Nachprüfung: intuitives Verschieben in Setzwerkzeugen (14. Oktober 2026)
 

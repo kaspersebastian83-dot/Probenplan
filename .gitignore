@@ -9,3 +9,4 @@ beispiele/
 *.log
 [[]Polycam Floor Plan]*/
 public/pdfjs/
+.manual-checks/
