@@ -1,5 +1,15 @@
 # Prüfprotokoll – Probenplan 1.2.0
 
+## Nachprüfung: intuitives Verschieben in Setzwerkzeugen (14. Oktober 2026)
+
+Feature-Branch `codex/feature/marker-pan`, Basis `aff6f50` vom aktuellen Remote-`main` einschließlich Flächen, Tastaturkürzeln und eigenständigen synthetischen Tests. Die vorhandene Kameraverschiebung wird nun auch bei Ziehen an einer freien Stelle unter „Probe setzen“/„Brandherd setzen“ verwendet. Bewegungsschwellen: 6 Bildschirm-Pixel für Maus, 8 für Touch; Bearbeitungs-/Polygonwerkzeuge behalten ihre bisherige Schwelle. Ein erkanntes Ziehen bleibt bis zum Loslassen ein Ziehen, auch bei Rückkehr zum Startpunkt. Ein Bewegungssprung erst im Freigabeereignis setzt ebenfalls keinen Punkt. Setzwerkzeug, Projektdaten, Autosicherung sowie Undo-/Redo-Verlauf bleiben beim Verschieben unverändert.
+
+`tests/marker-pan.mjs`: 16 neue Prüfgruppen in Chromium, WebKit unter Windows und Chromium mit iPhone-Touch-Emulation. Nachgewiesen sind Klick/Tipp, kleine Bewegungen, Ziehen über der Schwelle, Rückkehr zum Start, Klick/Tipp nach Pan mit korrekten Plan-Koordinaten, weiterhin aktives Werkzeug, unveränderte Projektdatei und Undo/Redo, keine IndexedDB-Schreibvorgänge beim Pan, Marker-Auswahl, Mausrad, Zweifinger-Zoom nach Einfinger-Pan, verbleibender Finger und Touch-Abbruch. Beide Setzwerkzeuge werden separat geprüft. Der vollständige Testläufer umfasst zusätzlich sämtliche bisherigen Browser-, Randfall-, PDF-/Vorbereitungs-, Unterverzeichnis-/Offline-, Flächen- und Tastaturprüfungen. Ergebnisse und Diagnosen liegen ausschließlich unter `.test-output/`; keine realen Grundrisse oder neuen Abhängigkeiten im Commit. Echte iOS-/iPadOS-Geräte bleiben zusätzlich manuell zu prüfen.
+
+Ergebnis: TypeScript-Prüfung und Produktionsbuild erfolgreich. Alle sieben Suites des vollständigen Testläufers bestanden (Exit-Code 0), einschließlich der 16 neuen Gestenprüfgruppen. Marker-/Polygonbearbeitung, Tastaturkürzel, Speicherung, Export und Offline-Neustart bestanden unverändert. Der Testläufer verwendete einen eigenen lokalen Server auf einem freien Port und schloss ihn nach der Prüfung; die geöffnete Benutzer-App wurde nicht für Tests verwendet.
+
+Die folgenden Abschnitte dokumentieren den bisherigen Versionsstand; diese Änderung wird ausschließlich als separater Pull Request vorgeschlagen und nicht eigenständig gemergt oder veröffentlicht.
+
 Prüfung: 12. Oktober 2026, Windows. Feature-Branch `codex/feature/probenplan-1-2-areas`, lokaler Produktionsbuild auf `http://127.0.0.1:4182/`.
 
 ## Ausgangspunkt und Veröffentlichungsgrenze
