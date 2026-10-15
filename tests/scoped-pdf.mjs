@@ -1,7 +1,7 @@
 import {createServer} from 'node:http';
 import {readFile,mkdir} from 'node:fs/promises';
 import {resolve,sep,extname} from 'node:path';
-import {chromium} from './runtime.mjs';
+import {chromium,openExport} from './runtime.mjs';
 import {syntheticPDF} from './fixtures.mjs';
 import assert from 'node:assert/strict';
 const root=resolve('dist'),prefix='/Probenplan/';
@@ -16,5 +16,5 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`htt
 let browser;try{browser=await chromium.launch({headless:true});
  const context=await browser.newContext({acceptDownloads:true}),page=await context.newPage(),bad=[];page.on('request',r=>{if(/^https?:/.test(r.url())&&!r.url().startsWith(base))bad.push(r.url());});await page.goto(base);await page.locator('#offline.ready').waitFor();await context.setOffline(true);await page.reload();await page.locator('#offline.ready').waitFor();
  await page.locator('#file').setInputFiles({name:'offline-scoped.pdf',mimeType:'application/pdf',buffer:syntheticPDF()});await page.locator('#import-status').waitFor({state:'hidden'});assert.match(await page.locator('#file-type').textContent(),/PDF/);
- const download=page.waitForEvent('download');await page.locator('#export').click();await mkdir('.test-output/v1.1',{recursive:true});await(await download).saveAs(resolve('.test-output/v1.1/scoped-offline.png'));assert.deepEqual(bad,[]);await context.close();console.log('OK Unterverzeichnis /Probenplan/: Offline-Erstimport PDF und Export mit lokalem Worker/Fonts');
+ await openExport(page);const download=page.waitForEvent('download');await page.locator('#export').click();await mkdir('.test-output/v1.1',{recursive:true});await(await download).saveAs(resolve('.test-output/v1.1/scoped-offline.png'));assert.deepEqual(bad,[]);await context.close();console.log('OK Unterverzeichnis /Probenplan/: Offline-Erstimport PDF und Export mit lokalem Worker/Fonts');
 }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}

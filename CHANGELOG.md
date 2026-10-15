@@ -1,5 +1,15 @@
 # Änderungen
 
+## 1.5.0 – 15. Oktober 2026
+
+- **Karte zuerst:** Die Planfläche wächst von 38–47 % auf 87–92 % des Fensters (Liste eingeklappt) bzw. 66–77 % (Liste offen), gemessen bei 1280 × 720 bis 1920 × 1080. Keine Seitenscrollleiste mehr.
+- Eine Kopfzeile statt drei Leisten: Datei-Aktionen, Laborimport, Planname, Rückgängig/Wiederherstellen, Hilfe, Export und Liste.
+- Werkzeugleiste links mit Tastenkürzeln (V, P, B, E, F, G, R, Umschalt+R, C, L, +, −, 0); Drehen und Zuschneiden ebenfalls dort.
+- Werkzeughinweis, nächste Probennummer und die Flächenentwurfs-Steuerung schweben über dem Plan; Zoom unten rechts, Legende unten links.
+- Liste rechts (Markierungen, Laborproben, Flächen) standardmäßig eingeklappt, öffnet sich bei Auswahl einer vorhandenen Markierung/Fläche und nach Laborimport; Zustand wird gemerkt.
+- Export als schwebende Karte über „Exportieren …“ (gleiche Felder wie bisher).
+- Keine Änderung an Projektformat, Plan-, Marker-, Flächen- oder Exportdarstellung. Tests an die neuen Plätze angepasst; neue Suite `layout`.
+
 ## 1.4.0 – 15. Oktober 2026
 
 - Neuer Name **PlanKit** (früher Probenplan) in Kopfzeile, Browsertitel, installierter App und lokalem Startfenster. Repository, Webadresse, `Start-Probenplan.cmd` und das Projektformat `.probenplan` bleiben unverändert.

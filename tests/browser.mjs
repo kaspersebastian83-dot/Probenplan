@@ -1,4 +1,4 @@
-import {chromium,webkit,savedProject} from './runtime.mjs';
+import {chromium,webkit,savedProject,openExport,closeExport} from './runtime.mjs';
 import assert from 'node:assert/strict';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -15,7 +15,7 @@ async function readProject(page,name='state'){
 async function planPoint(page,x,y){await page.locator('#drawing').scrollIntoViewIfNeeded();return page.locator('#drawing').evaluate((el,{x,y})=>{const p=new DOMPoint(x,y).matrixTransform(el.getScreenCTM());return {x:p.x,y:p.y};},{x,y});}
 async function clickPlan(page,x,y){const p=await planPoint(page,x,y);await page.mouse.click(p.x,p.y);}
 async function importZip(page){await page.locator('#file').setInputFiles({name:zip.name,mimeType:zip.mimeType,buffer:zip.buffer});await page.locator('#choose-dialog').waitFor();assert.equal(await page.locator('#choices .choice').count(),2);assert.match(await page.locator('#choices .choice').first().textContent(),/SVG.*Ground Floor.svg/);await page.locator('#choices .choice').first().click();await page.waitForFunction(()=>document.querySelector('#base-plan').hasAttribute('href'));}
-async function exportDownload(page,format,quality,path){await page.locator('#format').selectOption(format);await page.locator('#quality').selectOption(String(quality));const d=page.waitForEvent('download');await page.locator('#export').click();await (await d).saveAs(path);const size=await page.evaluate(async({bytes,mime})=>{const blob=new Blob([Uint8Array.from(atob(bytes),c=>c.charCodeAt(0))],{type:mime});const bitmap=await createImageBitmap(blob);return {width:bitmap.width,height:bitmap.height};},{bytes:(await readFile(path)).toString('base64'),mime:`image/${format}`});assert.equal(Math.max(size.width,size.height),quality);return size;}
+async function exportDownload(page,format,quality,path){await openExport(page);await page.locator('#format').selectOption(format);await page.locator('#quality').selectOption(String(quality));const d=page.waitForEvent('download');await page.locator('#export').click();await (await d).saveAs(path);const size=await page.evaluate(async({bytes,mime})=>{const blob=new Blob([Uint8Array.from(atob(bytes),c=>c.charCodeAt(0))],{type:mime});const bitmap=await createImageBitmap(blob);return {width:bitmap.width,height:bitmap.height};},{bytes:(await readFile(path)).toString('base64'),mime:`image/${format}`});assert.equal(Math.max(size.width,size.height),quality);await closeExport(page);return size;}
 for(const channel of ['chromium','webkit']){
  const browser=await (channel==='webkit'?webkit:chromium).launch({headless:true});
  try{
@@ -41,7 +41,7 @@ for(const channel of ['chromium','webkit']){
     const pt=await planPoint(page,m.x,m.y);await page.mouse.move(pt.x,pt.y);await page.mouse.down();await page.mouse.move(pt.x+20,pt.y+15,{steps:5});await page.mouse.up();const moved=(await readProject(page)).markers[0];assert.ok(moved.x>m.x);assert.equal(moved.lx,changed.lx);
   });
   await checkpoint(`${channel}: Projektdatei, Wiederöffnen und automatische Sicherung`,async()=>{
-    await page.locator('#report').fill('TEST-2026-0142');await page.locator('#report').dispatchEvent('change');await page.locator('#date').fill('2026-10-12');await page.locator('#date').dispatchEvent('change');
+    await openExport(page);await page.locator('#report').fill('TEST-2026-0142');await page.locator('#report').dispatchEvent('change');await page.locator('#date').fill('2026-10-12');await page.locator('#date').dispatchEvent('change');await closeExport(page);
     const p=await readProject(page,`${channel}-roundtrip`);await page.locator('#project-file').setInputFiles(resolve(out,`${channel}-roundtrip.probenplan`));await page.locator('#replace-yes').click();await page.locator('#import-status').waitFor({state:'hidden'});assert.deepEqual(await readProject(page),p);
     await page.reload();await page.waitForFunction(()=>document.querySelectorAll('.marker-row').length===5);assert.deepEqual(await readProject(page),p);
   });
