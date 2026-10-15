@@ -6,8 +6,9 @@
 - Eine Kopfzeile statt drei Leisten: Datei-Aktionen, Laborimport, Planname, Rückgängig/Wiederherstellen, Hilfe, Export und Liste.
 - Werkzeugleiste links mit Tastenkürzeln (V, P, B, E, F, G, R, Umschalt+R, C, L, +, −, 0); Drehen und Zuschneiden ebenfalls dort.
 - Werkzeughinweis, nächste Probennummer und die Flächenentwurfs-Steuerung schweben über dem Plan; Zoom unten rechts, Legende unten links.
-- Liste rechts (Markierungen, Laborproben, Flächen) standardmäßig eingeklappt, öffnet sich bei Auswahl einer vorhandenen Markierung/Fläche und nach Laborimport; Zustand wird gemerkt.
+- Liste rechts (offene Laborproben oben, dann Markierungen und Flächen) standardmäßig eingeklappt, öffnet sich bei Auswahl einer vorhandenen Markierung/Fläche und nach Laborimport; Zustand wird gemerkt.
 - Export als schwebende Karte über „Exportieren …“ (gleiche Felder wie bisher).
+- Schmale Fenster: bis 1279 px bricht die Kopfzeile um; auf Telefonen (≤ 700 px, nur Notbetrieb) stehen Werkzeuge, Plan und Liste untereinander, ohne dass etwas den Plan verdeckt.
 - Keine Änderung an Projektformat, Plan-, Marker-, Flächen- oder Exportdarstellung. Tests an die neuen Plätze angepasst; neue Suite `layout`.
 
 ## 1.4.0 – 15. Oktober 2026

@@ -261,7 +261,7 @@ moveTo(document.querySelector('.rail')!,'preparation');
 moveTo(stageEl,'crop-actions','import-status');
 moveTo($('toolbar'),'area-draft');
 moveTo($('file-actions'),'lab-import','lab-files');
-document.querySelector('.markers-section')!.after($('lab-panel'));
+document.querySelector('.markers-section')!.before($('lab-panel'));
 panelScroll.append(document.querySelector('.areas-section')!);
 const railLabel=(id:string,icon:string,text:string,title:string,key?:string)=>{const b=document.getElementById(id) as HTMLButtonElement|null;if(!b)return;b.innerHTML=`<span class="tool-icon">${icon}</span><span>${text}</span>`;b.title=title;b.classList.add('mode','rail-action');if(key)b.dataset.key=key;};
 railLabel('rotate-left','↶','Links','90° nach links drehen (Umschalt+R)');
@@ -271,7 +271,7 @@ for(const [mode,key,text,title] of [['area-draw','f','Fläche +','Schadensfläch
 document.querySelector('#help-dialog h2')!.insertAdjacentHTML('afterend','<h3>Tastenkürzel</h3><p><b>V</b> Ansicht · <b>P</b> Probe · <b>B</b> Brandherd · <b>E</b> Bearbeiten · <b>F</b> Fläche zeichnen · <b>G</b> Fläche bearbeiten · <b>R</b>/<b>Umschalt+R</b> drehen · <b>C</b> zuschneiden · <b>L</b> Liste ein/aus · <b>+</b>/<b>−</b> Zoom · <b>0</b> Einpassen · <b>Strg+Z</b> rückgängig · <b>Entf</b> löschen · <b>Esc</b> abwählen</p>');
 const PANEL_KEY='plankit:panel';
 function setPanel(open:boolean,remember=true){document.body.classList.toggle('panel-open',open);$('panel-toggle').setAttribute('aria-pressed',String(open));if(remember){try{localStorage.setItem(PANEL_KEY,open?'open':'closed');}catch{/* privates Fenster */}}}
-function reveal(id:string){setPanel(true);requestAnimationFrame(()=>document.getElementById(id)?.closest('section,div')?.scrollIntoView({block:'nearest'}));}
+function reveal(id:string){const wasOpen=document.body.classList.contains('panel-open');setPanel(true);if(!wasOpen||matchMedia('(min-width:701px)').matches){const target=document.getElementById(id);const box=target?.getBoundingClientRect(),view=panelScroll.getBoundingClientRect();if(target&&box&&(box.top<view.top||box.top>view.bottom-40))target.scrollIntoView({block:'nearest'});}}
 let storedPanel:string|null=null;try{storedPanel=localStorage.getItem(PANEL_KEY);}catch{/* privates Fenster */}
 setPanel(storedPanel==='open',false);
 $('panel-toggle').onclick=()=>setPanel(!document.body.classList.contains('panel-open'));

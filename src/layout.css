@@ -102,9 +102,23 @@ dialog.export-card #export{min-height:44px}
   .tb-doc{border-left:0;padding-left:0;margin-left:0}
   #canvas-name{max-width:180px}
 }
+/* Telefon (nur Notbetrieb, ausgelegt ist PlanKit für den PC): Werkzeuge oben als Zeile,
+   Plan mit fester Höhe, Liste darunter – die Seite scrollt, nichts verdeckt den Plan. */
 @media(max-width:700px){
-  .rail{width:58px}.rail .mode{width:50px;font-size:9px}
-  .kit-panel{position:absolute;right:0;top:auto;bottom:0;height:55dvh;width:100%;z-index:5;box-shadow:0 -4px 16px rgba(40,72,116,.18)}
-  .kit-workspace{position:relative}
-  #toolbar{top:6px}#toolbar #mode-hint{display:none}
+  body{height:auto;overflow:auto}
+  #app{height:auto}
+  .kit-workspace{flex-direction:column;flex:0 0 auto}
+  .rail{width:100%;flex-direction:row;flex-wrap:wrap;justify-content:center;border-right:0;border-bottom:1px solid var(--kit-line);padding:6px;overflow:visible}
+  .rail .modes{flex-direction:row;flex-wrap:wrap;justify-content:center}
+  #preparation{flex-direction:row;border-top:0;border-left:1px solid var(--kit-line);margin:0 0 0 4px;padding:0 0 0 4px}
+  #preparation .preparation-buttons{flex-direction:row}
+  .kit-canvas{height:62dvh;min-height:400px;flex:0 0 auto}
+  .kit-panel{width:100%;border-left:0;border-top:1px solid var(--kit-line)}
+  .panel-scroll{overflow:visible}
+  #toolbar #mode-hint{max-width:46vw}
+  /* Kopfzeile einzeilig und waagerecht scrollbar: feste Höhe, damit der Plan beim Speichern nicht springt */
+  .topbar{height:48px;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;padding:0 10px;scrollbar-width:none}
+  .topbar>*{flex-shrink:0}
+  .tb-spacer{display:none}
 }
+@media(min-width:701px) and (max-width:1000px){.kit-panel{width:260px}}
