@@ -20,5 +20,5 @@ if ($LASTEXITCODE -ne 0) { throw 'TypeScript-Pruefung fehlgeschlagen.' }
 if ($LASTEXITCODE -ne 0) { throw 'Build fehlgeschlagen.' }
 & $nodePath scripts/build-sw.mjs
 if ($LASTEXITCODE -ne 0) { throw 'Offline-Build fehlgeschlagen.' }
-Write-Host 'Probenplan: http://localhost:4173 (dieses Fenster offen lassen)'
+Write-Host 'PlanKit: http://localhost:4173 (dieses Fenster offen lassen)'
 & $nodePath node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 4173 --strictPort
