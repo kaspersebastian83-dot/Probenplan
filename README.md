@@ -1,8 +1,10 @@
-# Probenplan 1.3.1
+# PlanKit 1.4 (früher Probenplan)
+
+PlanKit gehört zur Familie von LabelKit und FotoKit und sieht genauso aus. Webadresse, Repository, Startdatei und das Dateiformat `.probenplan` behalten den bisherigen Namen – bestehende Projekte, Lesezeichen und installierte Apps funktionieren unverändert weiter.
 
 Lokale Webapp für beschriftete Grundrisse nach Brandschäden. TypeScript + Vite, ohne UI-Framework, Serverdatenbank, Konten oder externe Dienste.
 
-Version 1.3.1 bewahrt die Labor-Herkunft dauerhaft beim Speichern und Wiederöffnen. Der lokale Laborimport aus Eurofins-XML/PDF und die Platzierung offener Proben bleiben erhalten. PDF-Grundrisse, Bildvorbereitung, Schadensflächen, Tastaturkürzel und intuitives Verschieben in Setzwerkzeugen bleiben erhalten. Änderungen siehe `CHANGELOG.md`. Die Freigabe erfolgt über einen Pull Request; der Feature-Branch wird nicht auf die produktive Website bereitgestellt.
+Version 1.4 bringt den neuen Namen PlanKit und das gemeinsame Aussehen mit FotoKit und LabelKit, ohne Funktionen zu ändern. Version 1.3.1 bewahrt die Labor-Herkunft dauerhaft beim Speichern und Wiederöffnen. Der lokale Laborimport aus Eurofins-XML/PDF und die Platzierung offener Proben bleiben erhalten. PDF-Grundrisse, Bildvorbereitung, Schadensflächen, Tastaturkürzel und intuitives Verschieben in Setzwerkzeugen bleiben erhalten. Änderungen siehe `CHANGELOG.md`. Die Freigabe erfolgt über einen Pull Request; der Feature-Branch wird nicht auf die produktive Website bereitgestellt.
 
 ## Online öffnen und installieren
 
