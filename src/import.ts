@@ -1,5 +1,6 @@
 import {validDate} from './labreport';
 import type {LabData} from './model';
+import {copyOrigin,validOrigin} from './lab-provenance';
 import DOMPurify from 'dompurify';
 import { unzipSync } from 'fflate';
 import { type Plan, type Project, type Preparation, validLabel } from './model';
@@ -98,11 +99,17 @@ export async function validateProject(value:unknown):Promise<Project>{
     if(!Array.isArray(p.areas)||p.areas.length>MAX_AREAS||!Number.isSafeInteger(p.nextArea)||p.nextArea!<1||p.nextArea!>=1e9)throw Error('Ungültige Flächendaten in der Projektdatei.');
     for(const a of p.areas){if(!a||typeof a.id!=='string'||!/^[\w-]{1,80}$/.test(a.id)||ids.has(a.id)||typeof a.label!=='string'||!validLabel({...p,markers:[],areas:[],pending:[]},a.label,a.id)||labels.has(a.label.toLocaleUpperCase())||typeof a.name!=='string'||!cleanName(a.name)||a.name.length>160||!PALETTE.some(c=>c.color===a.color)||!Number.isFinite(a.opacity)||a.opacity<.05||a.opacity>.7||!Array.isArray(a.points)||a.points.length>MAX_POINTS||polygonError(a.points,plan)||polygonError(a.points.map(pt=>({x:Math.max(0,Math.min(plan.width,pt.x)),y:Math.max(0,Math.min(plan.height,pt.y))})),plan))throw Error('Ungültige Fläche: Kennung, Farbe, Deckkraft oder Polygonkoordinaten fehlerhaft.');ids.add(a.id);labels.add(a.label.toLocaleUpperCase());}
   }else if(p.areas!==undefined||p.nextArea!==undefined)throw Error('Flächen benötigen das Projektformat der Version 1.2.');
-  if(p.version!==4&&(p.pending!==undefined||p.markers.some(m=>m.lab!==undefined)))throw Error('Labordaten benötigen Projektformat 4.');
+  if(p.version!==4&&(p.pending!==undefined||p.labReports!==undefined||p.markers.some(m=>m.lab!==undefined)))throw Error('Labordaten benötigen Projektformat 4.');
+  const reports=new Map<string, NonNullable<Project['labReports']>[number]>();
+  if(p.labReports!==undefined){
+    if(!Array.isArray(p.labReports)||p.labReports.length>3000)throw Error('Ungültige Labor-Herkunftsliste.');
+    for(const r of p.labReports){if(!validOrigin(r)||reports.has(r.id))throw Error('Ungültige oder doppelte Labor-Berichts-ID bzw. Herkunftsdaten.');reports.set(r.id,r);}
+  }
   for(const m of p.markers)if(m.lab!==undefined&&!validLab(m.lab))throw Error('Ungültige Labordaten an einer Markierung.');
   if(p.pending!==undefined){if(!Array.isArray(p.pending)||p.pending.length>1000)throw Error('Ungültige Liste offener Proben.');for(const row of p.pending){if(!validLab(row)||!/^P[1-9]\d{0,8}$/.test(row.label)||labels.has(row.label.toUpperCase()))throw Error('Ungültige oder doppelte offene Probe.');labels.add(row.label.toUpperCase());}}
-  return {format:'probenplan',version:p.version>=3?p.version:plan.pdf||plan.preparation?2:p.version,plan,markers:p.markers.map(m=>({id:m.id,kind:m.kind,label:m.label,note:m.note,x:m.x,y:m.y,lx:m.lx,ly:m.ly,...(m.lab?{lab:copyLab(m.lab)}:{})})),nextSample:p.nextSample,nextFire:p.nextFire,report:p.report,date:p.date,...(p.areas!==undefined?{areas:p.areas!.map(a=>({id:a.id,label:a.label,name:cleanName(a.name),color:a.color,opacity:a.opacity,points:a.points.map(pt=>({x:Math.max(0,Math.min(plan.width,pt.x)),y:Math.max(0,Math.min(plan.height,pt.y))}))})),nextArea:p.nextArea}:{}),...(p.pending!==undefined?{pending:p.pending.map(r=>({label:r.label,...copyLab(r)}))}:{})};
+  for(const row of [...p.markers.flatMap(m=>m.lab?[m.lab]:[]),...(p.pending||[])])if(row.reportId!==undefined){const r=reports.get(row.reportId);if(!r||(row.bericht!==undefined&&row.bericht!==r.bericht))throw Error('Laborprobe verweist auf eine fehlende oder widersprüchliche Bericht-Herkunft.');}
+  return {format:'probenplan',version:p.version>=3?p.version:plan.pdf||plan.preparation?2:p.version,plan,markers:p.markers.map(m=>({id:m.id,kind:m.kind,label:m.label,note:m.note,x:m.x,y:m.y,lx:m.lx,ly:m.ly,...(m.lab?{lab:copyLab(m.lab)}:{})})),nextSample:p.nextSample,nextFire:p.nextFire,report:p.report,date:p.date,...(p.areas!==undefined?{areas:p.areas!.map(a=>({id:a.id,label:a.label,name:cleanName(a.name),color:a.color,opacity:a.opacity,points:a.points.map(pt=>({x:Math.max(0,Math.min(plan.width,pt.x)),y:Math.max(0,Math.min(plan.height,pt.y))}))})),nextArea:p.nextArea}:{}),...(p.pending!==undefined?{pending:p.pending.map(r=>({label:r.label,...copyLab(r)}))}:{}),...(p.labReports!==undefined?{labReports:p.labReports.map(copyOrigin)}:{})};
 }
 
-export function validLab(row:unknown):row is LabData{const r=row as LabData;return !!r&&typeof r.ref==='string'&&r.ref.length<=160&&typeof r.desc==='string'&&r.desc.length<=500&&(['art','labNr','bericht'] as const).every(k=>r[k as 'art'|'labNr'|'bericht']===undefined||(typeof r[k]==='string'&&r[k].length<=160))&&(r.datum===undefined||r.datum===''||validDate(r.datum));}
-export function copyLab(r:LabData):LabData{return {ref:r.ref,desc:r.desc,...(r.art!==undefined?{art:r.art}:{}),...(r.labNr!==undefined?{labNr:r.labNr}:{}),...(r.datum!==undefined?{datum:r.datum}:{}),...(r.bericht!==undefined?{bericht:r.bericht}:{})};}
+export function validLab(row:unknown):row is LabData{const r=row as LabData;return !!r&&typeof r.ref==='string'&&r.ref.length<=160&&typeof r.desc==='string'&&r.desc.length<=500&&(['art','labNr','bericht'] as const).every(k=>r[k as 'art'|'labNr'|'bericht']===undefined||(typeof r[k]==='string'&&r[k].length<=160))&&(r.reportId===undefined||(typeof r.reportId==='string'&&/^[\w-]{1,80}$/.test(r.reportId)))&&(r.datum===undefined||r.datum===''||validDate(r.datum));}
+export function copyLab(r:LabData):LabData{return {ref:r.ref,desc:r.desc,...(r.art!==undefined?{art:r.art}:{}),...(r.labNr!==undefined?{labNr:r.labNr}:{}),...(r.datum!==undefined?{datum:r.datum}:{}),...(r.bericht!==undefined?{bericht:r.bericht}:{}),...(r.reportId!==undefined?{reportId:r.reportId}:{})};}
