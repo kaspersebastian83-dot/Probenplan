@@ -35,7 +35,8 @@ export function applyLabImport(project:Project,report:LabReport,choices:Readonly
   }
   accepted++;number=Math.max(number,Number(row.label.slice(1))+1);
  }
- if(!accepted)return clone(project);
+ // Preserve identity for a no-op so callers can skip history and persistence.
+ if(!accepted)return project;
  if(next.pending.length>1000||next.markers.length+next.pending.length>3000)throw Error('Zu viele Proben im Projekt (maximal 1000 offen, 3000 insgesamt).');
  if(number>=1e9)throw Error('Probenzähler ausgeschöpft.');
  if((next.labReports?.length||0)>=3000)throw Error('Zu viele gespeicherte Laborberichte (maximal 3000).');

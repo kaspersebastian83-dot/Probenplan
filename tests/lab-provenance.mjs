@@ -22,7 +22,7 @@ await check('Modell: isolierte Berichte, atomare Konflikte, Deep-Clone und Herku
  assert.equal(a.pending.length,9);assert.ok(a.pending.every(r=>r.reportId===id));assert.equal(p.labReports,undefined);
  const importedHistory=new model.History();importedHistory.push(p);const empty=importedHistory.undo(a);assert.deepEqual(empty,p);assert.deepEqual(importedHistory.redo(empty),a);
  assert.throws(()=>origins.applyLabImport(a,report,new Map()),/konflikt/i);assert.deepEqual(a,old);
- assert.deepEqual(origins.applyLabImport(a,report,new Map(labRows.map(r=>[r,'skip']))),a);
+ assert.strictEqual(origins.applyLabImport(a,report,new Map(labRows.map(r=>[r,'skip']))),a);
  const b=origins.applyLabImport(a,report,new Map(labRows.map(r=>[r,'next'])));assert.notEqual(b.labReports[1].id,id);assert.equal(b.pending[9].label,'P10');
  const clone=model.clone(a);clone.labReports[0].sources.xml='changed.xml';clone.labReports[0].labor='Other';clone.pending[0].reportId='other';assert.deepEqual(a,old);
  const history=new model.History();history.push(a);b.labReports[1].labor='Changed';const prev=history.undo(b);assert.deepEqual(prev,a);assert.deepEqual(history.redo(prev),b);
@@ -57,6 +57,33 @@ async function jsonExport(page,id,edits={}){
 for(const engine of ['chromium','webkit']){
  const browser=await ({chromium,webkit}[engine]).launch();
  try{
+  await check(`${engine}: ausschließlich Überspringen erhält Projekt, Undo/Redo und schreibt nicht in IndexedDB`,async()=>{
+   const context=await browser.newContext({viewport:{width:1500,height:1050},acceptDownloads:true});
+   try{
+    const page=await context.newPage();await page.goto(base);const empty=await plan(page);
+    const files=[file('noop.xml',labXML(labRows.slice(0,2)))];await review(page,files);const imported=await accept(page);
+    await page.locator('#report').fill('Synthetischer Redo-Schritt');await page.locator('#report').press('Tab');const edited=await savedProject(page);
+    await page.locator('#undo').click();assert.deepEqual(await savedProject(page),imported);
+    const skipAll=async()=>{
+     const before=await savedProject(page),buttons={undo:await page.locator('#undo').isEnabled(),redo:await page.locator('#redo').isEnabled()};
+     await page.evaluate(()=>{window.noopWrites=0;window.noopOriginalPut=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(...args){if(this.name==='projects')window.noopWrites++;return window.noopOriginalPut.apply(this,args);};});
+     try{
+      await review(page,files);for(const row of await page.locator('[data-lab-row]').all())await row.locator('select').selectOption('skip');await accept(page);
+      assert.deepEqual(await savedProject(page),before);assert.equal(await page.evaluate(()=>window.noopWrites),0,'No-op darf keine Autosicherung auslösen');
+      assert.deepEqual({undo:await page.locator('#undo').isEnabled(),redo:await page.locator('#redo').isEnabled()},buttons);
+     }finally{await page.evaluate(()=>{IDBObjectStore.prototype.put=window.noopOriginalPut;delete window.noopOriginalPut;delete window.noopWrites;});}
+    };
+    await skipAll();
+    // Check actual history contents, not just the state of the history buttons.
+    await page.locator('#redo').click();assert.deepEqual(await savedProject(page),edited);
+    await page.locator('#undo').click();assert.deepEqual(await savedProject(page),imported);
+    await page.locator('#undo').click();assert.deepEqual(await savedProject(page),empty);assert.equal(await page.locator('#undo').isEnabled(),false);
+    await page.locator('#redo').click();assert.deepEqual(await savedProject(page),imported);
+    await page.locator('#redo').click();assert.deepEqual(await savedProject(page),edited);assert.equal(await page.locator('#redo').isEnabled(),false);
+    await openProject(page,imported,true);assert.equal(await page.locator('#undo').isEnabled(),false);assert.equal(await page.locator('#redo').isEnabled(),false);
+    await skipAll();assert.deepEqual(await downloadedProject(page),imported);
+   }finally{await context.close();}
+  });
   // Fresh contexts ensure no report objects, dialog state or IndexedDB survive a file roundtrip.
   for(const mode of ['xml','pdf','combined'])await check(`${engine}: ${mode}, P1–P9 mit drei platzierten Proben, Datei/Neustart/JSON ohne Nacherfassung`,async()=>{
    let context=await browser.newContext({viewport:{width:1500,height:1050},acceptDownloads:true}),page=await context.newPage();await page.goto(base);await plan(page);
