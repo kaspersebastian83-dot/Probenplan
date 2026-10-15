@@ -13,6 +13,8 @@ process.once('SIGINT',()=>stop('SIGINT'));process.once('SIGTERM',()=>stop('SIGTE
 try{
  for(const suite of suites){if(interrupted)break;console.log(`\n=== ${suite} ===`);const start=Date.now();let output='';
   const code=await new Promise((resolve,reject)=>{child=spawn(process.execPath,['tests/execute.mjs',suite],{env:{...process.env,TEST_URL:base,TEST_SUITE:suite,AREA_ENGINE:'',TEST_FILTER:''},stdio:['ignore','pipe','pipe'],timeout:10*60*1000,killSignal:'SIGTERM'});for(const [stream,dest] of [[child.stdout,process.stdout],[child.stderr,process.stderr]])stream.on('data',data=>{output+=data;dest.write(data);});child.once('error',reject);child.once('exit',code=>resolve(code));});
-  await writeFile(`.test-output/${suite}.log`,output);results.push({suite,code,durationMs:Date.now()-start});if(code!==0)process.exitCode=1;
+  await writeFile(`.test-output/${suite}.log`,output);results.push({suite,code,durationMs:Date.now()-start});if(code!==0){process.exitCode=1;
+   // In GitHub Actions erscheint der Fehler zusätzlich als Annotation direkt am Pull Request.
+   if(process.env.GITHUB_ACTIONS){const tail=output.replace(/\u001b\[[0-9;]*m/g,'').split('\n').filter(l=>!/^OK /.test(l)).join('\n').trim().slice(-1500);console.log(`::error title=Testsuite ${suite}::${tail.replace(/%/g,'%25').replace(/\r/g,'').replace(/\n/g,'%0A')}`);}}
  }
 }finally{await writeFile('.test-output/summary.json',JSON.stringify(results,null,2));await new Promise(resolve=>server.httpServer.close(resolve));}
