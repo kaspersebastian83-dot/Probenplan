@@ -95,3 +95,16 @@ dialog.export-card label{margin-top:12px}
 dialog.export-card .export-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 dialog.export-card .export-dim{margin:14px 0}
 dialog.export-card #export{min-height:44px}
+
+/* Schmalere Fenster (z. B. halbe Bildschirmbreite, Tablet): Kopfzeile bricht um, nichts wird abgeschnitten. */
+@media(max-width:1279px){
+  .topbar{height:auto;min-height:48px;flex-wrap:wrap;row-gap:6px;padding:8px 10px}
+  .tb-doc{border-left:0;padding-left:0;margin-left:0}
+  #canvas-name{max-width:180px}
+}
+@media(max-width:700px){
+  .rail{width:58px}.rail .mode{width:50px;font-size:9px}
+  .kit-panel{position:absolute;right:0;top:auto;bottom:0;height:55dvh;width:100%;z-index:5;box-shadow:0 -4px 16px rgba(40,72,116,.18)}
+  .kit-workspace{position:relative}
+  #toolbar{top:6px}#toolbar #mode-hint{display:none}
+}
