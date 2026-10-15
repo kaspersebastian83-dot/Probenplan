@@ -1,3 +1,37 @@
+# Prüfprotokoll – Probenplan 1.3.1
+
+## Dauerhafte Labor-Herkunft (15. Oktober 2026)
+
+Basis: Remote-`main` `4feae48` einschließlich PR #6. Feature-Branch `codex/fix/persist-lab-provenance`; keine automatische Zusammenführung oder Produktivveröffentlichung.
+
+Projektformat 4 erhält optionale `labReports` und `reportId` an offenen sowie platzierten Proben. Berichtsnummer, Labor, vollständige Auftragsreferenz, optionale Batchkennung und strukturierte XML-/PDF-Dateinamen werden über Dateisicherung, IndexedDB und Undo/Redo erhalten. Gleiche/leere Berichtsnummern und gleiche Dateinamen werden über eigene interne IDs getrennt. Rohdateien, rohe Analysen und lokale Dateipfade sind nicht Teil der gespeicherten Herkunft.
+
+Der mosaik-probenliste-JSON-Export bleibt in Schema/Version 1. Er übernimmt gespeicherte Metadaten und alle offenen/platzierten Proben des ausdrücklich ausgewählten Berichts. JSON-Metadatenkorrekturen ändern die interne Zuordnung nicht. Legacy-Proben ohne Herkunft bleiben Legacy-Proben. Neue Importe überschreiben Herkunft nur nach expliziter Ersetzen-Auswahl; Überspringen, Abbrechen und Fehler erhalten den bestehenden Zustand. Widersprüchliche XML-/PDF-Paare werden abgewiesen.
+
+### Vollständiger lokaler Testlauf
+
+`pnpm build` einschließlich TypeScript: erfolgreich. `pnpm test`: alle neun Suites, Exit-Code 0. Die 20 neuen Herkunfts-Prüfgruppen enthalten XML-only/PDF-only/kombiniert, P1–P9 mit P1–P3 platziert und P4–P9 offen, Dateiöffnung in frischen Browserkontexten, IndexedDB-Neustart, JSON ohne Nacherfassung, Batch, vier Berichte bei gleichen/leeren Nummern, Konflikte, Umnummerierung, Import-Abbruch und Formate 1–4. Fehlende/doppelte/ungültige Herkunft und zusätzliche Rohdatenfelder werden gesondert geprüft. Sämtliche Testdaten sind synthetisch.
+
+| Suite | Erfolgreiche Prüfgruppen |
+| --- | ---: |
+| `browser` | 14 |
+| `edge-cases` | 5 |
+| `import-preparation` | 26 |
+| `scoped-pdf` | 1 |
+| `areas` | 19 |
+| `keyboard` | 2 |
+| `marker-pan` | 16 |
+| `labreport` | 22 |
+| `lab-provenance` | 20 |
+
+Insgesamt 125 Prüfgruppen. Chromium und WebKit, einschließlich bestehender Touch-/Pen-, Bildexport-, Planwerkzeug- und Offline-Regressionsprüfungen. GitHub Actions führt dieselbe vollständige Suite im Pull Request aus; der aktuelle Lauf ist beim PR einsehbar.
+
+### Verbleibende Grenzen
+
+Bereits in älteren Dateien verlorene Herkunft kann nicht rekonstruiert werden und muss ergänzt werden. Alte Programmversionen kennen die zusätzlichen Felder nicht und können sie beim Speichern entfernen. PDF-Erkennung bleibt vom vorhandenen Layout und der Textschicht abhängig. Automatisches WebKit ersetzt keine Geräteprüfung von iPhone-/iPad-Dateidialogen und Speichergrenzen. Keine Änderungen an Planwerkzeugen, Probenplatzierung oder grafischem Export.
+
+## Historischer Stand 1.3.0
+
 # Prüfprotokoll – Probenplan 1.3.0
 
 ## Laborbericht-Import (14. Oktober 2026)

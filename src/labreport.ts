@@ -1,7 +1,8 @@
-import type {LabSample,Project} from './model';
+import type {LabSample,LabSources,Project} from './model';
+import {sourceFilename} from './lab-provenance';
 export interface TextItem {text:string;x:number;y:number;width:number;height:number}
 export interface TextPage {width:number;height:number;items:TextItem[]}
-export interface LabReport {bericht:string;labor:string;auftragsreferenz:string;quelle:string;batch:string;rows:LabSample[];expected:number|null;references:string[];warnings:string[];results:{ref:string;parameter:string;result:string;unit:string;loq:string}[]}
+export interface LabReport {bericht:string;labor:string;auftragsreferenz:string;quelle:string;batch:string;sources:LabSources;rows:LabSample[];expected:number|null;references:string[];warnings:string[];results:{ref:string;parameter:string;result:string;unit:string;loq:string}[]}
 const tidy=(s:string)=>s.normalize('NFC').replace(/\s+/g,' ').trim();
 const norm=(s:string)=>tidy(s).toLocaleLowerCase('de').replace(/[^\p{L}\p{N}]/gu,'');
 export function referenceLabel(ref:string){const s=tidy(ref),match=s.match(/^(?:Probe|P)\s*(\d+)$/i)||s.match(/-(\d+)$/);if(!match)return '';const n=Number(match[1]);return Number.isSafeInteger(n)&&n>0&&n<1e9?`P${n}`:'';}
@@ -12,7 +13,7 @@ export function berlinDate(value:string){
  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(value));const get=(type:string)=>parts.find(p=>p.type===type)!.value;return `${get('year')}-${get('month')}-${get('day')}`;
 }
 export function validDate(s:string){return /^\d{4}-\d{2}-\d{2}$/.test(s)&&Number.isFinite(Date.parse(s))&&new Date(s).toISOString().slice(0,10)===s;}
-export function blankReport(quelle=''):LabReport{return {bericht:'',labor:'',auftragsreferenz:'',quelle,batch:'',rows:[],expected:null,references:[],warnings:[],results:[]};}
+export function blankReport(quelle=''):LabReport{quelle=sourceFilename(quelle);return {bericht:'',labor:'',auftragsreferenz:'',quelle,batch:'',sources:/\.xml$/i.test(quelle)?{xml:quelle}:/\.pdf$/i.test(quelle)?{pdf:quelle}:{},rows:[],expected:null,references:[],warnings:[],results:[]};}
 const children=(el:Element,name:string)=>[...el.children].filter(e=>e.localName===name);
 const child=(el:Element,name:string)=>children(el,name)[0];
 const value=(el:Element,name:string)=>tidy(child(el,name)?.textContent||'');
@@ -49,6 +50,7 @@ function rowsOnPage(page:TextPage){
 export function parseLabPDF(pages:TextPage[],quelle=''):LabReport{
  const report=blankReport(quelle),all=pages.map(rowsOnPage),cover=all[0]||[];const coverValue=(re:RegExp)=>{const line=cover.find(l=>re.test(l.text));return line?tidy(line.text.replace(re,'')):'';};
  report.bericht=coverValue(/.*?Pr[üu]fberichtsnummer\s*:?\s*/i).match(/AR-[\w-]+/i)?.[0]||'';report.auftragsreferenz=coverValue(/.*?(?:Ihre\s+)?Auftragsreferenz\s*:?\s*/i);report.labor=pages.some(p=>p.items.some(i=>/eurofins/i.test(i.text)))?'Eurofins':'';
+ report.batch=coverValue(/^Batch(?:kennung|code|[-\s]*Nr\.?)\s*:?\s*/i);
  const count=coverValue(/.*?Anzahl\s+Proben\s*:?\s*/i).match(/^\d+/);report.expected=count?Number(count[0]):null;const art=coverValue(/^Probenart\s*:?\s*/i),coverDate=berlinDate(coverValue(/^Probenahme(?:zeitraum|datum)\s*:?\s*/i));
  const resultInfo=new Map<string,{datum:string;labNr:string}>();
  // Results are transposed: find sample columns by position, then inspect dates/lab IDs below them.
@@ -102,5 +104,12 @@ export async function readLabFiles(files:File[]):Promise<LabReport>{
  let a:LabReport|null=null,b:LabReport|null=null;const errors:string[]=[];
  if(xml.length)try{a=parseLabXML(await xml[0].text(),xml[0].name);}catch(e){errors.push((e as Error).message);}
  if(pdf.length)try{const {openPDF}=await import('./pdf'),doc=await openPDF(pdf[0].name,new Uint8Array(await pdf[0].arrayBuffer()));try{b=parseLabPDF(await doc.text(),pdf[0].name);}finally{await doc.close();}}catch(e){errors.push((e as Error).message);}
- const report=a||b||blankReport(files.map(f=>f.name).join(' + '));if(a&&b){report.warnings.push(...compareReports(a,b));const xmlRefs=new Set(a.rows.map(r=>norm(r.ref)));for(const row of b.rows)if(!xmlRefs.has(norm(row.ref)))report.rows.push({...row});report.quelle=files.map(f=>f.name).join(' + ');}report.warnings.push(...errors);return report;
+ const report=a||b||blankReport();if(a&&b){
+  if(a.bericht&&b.bericht&&a.bericht!==b.bericht)throw Error('XML und PDF gehören zu unterschiedlichen Berichten. Bitte getrennt importieren.');
+  if(a.auftragsreferenz&&b.auftragsreferenz&&a.auftragsreferenz!==b.auftragsreferenz)throw Error('XML und PDF haben unterschiedliche Auftragsreferenzen. Bitte getrennt importieren.');
+  if(a.batch&&b.batch&&a.batch!==b.batch)throw Error('XML und PDF haben unterschiedliche Batchkennungen. Bitte getrennt importieren.');
+  report.warnings.push(...compareReports(a,b));const xmlRefs=new Set(a.rows.map(r=>norm(r.ref)));for(const row of b.rows)if(!xmlRefs.has(norm(row.ref)))report.rows.push({...row});
+  report.bericht||=b.bericht;report.labor||=b.labor;report.auftragsreferenz||=b.auftragsreferenz;report.batch||=b.batch;
+ }
+ report.sources={...(a?{xml:sourceFilename(xml[0].name)}:{}),...(b?{pdf:sourceFilename(pdf[0].name)}:{})};report.quelle=[report.sources.xml,report.sources.pdf].filter(Boolean).join(' + ');report.warnings.push(...errors);return report;
 }
