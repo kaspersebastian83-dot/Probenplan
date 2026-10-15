@@ -1,8 +1,8 @@
-# Probenplan 1.2
+# Probenplan 1.3
 
 Lokale Webapp für beschriftete Grundrisse nach Brandschäden. TypeScript + Vite, ohne UI-Framework, Serverdatenbank, Konten oder externe Dienste.
 
-Version 1.2.0 ergänzt transparente Schadensflächen und eine automatisch gruppierte Exportlegende. PDF-Import, Seitenauswahl, Drehen und Zuschneiden aus 1.1 bleiben erhalten. Die Freigabe erfolgt über einen Pull Request; der Feature-Branch wird nicht auf die produktive Website bereitgestellt.
+Version 1.3.0 ergänzt den lokalen Laborbericht-Import aus Eurofins-XML oder PDF, eine bearbeitbare Probenprüfung und die Platzierung offener Laborproben. PDF-Grundrisse, Bildvorbereitung, Schadensflächen, Tastaturkürzel und intuitives Verschieben in Setzwerkzeugen bleiben erhalten. Änderungen siehe `CHANGELOG.md`. Die Freigabe erfolgt über einen Pull Request; der Feature-Branch wird nicht auf die produktive Website bereitgestellt.
 
 ## Online öffnen und installieren
 
@@ -40,6 +40,18 @@ Zur Entwicklung `npm run dev`. Die Offlinefunktion ist für den **Produktionsbui
 6. **Exportieren:** Optional Gutachtennummer und Datum eingeben (Datum kann geleert werden), PNG/JPG und 3.500/4.600 px wählen. Die tatsächlichen Abmessungen stehen darunter. Der Export umfasst immer den kompletten Grundriss mit Legende, auch bei starkem Zoom oder Beschriftungen außerhalb des Plans. Nach erfolgreicher Erstellung startet der Download; ein Link erlaubt erneutes Speichern.
 
 Die SVG wird beim Export neu gerendert. Eingebettete Schriften und Rasterbilder bleiben erhalten. Eine PNG-/JPG-Vorlage bleibt dagegen eine Rastervorlage; höhere Ausgabeauflösung ergänzt dort keine Details. Beide Formate haben einen weißen Hintergrund, JPG verwendet hohe Qualität. Die Legende unterscheidet runde Probenmarker und rautenförmige Brandherdmarker auch ohne Farbe. **Notizen werden nur im Projekt gespeichert, nicht im Bild abgedruckt.**
+
+### Laborbericht importieren
+
+Zuerst einen Grundriss laden. **„Laborbericht importieren …“** akzeptiert eine Eurofins-XML, eine PDF oder beide gemeinsam; Dateien lassen sich auch auf die App ziehen. XML ist die bevorzugte Quelle. Eine Prüftabelle zeigt P-Nummer, Referenz, Beschreibung, Probenart, Labor-Nr. und Probenahmedatum. Alle Texte sind bearbeitbar; Zeilen können hinzugefügt, entfernt und mit ↑/↓ sortiert werden. Änderungen werden erst mit **„Übernehmen“** ins Projekt geschrieben. Bei unbekannten Referenzen die P-Nummer ergänzen. Mengenabweichungen, Referenz-/Beschreibungsunterschiede und eine abweichende Gutachtennummer erscheinen als Warnungen. Zusätzliche PDF-Proben fehlen nicht stillschweigend, sondern bleiben zur Prüfung erhalten. Doppelte P-Nummern verhindern die Übernahme, bis sie korrigiert sind.
+
+Bei belegten Kennungen ausdrücklich **Überspringen**, **Notiz und Labordaten aktualisieren** (bestehender Probenmarker behält Position/Schild) oder **Nächste freie P-Nummer** wählen. Offene Proben und Flächenkennungen werden ebenfalls berücksichtigt. Unter **„Noch zu platzieren“** einen Eintrag mit Maus, Stift oder Touch auf den Plan ziehen. Alternativ den Eintrag wählen und in den Plan klicken/tippen; Ziehen im Plan verschiebt weiterhin die Ansicht. Der Zähler zeigt den Fortschritt. Platzierung und Übernahme unterstützen Undo/Redo. Manuelle Proben beginnen hinter der höchsten übernommenen P-Nummer; offene Nummern werden reserviert.
+
+Projektformat **4** speichert `Marker.lab` und die offene Liste `Project.pending`. Nach Dateiexport oder Offline-Neustart kann die Platzierung fortgesetzt werden. Formate 1–3 bleiben unverändert lesbar; ohne Laborimport entstehen keine zusätzlichen Labordatenfelder. Beschreibung als Notiz und Labor-Metadaten bleiben im Projekt; der Bildexport enthält weiterhin ausschließlich Plan, Kennungen und Legenden. Kein Upload, OCR-Dienst oder Auswerten von Schadstoffgrenzen. XML-Analysenwerte werden im Parser getrennt als unveränderte Ergebnis-/Einheiten-/LOQ-Zeichenketten bereitgestellt, derzeit weder dargestellt noch in Projektdateien gespeichert.
+
+**„Probenliste speichern“** schreibt `<Projektnummer>_Probenliste.json` im Format `mosaik-probenliste` für andere Apps. Chrome/Edge bieten den nativen Dateidialog; dort **Projektordner → Laborergebnisse** wählen. Die App kann diesen externen Ordner nicht automatisch ermitteln. Nicht unterstützende Browser verwenden den Download. Die Datei enthält ausgewählte/geprüfte Proben bzw. die offenen und platzierten Proben des gewählten Berichts. Nach einem Projekt-Neustart sind Berichtsnummer und Probenfelder vorhanden; Laborname, vollständige Auftragsreferenz und Quelldateiname im JSON-Dialog ergänzen. Diese Herkunftsangaben werden bewusst nicht als zusätzliche Projektfelder eingeführt. Die Prüftabelle kann die JSON-Datei auch vor Übernahme speichern.
+
+Grenzen: XML maximal 10 MB; PDF maximal 60 MB / 100 Seiten / 2 Millionen Textzeichen; maximal 1000 offene bzw. 3000 gesamte Marker/Reservierungen; Beschreibung maximal 500 Zeichen. XML mit DTD/Entitäten wird abgewiesen. PDF-Erkennung benötigt eine Textschicht und eine passende Tabelle mit Probennummer, Probenart, Referenz und Beschreibung. Mehrzeilige/fortgesetzte Eurofins-Tabellen und gängige Spaltennamen werden berücksichtigt; beliebige Laborlayouts oder Scans werden nicht zuverlässig erkannt. Ohne Tabelle erscheint eine leere Prüfliste mit Hinweis zur XML bzw. manuellen Eingabe. Eingangsdatum wird nicht als Probenahmedatum übernommen; UTC-XML-Daten werden auf den Kalendertag in Europe/Berlin umgerechnet. Auf kleinen Touchscreens ist Auswahl + Tippen häufig einfacher als langes Ziehen. Echte iPhone-/iPad-Geräteprüfungen bleiben zusätzlich erforderlich.
 
 ## Schadensflächen und automatische Legende
 
@@ -102,6 +114,8 @@ Offlinebereitschaft kann durch das Löschen von Browserdaten oder automatische S
 - `src/main.ts`: Oberfläche, Pointer-/Touchbedienung, Kamerasteuerung.
 - `src/model.ts`: Plan-Koordinaten, Kennungen, Markersymbole, Undo/Redo.
 - `src/areas.ts`: Polygonprüfung, Farben/Konturen, Flächenschilder und Legendenkategorien.
+- `src/labreport.ts`: XML-/PDF-Tabellenparser, Datum, Referenzmapping und Abgleich.
+- `src/labui.ts`: bearbeitbare Laborprüfung, Konfliktentscheidungen, Pointer-Platzierung und JSON-Probenliste.
 - `src/import.ts`: ZIP-Auswahl, SVG-Bereinigung, Projektvalidierung.
 - `src/export.ts`: hochauflösender Canvas-Export mit separatem Beschriftungsbereich.
 - `src/storage.ts`: IndexedDB und Dateidownloads.
@@ -125,9 +139,7 @@ Details siehe `PRUEFPROTOKOLL.md`. Mit laufendem Produktionsserver:
 npm test
 ```
 
-Die Tests benötigen installierte Desktopversionen von Google Chrome und Microsoft Edge sowie die originale ZIP im Projektordner oder unter `beispiele/`. Ergebnisse liegen ausschließlich im ignorierten Ordner `.test-output/`. Die ZIP, Projektdateien, Testbilder, Abhängigkeiten und Buildausgabe sind aus Git ausgeschlossen.
-
-Die Haupttests prüfen Chrome und Edge. Zusätzlich wird eine lokale Playwright-WebKit-Testlaufzeit verwendet (`node node_modules/@playwright/test/cli.js install webkit`, falls noch nicht vorhanden). Die neuen Test-PDFs enthalten ausschließlich synthetische Geometrie und werden unter `.test-output/v1.1/` erzeugt. `tests/areas.mjs` prüft Geometrie, UI, Gruppierung, Textumbruch, Pixelvergleich PNG/JPG, PDF, Vorbereitung, Speicherung, Offline und Touch; Nachweise unter `.test-output/v1.2/`. Die ursprünglichen Tests benötigen die echte Polycam-ZIP lokal; sie wird nicht in Git aufgenommen.
+Die automatisierte Suite verwendet ausschließlich synthetische Vorlagen und Playwright-Chromium/WebKit. Sie startet und beendet einen eigenen Testserver. Details und Laufzeitinstallation siehe `tests/README.md`; keine echten ZIPs oder Laborberichte werden in Tests/CI gelesen.
 
 **Noch ausstehend:** echte iPhone-/iPad-Geräte, Safari/PWA-Installation unter iOS/iPadOS und reale Speichermangelsituationen. WebKit unter Windows und mobile Chromium-Emulation ersetzen diese Tests nicht. Auf dem iPhone/iPad vor endgültiger Freigabe besonders Flächen zeichnen/abschließen, Eckpunkte ziehen, Farb-/Deckkraftwechsel, Legende in PNG/JPG, Projektdateien mit Flächen, PDF-Auswahl, Touch-Zuschnitt, Proben/Schilder ziehen, JPG-/PNG-Downloads, Projektdateien über die Dateien-App und Offline-Neustart mit anschließendem PDF-Import prüfen.
 
@@ -137,4 +149,4 @@ In den Repository-Einstellungen unter **Pages → Build and deployment → Sourc
 
 Vite verwendet relative Assetpfade. Die App funktioniert dadurch sowohl lokal als auch im GitHub-Pages-Unterverzeichnis `/Probenplan/`.
 
-Für Version 1.2 wird ausschließlich `codex/feature/probenplan-1-2-areas` gepusht. Ausgangspunkt ist der tatsächliche Remote-`main` mit dem Squash-Merge der Version 1.1. Der bestehende Pages-Workflow veröffentlicht nur Pushes auf `main` (oder einen ausdrücklich ausgelösten manuellen Lauf). Den Pull Request erst nach Freigabe mergen; dadurch wird die automatische Veröffentlichung ausgelöst.
+Für Version 1.3 wird ausschließlich `codex/feature/lab-report-import` gepusht. Ausgangspunkt ist der aktuelle Remote-`main` einschließlich des Pan-Features. Der bestehende Pages-Workflow veröffentlicht nur Pushes auf `main` (oder einen ausdrücklich ausgelösten manuellen Lauf). Den Pull Request erst nach Freigabe mergen; dadurch wird die automatische Veröffentlichung ausgelöst.

@@ -1,17 +1,19 @@
 export type Kind = 'sample' | 'fire';
-export interface Marker { id: string; kind: Kind; label: string; note: string; x: number; y: number; lx: number; ly: number }
+export interface LabData {ref:string;desc:string;art?:string;labNr?:string;datum?:string;bericht?:string}
+export interface LabSample extends LabData {label:string}
+export interface Marker { id: string; kind: Kind; label: string; note: string; x: number; y: number; lx: number; ly: number; lab?:LabData }
 export interface Rect { x:number; y:number; width:number; height:number }
 export interface Point { x:number; y:number }
 export interface Area { id:string; label:string; name:string; color:string; opacity:number; points:Point[] }
 export interface Preparation { sourceWidth:number; sourceHeight:number; rotation:0|90|180|270; crop:Rect }
 export interface Plan { name: string; width: number; height: number; data: string; vector: boolean; preparation?:Preparation; pdf?:{page:number; totalPages:number; renderLongSide:number} }
-export interface Project { format: 'probenplan'; version: 1|2|3; plan: Plan; markers: Marker[]; nextSample: number; nextFire: number; report: string; date: string; areas?:Area[]; nextArea?:number }
+export interface Project { format: 'probenplan'; version: 1|2|3|4; plan: Plan; markers: Marker[]; nextSample: number; nextFire: number; report: string; date: string; areas?:Area[]; nextArea?:number; pending?:LabSample[] }
 export const clone = <T>(value: T): T => {
   if(value && typeof value==='object' && 'format' in value && value.format==='probenplan'){
     const p=value as unknown as Project;
     // Image data is immutable. Share the large string across history snapshots;
     // only coordinates and preparation metadata need independent copies.
-    return {...p,plan:{...p.plan,...(p.plan.preparation?{preparation:structuredClone(p.plan.preparation)}:{}),...(p.plan.pdf?{pdf:{...p.plan.pdf}}:{})},markers:p.markers.map(m=>({...m})),...(p.areas?{areas:p.areas.map(a=>({...a,points:a.points.map(pt=>({...pt}))}))}:{})} as T;
+    return {...p,plan:{...p.plan,...(p.plan.preparation?{preparation:structuredClone(p.plan.preparation)}:{}),...(p.plan.pdf?{pdf:{...p.plan.pdf}}:{})},markers:p.markers.map(m=>({...m,...(m.lab?{lab:{...m.lab}}:{})})),...(p.pending?{pending:p.pending.map(r=>({...r}))}:{}),...(p.areas?{areas:p.areas.map(a=>({...a,points:a.points.map(pt=>({...pt}))}))}:{})} as T;
   }
   return structuredClone(value);
 };
@@ -19,10 +21,10 @@ export const escape = (s: string) => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<
 export function createProject(plan: Plan): Project { return {format:'probenplan',version:plan.pdf||plan.preparation?2:1,plan,markers:[],nextSample:1,nextFire:1,report:'',date: new Date().toLocaleDateString('sv-SE')}; }
 export function addMarker(p: Project, kind: Kind, x: number, y: number): Marker {
   const key = kind === 'sample' ? 'nextSample' : 'nextFire'; const prefix = kind === 'sample' ? 'P' : 'B';
-  let number=p[key]; while([...p.markers,...(p.areas||[])].some(m=>m.label.toLocaleUpperCase()===`${prefix}${number}`))number++;
+  let number=p[key]; while([...p.markers,...(p.areas||[]),...(p.pending||[]).map(r=>({...r,id:''}))].some(m=>m.label.toLocaleUpperCase()===`${prefix}${number}`))number++;
   p[key]=number+1; const m={id:crypto.randomUUID(),kind,label:`${prefix}${number}`,note:'',x,y,lx:x,ly:y}; p.markers.push(m); return m;
 }
-export function validLabel(p: Project, label: string, id: string) { return /^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,15}$/u.test(label) && ![...p.markers,...(p.areas||[])].some(m=>m.id!==id && m.label.toLocaleUpperCase()===label.toLocaleUpperCase()); }
+export function validLabel(p: Project, label: string, id: string) { return /^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,15}$/u.test(label) && ![...p.markers,...(p.areas||[]),...(p.pending||[]).map(r=>({...r,id:''}))].some(m=>m.id!==id && m.label.toLocaleUpperCase()===label.toLocaleUpperCase()); }
 export function markerSize(p: Project) { return Math.max(p.plan.width,p.plan.height)/65; }
 export function labelRadius(p: Project,m:Marker) { return markerSize(p)*Math.max(1,m.label.length*.34); }
 export function bounds(p:Project) {

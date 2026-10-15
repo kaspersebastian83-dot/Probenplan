@@ -1,4 +1,4 @@
-import {getDocument,GlobalWorkerOptions,type PDFDocumentProxy,type PDFDocumentLoadingTask} from 'pdfjs-dist/legacy/build/pdf.mjs';
+import {getDocument,GlobalWorkerOptions,Util,type PDFDocumentProxy,type PDFDocumentLoadingTask} from 'pdfjs-dist/legacy/build/pdf.mjs';
 import workerURL from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url';
 import type {Plan} from './model';
 GlobalWorkerOptions.workerSrc=workerURL;
@@ -17,6 +17,12 @@ function pdfError(error:unknown):Error{
 export class LocalPDF {
   constructor(private document:PDFDocumentProxy,private task:PDFDocumentLoadingTask,readonly name:string){}
   get pages(){return this.document.numPages;}
+  async text():Promise<import('./labreport').TextPage[]>{
+    if(this.pages>100)throw Error('Laborbericht mit mehr als 100 Seiten. Bitte einen kürzeren Bericht verwenden.');
+    const pages:import('./labreport').TextPage[]=[];let count=0;
+    for(let number=1;number<=this.pages;number++){const page=await this.document.getPage(number),viewport=page.getViewport({scale:1});try{const content=await deadline(page.getTextContent(),()=>{void this.task.destroy();},'Die PDF-Texterkennung');const items=content.items.flatMap(item=>{if(!('str' in item))return [];const m=Util.transform(viewport.transform,item.transform);count+=item.str.length;if(count>2_000_000)throw Error('Zu viel Text im Laborbericht. Bitte einen kleineren Bericht verwenden.');return [{text:item.str,x:m[4],y:m[5],width:item.width,height:item.height}];});pages.push({width:viewport.width,height:viewport.height,items});}finally{page.cleanup();}}
+    return pages;
+  }
   async preview(page:number):Promise<string>{return (await this.render(page,650,500_000)).data;}
   private async render(number:number,maxSide:number,maxPixels:number){
     if(!Number.isInteger(number)||number<1||number>this.pages)throw Error('Bitte eine gültige PDF-Seite auswählen.');
