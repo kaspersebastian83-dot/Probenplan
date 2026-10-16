@@ -108,7 +108,9 @@ function renderAreas(){
 function requireFinished(){if(!draftPoints.length)return true;toast('Bitte die gezeichnete Fläche zuerst abschließen oder abbrechen.',true);return false;}
 function exportFormat(){return input('format').value as 'png'|'jpeg'|'pdf-a4'|'pdf-a3';}
 function dimensions(){if(!project)return;const format=exportFormat(),pdf=format.startsWith('pdf');
-  $('quality-field').hidden=pdf;$('export').textContent=pdf?'↓ PDF exportieren':'↓ Bild exportieren';
+  // Beschriftung nur bei Änderung und nie während eines Exports setzen: WebKit verwirft einen Klick, wenn der Text
+  // unter dem Mauszeiger zwischen Drücken und Loslassen ersetzt wird (z. B. Neuzeichnen nach Verlassen eines Feldes).
+  $('quality-field').hidden=pdf;const label=pdf?'↓ PDF exportieren':'↓ Bild exportieren';if(!busy&&$('export').textContent!==label)$('export').textContent=label;
   if(!pdf){const l=exportLayout(project,Number(input('quality').value));$('dimensions').textContent=`${l.pixelWidth.toLocaleString('de-DE')} × ${l.pixelHeight.toLocaleString('de-DE')} px`;$('dimensions-note').textContent='Inklusive Rand und Legende';return;}
   if(!$<HTMLDialogElement>('export-dialog').open)return;
   const resultsView=!$('view-field').hidden&&input('view').value==='results',all=sheetCount(project)>1&&input('scope').value==='all';
