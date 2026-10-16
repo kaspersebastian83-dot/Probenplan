@@ -178,3 +178,12 @@ dialog.export-card #export{min-height:44px}
   .tb-spacer{display:none}
 }
 @media(min-width:701px) and (max-width:1000px){.kit-panel{width:260px}}
+
+/* Punktgröße je Plan */
+.size-section{border-bottom:1px solid var(--kit-line);padding-bottom:10px;margin-bottom:10px}
+.size-section .section-heading{display:flex;align-items:baseline;justify-content:space-between}
+.size-value{font:600 12px var(--kit-mono,monospace);color:var(--kit-accent)}
+.size-section input[type=range]{width:100%;margin:8px 0 2px;min-height:0;padding:0;accent-color:var(--kit-accent)}
+.size-row{display:flex;align-items:center;gap:8px}
+.size-row button{font-size:11px;min-height:26px;padding:2px 8px;white-space:nowrap}
+.size-row .tiny{margin:0}

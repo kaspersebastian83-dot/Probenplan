@@ -3,7 +3,7 @@ import type {LabData} from './model';
 import {copyOrigin,validOrigin} from './lab-provenance';
 import DOMPurify from 'dompurify';
 import { unzipSync } from 'fflate';
-import { type Plan, type Project, type Preparation, type Sheet, type ResultSettings, type Scale, validLabel, MAX_SHEETS, cleanSheetName, allMarkers, allAreas } from './model';
+import { MARKER_SCALE, type Plan, type Project, type Preparation, type Sheet, type ResultSettings, type Scale, validLabel, MAX_SHEETS, cleanSheetName, allMarkers, allAreas } from './model';
 import {MAX_AREAS,MAX_POINTS,PALETTE,cleanName,polygonError} from './areas';
 const MAX=60*1024*1024;
 const safeData=(s:string)=>/^data:(?:image\/(?:png|jpeg|webp|gif)|font\/(?:woff2?|ttf|otf)|application\/(?:font-woff|x-font-ttf|vnd.ms-fontobject|octet-stream))(?:;charset=[\w-]+)?;base64,[a-z0-9+/=\s]+$/i.test(s);
@@ -112,6 +112,7 @@ async function validateSingle(p:Project):Promise<Project>{
     if(c.x+c.width>w+.01||c.y+c.height>h+.01||Math.abs(p.plan.width-c.width)>.01||Math.abs(p.plan.height-c.height)>.01)throw Error('Der gespeicherte Zuschnitt liegt außerhalb des Originalplans.');
     plan.preparation={sourceWidth:edit.sourceWidth,sourceHeight:edit.sourceHeight,rotation:edit.rotation as Preparation['rotation'],crop:{x:c.x,y:c.y,width:c.width,height:c.height}};plan.width=c.width;plan.height=c.height;
   }
+  if(p.plan.markerScale!==undefined){const s=p.plan.markerScale;if(typeof s!=='number'||!Number.isFinite(s)||s<MARKER_SCALE.min||s>MARKER_SCALE.max)throw Error('Ungültige Punktgröße in der Projektdatei.');if(s!==1)plan.markerScale=s;}
   const ids=new Set<string>();const labels=new Set<string>();
   for(const m of p.markers){
     if(!m||!['sample','fire'].includes(m.kind)||typeof m.id!=='string'||!/^[\w-]{1,80}$/.test(m.id)||ids.has(m.id)||typeof m.label!=='string'||!validLabel({...p,markers:[],areas:[],pending:[]},m.label,m.id)||labels.has(m.label.toLocaleUpperCase())||typeof m.note!=='string'||m.note.length>500||![m.x,m.y,m.lx,m.ly].every(n=>Number.isFinite(n)&&Math.abs(n)<1_000_000))throw Error('Ungültige oder doppelte Markierungen in der Projektdatei.');

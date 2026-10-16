@@ -3,7 +3,7 @@ import {LabUI} from './labui';
 import './style.css';
 import './theme.css';
 import './layout.css';
-import {addMarker,addSheet,bounds,clone,createProject,escape,floorName,History,markerSize,markerSVG,moveSheet,removeSheet,renameSheet,sheetCount,sheetProject,switchSheet,validLabel,MAX_SHEETS,type Project,type Marker} from './model';
+import {addMarker,addSheet,bounds,clone,createProject,escape,floorName,History,markerScale,markerSize,markerSVG,MARKER_SCALE,stepMarkerScale,moveSheet,removeSheet,renameSheet,sheetCount,sheetProject,switchSheet,validLabel,MAX_SHEETS,type Project,type Marker} from './model';
 import {candidates,loadImage,readPlan,validateProject,type Candidate} from './import';
 import {download,restoreLocal,saveLocal} from './storage';
 import {labelkitReport} from './labelkit';
@@ -50,7 +50,7 @@ document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Pl
 document.querySelector('#help-dialog')!.insertAdjacentHTML('beforeend','<h3>Laborberichte und offene Proben</h3><p>Zuerst einen Grundriss laden. Unter „Laborbericht importieren …“ XML, PDF oder beide gemeinsam auswählen oder Dateien auf die App ziehen. Die Prüftabelle vor Übernahme korrigieren, ergänzen und sortieren. Bei belegten P-Nummern das gewünschte Vorgehen ausdrücklich wählen. Offene Laborproben auf den Plan ziehen oder auswählen und in den Plan tippen. Übernahme und Platzierung unterstützen Undo/Redo; Projektdatei und Autosicherung erhalten die offene Liste.</p><p>„Probenliste speichern“ erzeugt eine JSON-Datei für andere Apps. Im Speicherdialog den Projektordner und „Laborergebnisse“ wählen; Browser ohne nativen Dialog laden die Datei herunter. Gespeicherte Herkunft bleibt nach erneutem Öffnen erhalten; bei mehreren Berichten den gewünschten Eintrag wählen. Nur bei älteren Projekten fehlende Herkunftsangaben ergänzen. PDF-Scans oder unbekannte Tabellenlayouts benötigen XML oder manuelle Eingabe. Alle Laborwerte bleiben lokal; die Ergebniskarte nutzt Ihre Skala oder die ausdrücklich gewählte VdS-Hintergrundreferenz.</p>');
 input('file').accept='.zip,.svg,.png,.jpg,.jpeg,.pdf,.heic,.heif,application/pdf,image/png,image/jpeg';
 $('plan-name').textContent='PDF, Polycam-ZIP, SVG, PNG oder JPG';
-document.getElementById('app-version')!.textContent='v1.8.3';
+document.getElementById('app-version')!.textContent='v1.9.0';
 const colorOptions=PALETTE.map(c=>`<option value="${c.color}">${c.title} · ${c.suggestion}</option>`).join('');
 document.querySelector('.modes')!.insertAdjacentHTML('beforeend','<button data-mode="area-draw" class="mode" disabled><span class="tool-icon">⬡</span><span>Fläche zeichnen<small>Eckpunkte setzen & abschließen</small></span></button><button data-mode="area-edit" class="mode" disabled><span class="tool-icon">◇</span><span>Fläche bearbeiten<small>Ecken oder ganze Fläche ziehen</small></span></button>');
 document.querySelector('.markers-section')!.insertAdjacentHTML('afterend',`<section class="areas-section"><div class="section-heading"><h2>Schadensflächen</h2><span id="area-count" class="count">0</span></div><div id="area-draft" hidden><label>Farbe<select id="draft-color">${colorOptions}</select></label><label>Deckkraft <output id="draft-opacity-value">30 %</output><input id="draft-opacity" type="range" min="5" max="70" value="30"></label><p id="draft-status" class="tiny"></p><div class="inspector-actions"><button id="area-last">Letzten Eckpunkt entfernen</button><button id="area-cancel">Abbrechen</button><button id="area-finish" class="primary">Fläche abschließen</button></div></div><div id="area-list"></div><div id="area-inspector" hidden><label>Kennung<input id="area-label" maxlength="16"></label><label>Bezeichnung<textarea id="area-name" maxlength="160" rows="3"></textarea></label><label>Farbe<select id="area-color">${colorOptions}</select></label><label>Deckkraft <output id="area-opacity-value"></output><input id="area-opacity" type="range" min="5" max="70"></label><p class="tiny">Eckpunkte oder die ganze Fläche im Plan ziehen. Die Bezeichnung bestimmt die gemeinsame Legendenkategorie.</p><button id="area-delete" class="danger wide">Fläche löschen</button></div><p class="tiny">Farben und Bezeichnungen dokumentieren Ihre Eingabe. Sie stellen keine chemische Bewertung oder Freigabe fest.</p></section>`);
@@ -89,7 +89,7 @@ function point(e:{clientX:number;clientY:number}){const matrix=svg.getScreenCTM(
 function zoom(factor:number,anchor?:{x:number;y:number}){if(!project)return;const ratio=Math.min(20,Math.max(.25,fitWidth/(camera.width*factor)));factor=fitWidth/(ratio*camera.width);const c=anchor||{x:camera.x+camera.width/2,y:camera.y+camera.height/2};camera={x:c.x-(c.x-camera.x)*factor,y:c.y-(c.y-camera.y)*factor,width:camera.width*factor,height:camera.height*factor};updateCamera();}
 function setMode(next:string){mode=next;document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(b=>{b.classList.toggle('active',b.dataset.mode===mode);b.setAttribute('aria-pressed',String(b.dataset.mode===mode));});$('stage').dataset.mode=mode;$('mode-hint').textContent=({navigate:'Ansicht bewegen · Mausrad oder zwei Finger zum Zoomen',sample:'Tippen setzt eine Probe · Ziehen verschiebt die Ansicht',fire:'Tippen setzt einen Brandherd · Ziehen verschiebt die Ansicht',edit:'Markierung wählen · Punkt oder Beschriftung ziehen','area-draw':'Eckpunkte setzen · anschließend Fläche abschließen','area-edit':'Fläche wählen · Eckpunkte oder Fläche ziehen','lab-place':'Ausgewählte Laborprobe durch Tippen platzieren · Ziehen verschiebt die Ansicht'} as Record<string,string>)[mode];}
 let showResults=false;
-function renderMarkers(){if(project){const fills=showResults?rateMarkers(project).fill:null;marks.innerHTML=project.markers.map(m=>markerSVG(project!,m,m.id===selected,camera.width/Math.max(1,svg.clientWidth)*12,fills?.get(m.id))).join('');renderAreas();}}
+function renderMarkers(){if(project){const fills=showResults?rateMarkers(project).fill:null;marks.innerHTML=project.markers.map(m=>markerSVG(project!,m,m.id===selected,camera.width/Math.max(1,svg.clientWidth)*12*Math.min(1,markerScale(project!)),fills?.get(m.id))).join('');renderAreas();}}
 function selectedPolygon(){return project?.areas?.find(a=>a.id===selectedArea);}
 function renderAreas(){
   if(!project)return;
@@ -132,7 +132,7 @@ svg.addEventListener('pointerup',e=>{if(cropping&&cropDrag?.id===e.pointerId)cro
 svg.addEventListener('pointercancel',e=>{if(cropping&&cropDrag?.id===e.pointerId){cropDrag=null;cropRect=null;$<HTMLButtonElement>('crop-confirm').disabled=true;renderCrop();}},{capture:true});
 window.addEventListener('keydown',e=>{if(e.key==='Escape'&&cropping)endCrop();});
 function render(){
-  const p=project;labUI?.render(p); $('welcome').hidden=!!p;$('mode-hint').hidden=!p;if(!p){renderSheets();renderResults();}
+  const p=project;labUI?.render(p); $('welcome').hidden=!!p;$('mode-hint').hidden=!p;if(!p){renderSheets();renderResults();updateSizeUI();}
   ['save-project','export','export-open','next','report','date'].forEach(id=>($<HTMLButtonElement>(id).disabled=!p));
   document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(b=>b.disabled=!p&&b.dataset.mode!=='navigate');
   $<HTMLButtonElement>('undo').disabled=!history.past.length;$<HTMLButtonElement>('redo').disabled=!history.future.length;
@@ -153,7 +153,7 @@ function render(){
   $('count').textContent=String(p.markers.length);
   $('marker-list').innerHTML=DOMPurify.sanitize(p.markers.length?p.markers.map(m=>`<button class="marker-row ${m.id===selected?'selected':''}" data-select="${m.id}"><span class="marker-badge ${m.kind}">${escape(m.label)}</span><span>${m.kind==='sample'?'Probenahmestelle':'Brandherd'}${showResults&&p.results&&valueOf(m,p.results.parameter)?`<small>${escape(shortParameter(p.results.parameter))}: ${escape(valueOf(m,p.results.parameter)!.r)} ${escape(valueOf(m,p.results.parameter)!.u)}</small>`:m.note?`<small>${escape(m.note)}</small>`:''}</span><span class="row-arrow">›</span></button>`).join(''):'<p class="muted empty-list">Noch keine Markierungen gesetzt.</p>');
   const m=selectedMarker();$('inspector').hidden=!m;if(m){input('label').value=m.label;input('note').value=m.note;}let labFields=document.getElementById('marker-lab');if(!labFields){labFields=document.createElement('p');labFields.id='marker-lab';labFields.className='lab-fields';$('inspector').append(labFields);}labFields.textContent=m?.lab?['Referenz: '+m.lab.ref,'Probenart: '+(m.lab.art||'—'),'Labor-Nr.: '+(m.lab.labNr||'—'),'Probenahme: '+(m.lab.datum||'—'),'Bericht: '+(m.lab.bericht||'—')].join(' · '):'';
-  renderMarkers();dimensions();renderSheets();renderResults();
+  renderMarkers();dimensions();renderSheets();renderResults();updateSizeUI();
 }
 async function install(p:Project,fromFolder=false,transition?:()=>void){await preserveUnsavedProject();transition?.();if(folder&&!fromFolder){folderDirty=true;if(!p.report)p.report=folder.name;}labUI?.reset();project=p;selected=null;selectedArea=null;draftPoints=[];history.clear();cropping=false;cropRect=null;setMode('navigate');render();fit();persist(!fromFolder);$('export-result').hidden=true;}
 function saveProject(){if(project&&requireFinished()&&folder){void saveToFolder(true);return;}if(project&&requireFinished())void download(new Blob([JSON.stringify(project)],{type:'application/json'}),`${project.report||'Probenplan'}.probenplan`);}
@@ -219,6 +219,7 @@ window.addEventListener('keydown',e=>{
   const editing=(target:EventTarget|null)=>target instanceof Element&&(!!target.closest('input,textarea,select,dialog,[role="dialog"],[role="textbox"]')||(target instanceof HTMLElement&&target.isContentEditable));
   if(e.defaultPrevented||e.isComposing||editing(e.target)||editing(document.activeElement)||document.querySelector('dialog:modal,[role="dialog"][aria-modal="true"]'))return;
   if(e.key==='Escape'&&(selected||selectedArea)){e.preventDefault();selected=null;selectedArea=null;render();return;}
+  if((e.key==='<'||e.key==='>')&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&project&&!cropping){e.preventDefault();setMarkerScale(stepMarkerScale(markerScale(project),e.key==='>'?1:-1));toast(`Punktgröße ${Math.round(markerScale(project)*100)} %`);return;}
   if((e.key==='Delete'||e.key==='Backspace')&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
     // Backspace must not navigate away from the plan, even without a selection.
     e.preventDefault();
@@ -296,7 +297,7 @@ railLabel('rotate-left','↶','Links','90° nach links drehen (Umschalt+R)');
 railLabel('rotate-right','↷','Rechts','90° nach rechts drehen (R)','r');
 railLabel('crop-start','⌗','Zuschnitt','Bildausschnitt zuschneiden (C)','c');
 for(const [mode,key,text,title] of [['area-draw','f','Fläche +','Schadensfläche zeichnen (F)'],['area-edit','g','Fläche ✎','Schadensfläche bearbeiten (G)']] as const){const b=document.querySelector<HTMLButtonElement>(`[data-mode="${mode}"]`);if(!b)continue;b.dataset.key=key;b.title=title;const label=b.querySelector('span:last-child');if(label)label.firstChild!.textContent=text;}
-document.querySelector('#help-dialog h2')!.insertAdjacentHTML('afterend','<h3>Tastenkürzel</h3><p><b>V</b> Ansicht · <b>P</b> Probe · <b>B</b> Brandherd · <b>E</b> Bearbeiten · <b>F</b> Fläche zeichnen · <b>G</b> Fläche bearbeiten · <b>R</b>/<b>Umschalt+R</b> drehen · <b>C</b> zuschneiden · <b>L</b> Liste ein/aus · <b>+</b>/<b>−</b> Zoom · <b>0</b> Einpassen · <b>Bild↑</b>/<b>Bild↓</b> Plan wechseln · <b>Strg+Z</b> rückgängig · <b>Entf</b> löschen · <b>Esc</b> abwählen</p>');
+document.querySelector('#help-dialog h2')!.insertAdjacentHTML('afterend','<h3>Tastenkürzel</h3><p><b>V</b> Ansicht · <b>P</b> Probe · <b>B</b> Brandherd · <b>E</b> Bearbeiten · <b>F</b> Fläche zeichnen · <b>G</b> Fläche bearbeiten · <b>R</b>/<b>Umschalt+R</b> drehen · <b>C</b> zuschneiden · <b>L</b> Liste ein/aus · <b>+</b>/<b>−</b> Zoom · <b>0</b> Einpassen · <b>&lt;</b>/<b>&gt;</b> Punktgröße · <b>Bild↑</b>/<b>Bild↓</b> Plan wechseln · <b>Strg+Z</b> rückgängig · <b>Entf</b> löschen · <b>Esc</b> abwählen</p>');
 const PANEL_KEY='plankit:panel';
 function setPanel(open:boolean,remember=true){document.body.classList.toggle('panel-open',open);$('panel-toggle').setAttribute('aria-pressed',String(open));if(remember){try{localStorage.setItem(PANEL_KEY,open?'open':'closed');}catch{/* privates Fenster */}}}
 function reveal(id:string){const wasOpen=document.body.classList.contains('panel-open');setPanel(true);if(!wasOpen||matchMedia('(min-width:701px)').matches){const target=document.getElementById(id);const box=target?.getBoundingClientRect(),view=panelScroll.getBoundingClientRect();if(target&&box&&(box.top<view.top||box.top>view.bottom-40))target.scrollIntoView({block:'nearest'});}}
@@ -372,6 +373,21 @@ document.querySelector('#help-dialog h3')!.insertAdjacentHTML('beforebegin','<h3
 // ---- Ergebniskarte ----
 // „Ergebnisse“ färbt Probenmarker nach Bewertungskategorie (Skalen wie in FotoKit, Farben im Projekt).
 // Einstellungen in der Liste rechts; Export wahlweise als Probenplan oder Ergebniskarte.
+// Punktgröße je Plan: Regler im Seitenfenster, Tasten < und > (ohne Seitenfenster nutzbar)
+document.querySelector('.panel-scroll')!.insertAdjacentHTML('afterbegin','<section class="size-section" id="size-section" hidden><div class="section-heading"><h2>Punktgröße</h2><span id="size-value" class="size-value">100 %</span></div><input id="marker-size" type="range" min="20" max="300" step="5" value="100" aria-label="Punktgröße dieses Plans in Prozent"><div class="size-row"><button id="size-reset" class="tb" title="Auf 100 % zurücksetzen">100 %</button><p class="tiny">Gilt nur für diesen Plan. Tasten: <b>&lt;</b> kleiner · <b>&gt;</b> größer.</p></div></section>');
+let sizeUndoAt=0,sizeTimer=0;
+function updateSizeUI(){const s=$('size-section');s.hidden=!project;if(!project)return;const pct=Math.round(markerScale(project)*100);input('marker-size').value=String(pct);$('size-value').textContent=`${pct} %`;}
+/** Ändert die Punktgröße des aktuellen Plans. Aufeinanderfolgende Änderungen (Ziehen, Tastenwiederholung) ergeben einen Rückgängig-Schritt. */
+function setMarkerScale(value:number){
+  if(!project||cropping)return;const v=Math.min(MARKER_SCALE.max,Math.max(MARKER_SCALE.min,Math.round(value*20)/20));if(v===markerScale(project))return;
+  if(Date.now()-sizeUndoAt>1200)history.push(project);sizeUndoAt=Date.now();
+  if(v===1)delete project.plan.markerScale;else project.plan.markerScale=v;
+  renderMarkers();updateSizeUI();clearTimeout(sizeTimer);sizeTimer=window.setTimeout(()=>{if(project)changed();},300);
+}
+input('marker-size').addEventListener('input',()=>setMarkerScale(Number(input('marker-size').value)/100));
+// Nach dem Ziehen den Fokus abgeben, damit < > und Strg+Z sofort wieder funktionieren (Tastaturbedienung per Pfeiltasten bleibt möglich).
+input('marker-size').addEventListener('pointerup',()=>input('marker-size').blur());
+$('size-reset').onclick=()=>setMarkerScale(1);
 document.querySelector('.panel-scroll')!.insertAdjacentHTML('afterbegin','<section class="results-section" id="results-section" hidden><div class="section-heading"><h2>Ergebniskarte</h2></div><label>Bewerteter Parameter<select id="result-param"></select></label><label>Nutzung / Referenz<select id="result-usage"><option value="">Eigene / FotoKit-Skala</option><option value="residential">VdS 2357 · Wohn-/Büroräume · 10 µg/m²</option><option value="industrial">VdS 2357 · Industrie · 100 µg/m²</option></select></label><div id="result-scales"></div><p class="tiny">Kategorien aufsteigend: Ein Wert gehört zur letzten Kategorie, deren „ab“-Wert er erreicht; Unter BG nur bei „unter BG“ oder „&lt;“ mit gültiger Zahl. n.n.: Nicht nachgewiesen. n.b.: Nicht bestimmt / Bedeutung prüfen. Diese Angaben sind keine gemessenen Nullwerte; fehlerhafte „&lt;“-Angaben bleiben ohne Bewertung. Mehrdeutige Zahlen (z. B. 1.234) bleiben ohne Bewertung. Die Skalen gelten auch für die Ergebnistabelle in FotoKit. Farben werden im Projekt gespeichert. VdS 2357: Hintergrundreferenzen nur für Σ16 EPA-PAK auf Oberflächen, keine pauschalen Freigabe- oder Sanierungsgrenzwerte. Originalwerte und Einheiten bleiben erhalten.</p></section>');
 document.querySelector('.canvas-footer')!.insertAdjacentHTML('beforeend','<span id="result-legend" hidden></span>');
 let resultSignature='';

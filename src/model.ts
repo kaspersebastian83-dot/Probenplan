@@ -14,7 +14,7 @@ export interface Rect { x:number; y:number; width:number; height:number }
 export interface Point { x:number; y:number }
 export interface Area { id:string; label:string; name:string; color:string; opacity:number; points:Point[] }
 export interface Preparation { sourceWidth:number; sourceHeight:number; rotation:0|90|180|270; crop:Rect }
-export interface Plan { name: string; width: number; height: number; data: string; vector: boolean; preparation?:Preparation; pdf?:{page:number; totalPages:number; renderLongSide:number} }
+export interface Plan { name: string; width: number; height: number; data: string; vector: boolean; markerScale?:number; preparation?:Preparation; pdf?:{page:number; totalPages:number; renderLongSide:number} }
 // Mehrere Pläne (Geschosse) ab Format 5: Der aktive Plan steht wie bisher in plan/markers/areas,
 // in sheets[active] nur Kennung und Name. Alle anderen Pläne liegen vollständig in sheets.
 export interface Sheet { id:string; name:string; plan?:Plan; markers?:Marker[]; areas?:Area[] }
@@ -41,7 +41,15 @@ export function addMarker(p: Project, kind: Kind, x: number, y: number): Marker 
   p[key]=number+1; const m={id:crypto.randomUUID(),kind,label:`${prefix}${number}`,note:'',x,y,lx:x,ly:y}; p.markers.push(m); return m;
 }
 export function validLabel(p: Project, label: string, id: string) { return /^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,15}$/u.test(label) && !takenLabels(p).some(m=>m.id!==id && m.label.toLocaleUpperCase()===label.toLocaleUpperCase()); }
-export function markerSize(p: Project) { return Math.max(p.plan.width,p.plan.height)/65; }
+/** Punktgröße je Plan: Faktor auf die Grundgröße (1/65 der längeren Planseite). Gespeichert am Plan, also je Geschoss. */
+export const MARKER_SCALE={min:.2,max:3,step:1.2};
+export function markerScale(p:Project){const s=p.plan.markerScale;return typeof s==='number'&&Number.isFinite(s)?Math.min(MARKER_SCALE.max,Math.max(MARKER_SCALE.min,s)):1;}
+/** Nächster Faktor für die Tasten < und >: ca. 20 % je Schritt, auf 5 % gerundet, mindestens ein 5-%-Schritt. */
+export function stepMarkerScale(current:number,direction:1|-1){
+  const next=Math.round(current*(direction>0?MARKER_SCALE.step:1/MARKER_SCALE.step)*20)/20,fallback=Math.round((current+direction*.05)*20)/20;
+  return Math.min(MARKER_SCALE.max,Math.max(MARKER_SCALE.min,next===Math.round(current*20)/20?fallback:next));
+}
+export function markerSize(p: Project) { return Math.max(p.plan.width,p.plan.height)/65*markerScale(p); }
 export function labelRadius(p: Project,m:Marker) { return markerSize(p)*Math.max(1,m.label.length*.34); }
 export function bounds(p:Project) {
   let x=0,y=0,right=p.plan.width,bottom=p.plan.height; const r=markerSize(p);
