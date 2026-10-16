@@ -14,13 +14,15 @@ export interface Rect { x:number; y:number; width:number; height:number }
 export interface Point { x:number; y:number }
 export interface Area { id:string; label:string; name:string; color:string; opacity:number; points:Point[] }
 export interface Preparation { sourceWidth:number; sourceHeight:number; rotation:0|90|180|270; crop:Rect }
-export interface Plan { name: string; width: number; height: number; data: string; vector: boolean; markerScale?:number; preparation?:Preparation; pdf?:{page:number; totalPages:number; renderLongSide:number} }
+/** Maßstab je Plan: eine gemessene Strecke in Planeinheiten und ihre wahre Länge in Metern. Drehen/Zuschneiden ändern die Einheit nicht. */
+export interface Calibration { units:number; meters:number }
+export interface Plan { name: string; width: number; height: number; data: string; vector: boolean; markerScale?:number; calibration?:Calibration; north?:number; preparation?:Preparation; pdf?:{page:number; totalPages:number; renderLongSide:number} }
 // Mehrere Pläne (Geschosse) ab Format 5: Der aktive Plan steht wie bisher in plan/markers/areas,
 // in sheets[active] nur Kennung und Name. Alle anderen Pläne liegen vollständig in sheets.
 export interface Sheet { id:string; name:string; plan?:Plan; markers?:Marker[]; areas?:Area[] }
 export type Version = 1|2|3|4|5;
 export interface Project { format: 'probenplan'; version: Version; plan: Plan; markers: Marker[]; nextSample: number; nextFire: number; report: string; date: string; areas?:Area[]; nextArea?:number; pending?:LabSample[]; labReports?:LabOrigin[]; sheets?:Sheet[]; active?:number; results?:ResultSettings }
-const clonePlan=(plan:Plan):Plan=>({...plan,...(plan.preparation?{preparation:structuredClone(plan.preparation)}:{}),...(plan.pdf?{pdf:{...plan.pdf}}:{})});
+const clonePlan=(plan:Plan):Plan=>({...plan,...(plan.calibration?{calibration:{...plan.calibration}}:{}),...(plan.preparation?{preparation:structuredClone(plan.preparation)}:{}),...(plan.pdf?{pdf:{...plan.pdf}}:{})});
 const cloneMarkers=(markers:Marker[])=>markers.map(m=>({...m,...(m.lab?{lab:{...m.lab}}:{})}));
 const cloneAreas=(areas:Area[])=>areas.map(a=>({...a,points:a.points.map(pt=>({...pt}))}));
 export const clone = <T>(value: T): T => {
@@ -49,6 +51,10 @@ export function stepMarkerScale(current:number,direction:1|-1){
   const next=Math.round(current*(direction>0?MARKER_SCALE.step:1/MARKER_SCALE.step)*20)/20,fallback=Math.round((current+direction*.05)*20)/20;
   return Math.min(MARKER_SCALE.max,Math.max(MARKER_SCALE.min,next===Math.round(current*20)/20?fallback:next));
 }
+/** Meter je Planeinheit oder null, wenn der Plan nicht kalibriert ist. */
+export function metersPerUnit(plan:Plan){const c=plan.calibration;return c&&c.units>0&&c.meters>0?c.meters/c.units:null;}
+/** Nordrichtung in Grad im Uhrzeigersinn (0 = oben) oder null, wenn kein Nordpfeil gesetzt ist. */
+export function northAngle(plan:Plan){const n=plan.north;return typeof n==='number'&&Number.isFinite(n)?((n%360)+360)%360:null;}
 export function markerSize(p: Project) { return Math.max(p.plan.width,p.plan.height)/65*markerScale(p); }
 export function labelRadius(p: Project,m:Marker) { return markerSize(p)*Math.max(1,m.label.length*.34); }
 export function bounds(p:Project) {

@@ -113,6 +113,8 @@ async function validateSingle(p:Project):Promise<Project>{
     plan.preparation={sourceWidth:edit.sourceWidth,sourceHeight:edit.sourceHeight,rotation:edit.rotation as Preparation['rotation'],crop:{x:c.x,y:c.y,width:c.width,height:c.height}};plan.width=c.width;plan.height=c.height;
   }
   if(p.plan.markerScale!==undefined){const s=p.plan.markerScale;if(typeof s!=='number'||!Number.isFinite(s)||s<MARKER_SCALE.min||s>MARKER_SCALE.max)throw Error('Ungültige Punktgröße in der Projektdatei.');if(s!==1)plan.markerScale=s;}
+  if(p.plan.calibration!==undefined){const c=p.plan.calibration;if(!c||typeof c!=='object'||![c.units,c.meters].every(n=>typeof n==='number'&&Number.isFinite(n)&&n>0)||c.meters>100_000||c.units>10_000_000||c.meters/c.units>1000||c.meters/c.units<1e-7)throw Error('Ungültiger Maßstab in der Projektdatei.');plan.calibration={units:c.units,meters:c.meters};}
+  if(p.plan.north!==undefined){const n=p.plan.north;if(typeof n!=='number'||!Number.isFinite(n)||n<0||n>=360)throw Error('Ungültige Nordrichtung in der Projektdatei.');plan.north=n;}
   const ids=new Set<string>();const labels=new Set<string>();
   for(const m of p.markers){
     if(!m||!['sample','fire'].includes(m.kind)||typeof m.id!=='string'||!/^[\w-]{1,80}$/.test(m.id)||ids.has(m.id)||typeof m.label!=='string'||!validLabel({...p,markers:[],areas:[],pending:[]},m.label,m.id)||labels.has(m.label.toLocaleUpperCase())||typeof m.note!=='string'||m.note.length>500||![m.x,m.y,m.lx,m.ly].every(n=>Number.isFinite(n)&&Math.abs(n)<1_000_000))throw Error('Ungültige oder doppelte Markierungen in der Projektdatei.');
