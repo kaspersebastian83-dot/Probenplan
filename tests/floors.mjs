@@ -63,8 +63,9 @@ for(const engine of ['chromium','webkit']){
    await openExport(page);await page.locator('#scope-field').waitFor();await page.locator('#report').fill('26.0123');await page.locator('#report').press('Tab');
    await page.locator('#scope').selectOption('all');const names=[];page.on('download',d=>names.push(d.suggestedFilename()));
    await page.locator('#export').click();await page.locator('#export:has-text("Bild exportieren")').waitFor({timeout:60000});await page.waitForTimeout(300);
-   assert.deepEqual(names.sort(),['26.0123 - EG.png','26.0123 - Obergeschoss.png']);
-   await page.locator('#scope').selectOption('one');const one=page.waitForEvent('download');await page.locator('#export').click();assert.equal((await one).suggestedFilename(),'26.0123 - Obergeschoss.png');
+   // WebKit ersetzt in Testdownloads Leerzeichen durch _; Chrome/Edge behalten sie.
+   const plain=n=>n.replace(/_/g,' ');assert.deepEqual(names.map(plain).sort(),['26.0123 - EG.png','26.0123 - Obergeschoss.png']);
+   await page.locator('#scope').selectOption('one');const one=page.waitForEvent('download');await page.locator('#export').click();assert.equal(plain((await one).suggestedFilename()),'26.0123 - Obergeschoss.png');
    await closeExport(page);
   });
   await check(`${engine}: Projektdatei mit zwei Plänen speichern und wieder öffnen`,async()=>{
