@@ -192,3 +192,9 @@ Inhaltsprüfsummen erkennen fremde Änderungen auch bei gleicher/älterer Dateiz
 Nach einem Abbruch bietet PlanKit abweichende Browserentwürfe und erhaltene Wiederherstellungsdateien ausdrücklich zur Prüfung an. Eine beschädigte/fehlende Hauptdatei wird nicht still mit der neuesten beliebigen Sicherung ersetzt. Wiederhergestellte Fassungen erst prüfen, dann „Speichern“ klicken. Bei ungespeicherten Änderungen warnt der Browser vor dem Schließen. Browserdaten sind eine zusätzliche Rettungsmöglichkeit, keine Garantie gegen Stromausfall; geschlossene Projekt- und Sicherungsdateien sind die dauerhafte Ablage.
 
 Validierung erfolgt mit synthetischen Browserdateien in GitHub Actions (Chromium/OPFS und simulierte Schreib-/Berechtigungsfehler), zusätzlich zur bestehenden vollständigen Suite. Dies prüft keine reale Windows-Festplatte und keine physische Stromunterbrechung. Lokal werden keine Abhängigkeiten installiert und keine Builds ausgeführt.
+
+### Schutz beim Versionswechsel
+
+Bevor PlanKit bei einem Konflikt „Andere Fassung laden“ anbietet, schreibt und prüft es eine eindeutig benannte Wiederherstellungsdatei der aktuell geöffneten ungespeicherten Fassung. Derselbe Schutz greift vor einem Projekt-/Grundrissimport und beim Projektordnerwechsel; Änderungen während der Sicherung werden erneut gesichert. Schlägt diese Erhaltung fehl, bleibt das aktuelle Projekt samt Browserentwurf erhalten. Auch beim Start mit „Datei verwenden“ wird ein abweichender Browserentwurf zuerst als geprüfte Wiederherstellungsdatei erhalten. Das anschließende Laden darf erst danach die Browser-Zwischenspeicherung ersetzen.
+
+Eine explizite Speicherbestätigung gilt nur für die aktuellste Projektänderung. Wird während eines laufenden Speicherns weitergearbeitet, bestätigt der ältere Schreibvorgang nicht die neueren Änderungen; deren Status bleibt ungespeichert, bis auch sie bestätigt geschrieben wurden. Eine vorherige Erfolgsnachricht wird bei neuen Änderungen ausgeblendet.
