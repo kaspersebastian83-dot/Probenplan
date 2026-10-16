@@ -93,7 +93,8 @@ for(const engine of ['chromium','webkit']){
    assert.deepEqual(saved.markers.map(m=>m.label),['P1','P2','P3']);assert.deepEqual(saved.pending.map(r=>r.label),['P4','P5','P6','P7','P8','P9']);
    assert.ok([...saved.pending,...saved.markers.map(m=>m.lab)].every(r=>r.reportId===origin.id));
    assert.deepEqual(origin,{id:origin.id,bericht:metadata.bericht,labor:metadata.labor,auftragsreferenz:metadata.auftragsreferenz,batch:metadata.batch,sources:mode==='xml'?{xml:'synthetic.xml'}:mode==='pdf'?{pdf:'synthetic.pdf'}:{xml:'synthetic.xml',pdf:'synthetic.pdf'}});
-   assert.doesNotMatch(JSON.stringify(saved),/AnalyticalReportLine|Synthetischer Parameter|%PDF|<AnalyticalReport|"results"/);
+   // Messwerte je Probe werden seit 1.7 bewusst gespeichert (Ergebniskarte); Rohdateien weiterhin nicht.
+   assert.doesNotMatch(JSON.stringify(saved),/AnalyticalReportLine|%PDF|<AnalyticalReport|"loq"/);
    await context.close();context=await browser.newContext({viewport:{width:1500,height:1050},acceptDownloads:true});page=await context.newPage();await page.goto(base);assert.deepEqual(await openProject(page,saved),saved);
    await page.reload();await page.locator('[data-pending]').first().waitFor();assert.deepEqual(await savedProject(page),saved);
    const {json,values}=await jsonExport(page);assert.equal(values.labor,metadata.labor);assert.equal(values.auftragsreferenz,metadata.auftragsreferenz);assert.equal(values.quelle,origins.sourceText(origin.sources));
