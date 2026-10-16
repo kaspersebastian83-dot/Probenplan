@@ -1,5 +1,13 @@
 # Änderungen
 
+## 1.10.0 – 16. Oktober 2026
+
+- Maßstäbliches PDF für das Gutachten: Export als **PDF · A4** oder **PDF · A3** mit Rahmen, Schriftfeld (Firmenlogo, Dr. Schiffers & Partner, Planart und Geschoss, Objekt, Gutachten-Nr., Datum, Maßstab, Blatt), Legende, Maßstabsleiste und optionalem Nordpfeil. Der Plan wird im größten passenden genormten Maßstab (1:50, 1:100, 1:200 …) gedruckt; Hoch-/Querformat wählt PlanKit automatisch. „Alle Pläne“ ergibt ein PDF mit einem Blatt je Geschoss, jedes im eigenen Maßstab.
+- Maßstab je Plan: „Strecke messen“ in der Liste – zwei Punkte einer bekannten Strecke anklicken und die wahre Länge eingeben. Erneutes Messen zeigt die Länge nach dem bisherigen Maßstab (zur Kontrolle). Drehen und Zuschneiden erhalten den Maßstab.
+- Nordpfeil je Plan (Richtung in Grad), dreht beim Drehen des Plans mit.
+- Das PDF ist ein verlustfrei komprimiertes 300-dpi-Blatt ohne Fremdbibliothek; auf dem Ausdruck stimmen Strecken auf Bruchteile eines Millimeters (Drucken mit „Tatsächliche Größe“). Ohne Kalibrierung wird auf die Blattgröße eingepasst und „ohne Maßstab“ vermerkt.
+- Maßstab und Nordrichtung werden im Projekt gespeichert; ältere Dateien laden unverändert, ungültige Werte werden beim Import abgewiesen.
+
 ## 1.9.0 – 16. Oktober 2026
 
 - Punktgröße je Plan: Bei sehr großen oder kleinen Plänen lassen sich die Probenpunkte jetzt anpassen. Regler „Punktgröße“ oben in der Liste (20–300 %) und die Tasten **<** (kleiner) und **>** (größer). Jeder Plan (Geschoss) behält seinen eigenen Wert; Export, Beschriftungen und Ergebniskarte folgen.

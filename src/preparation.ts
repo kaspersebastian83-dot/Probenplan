@@ -12,6 +12,7 @@ export function rotateProject(project:Project,direction:1|-1){
   const turn=(x:number,y:number)=>direction===1?{x:h-y,y:x}:{x:y,y:w-x};
   for(const m of project.markers){const pt=turn(m.x,m.y),label=turn(m.lx,m.ly);m.x=pt.x;m.y=pt.y;m.lx=label.x;m.ly=label.y;}
   for(const area of project.areas||[])area.points=area.points.map(pt=>turn(pt.x,pt.y));
+  if(typeof plan.north==='number')plan.north=((plan.north+direction*90)%360+360)%360;
   plan.preparation=p;plan.width=h;plan.height=w;project.version=Math.max(project.version,project.areas?3:2) as Project['version'];
 }
 export function cropProject(project:Project,rect:Rect){

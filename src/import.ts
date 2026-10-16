@@ -34,7 +34,8 @@ export function sanitizeSVG(source:string):{data:string;width:number;height:numb
   svg.setAttribute('width',String(width));svg.setAttribute('height',String(height));svg.setAttribute('xmlns','http://www.w3.org/2000/svg');
   return {data:`data:image/svg+xml;base64,${btoa(new TextEncoder().encode(new XMLSerializer().serializeToString(svg)).reduce((s,b)=>s+String.fromCharCode(b),''))}`,width,height};
 }
-export function loadImage(src:string):Promise<HTMLImageElement>{return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(Error('Das Planbild konnte nicht geladen werden.'));img.src=src;});}
+/** Bild laden; bleibt der Browser die Antwort schuldig, wird nach 60 s ein Fehler gemeldet statt still zu warten. */
+export function loadImage(src:string,what='Das Planbild'):Promise<HTMLImageElement>{return new Promise((resolve,reject)=>{const img=new Image(),timer=setTimeout(()=>reject(Error(`${what} konnte nicht geladen werden (Zeitüberschreitung).`)),60_000);img.onload=()=>{clearTimeout(timer);resolve(img);};img.onerror=()=>{clearTimeout(timer);reject(Error(`${what} konnte nicht geladen werden.`));};img.src=src;});}
 function checkRasterSize(bytes:Uint8Array){
   let width=0,height=0;
   if(bytes.length>=24&&bytes[0]===137&&bytes[1]===80&&bytes[2]===78&&bytes[3]===71){const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);width=view.getUint32(16);height=view.getUint32(20);}
@@ -113,6 +114,8 @@ async function validateSingle(p:Project):Promise<Project>{
     plan.preparation={sourceWidth:edit.sourceWidth,sourceHeight:edit.sourceHeight,rotation:edit.rotation as Preparation['rotation'],crop:{x:c.x,y:c.y,width:c.width,height:c.height}};plan.width=c.width;plan.height=c.height;
   }
   if(p.plan.markerScale!==undefined){const s=p.plan.markerScale;if(typeof s!=='number'||!Number.isFinite(s)||s<MARKER_SCALE.min||s>MARKER_SCALE.max)throw Error('Ungültige Punktgröße in der Projektdatei.');if(s!==1)plan.markerScale=s;}
+  if(p.plan.calibration!==undefined){const c=p.plan.calibration;if(!c||typeof c!=='object'||![c.units,c.meters].every(n=>typeof n==='number'&&Number.isFinite(n)&&n>0)||c.meters>100_000||c.units>10_000_000||c.meters/c.units>1000||c.meters/c.units<1e-7)throw Error('Ungültiger Maßstab in der Projektdatei.');plan.calibration={units:c.units,meters:c.meters};}
+  if(p.plan.north!==undefined){const n=p.plan.north;if(typeof n!=='number'||!Number.isFinite(n)||n<0||n>=360)throw Error('Ungültige Nordrichtung in der Projektdatei.');plan.north=n;}
   const ids=new Set<string>();const labels=new Set<string>();
   for(const m of p.markers){
     if(!m||!['sample','fire'].includes(m.kind)||typeof m.id!=='string'||!/^[\w-]{1,80}$/.test(m.id)||ids.has(m.id)||typeof m.label!=='string'||!validLabel({...p,markers:[],areas:[],pending:[]},m.label,m.id)||labels.has(m.label.toLocaleUpperCase())||typeof m.note!=='string'||m.note.length>500||![m.x,m.y,m.lx,m.ly].every(n=>Number.isFinite(n)&&Math.abs(n)<1_000_000))throw Error('Ungültige oder doppelte Markierungen in der Projektdatei.');

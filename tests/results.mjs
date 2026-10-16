@@ -93,6 +93,13 @@ for(const engine of ['chromium','webkit']){
    file.markers[0].lab.werte[0].r='0';await load(file);assert.equal((await fills(page)).P1,'#4caf50');assert.equal((await fills(page)).P2,'#749bb5');
    assert.equal((await savedProject(page)).results.usage,'residential');
   });
+  await check(`${engine}: Ergebniskarte als maßstäbliches PDF mit Ergebnislegende`,async()=>{
+   await openExport(page);await page.locator('#view').selectOption('results');await page.locator('#format').selectOption('pdf-a3');
+   assert.match(await page.locator('#dimensions').textContent(),/A3 (quer|hoch)/);
+   const download=page.waitForEvent('download');await page.locator('#export').click();const pdf=await download;assert.match(pdf.suggestedFilename(),/Ergebniskarte\.pdf$/);
+   const {readFile}=await import('node:fs/promises'),bytes=await readFile(await pdf.path());assert.match(bytes.subarray(0,8).toString('latin1'),/^%PDF-1\.4/);assert.match(bytes.toString('latin1'),/\/Count 1 /);
+   await page.locator('#format').selectOption('png');await closeExport(page);
+  });
   assert.deepEqual(errors,[]);
  }finally{await browser.close();}
 }

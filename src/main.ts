@@ -3,12 +3,14 @@ import {LabUI} from './labui';
 import './style.css';
 import './theme.css';
 import './layout.css';
-import {addMarker,addSheet,bounds,clone,createProject,escape,floorName,History,markerScale,markerSize,markerSVG,MARKER_SCALE,stepMarkerScale,moveSheet,removeSheet,renameSheet,sheetCount,sheetProject,switchSheet,validLabel,MAX_SHEETS,type Project,type Marker} from './model';
+import {addMarker,addSheet,bounds,clone,createProject,escape,floorName,History,markerScale,markerSize,markerSVG,MARKER_SCALE,metersPerUnit,northAngle,stepMarkerScale,moveSheet,removeSheet,renameSheet,sheetCount,sheetProject,switchSheet,validLabel,MAX_SHEETS,type Project,type Marker} from './model';
 import {candidates,loadImage,readPlan,validateProject,type Candidate} from './import';
 import {download,restoreLocal,saveLocal} from './storage';
 import {labelkitReport} from './labelkit';
 import {fileInfo,fileRevision,FolderConflict,saveFolderProject,writeProjectCopy,findSubdir,listFiles,openFolder,parseProjName,permission,pickFolder,projectDirOf,projectFileName,readProjectData,supported as folderSupported,writeFile,archiv,AUFTRAEGE,LABOR,PLAENE,type ProjectFolder} from './folder';
 import {exportImage,exportLayout} from './export';
+import {COMPANY,PAPERS,renderSheet,sheetLayout,type Paper} from './sheet';
+import {buildPdf,canvasRGB,type PdfPage} from './pdfwrite';
 import {cropProject,planMatrix,preparation,rotateProject} from './preparation';
 import type {LocalPDF} from './pdf';
 import type {Plan,Rect} from './model';
@@ -33,7 +35,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML=`
 <aside class="kit-panel" id="side-panel" aria-label="Markierungen, Laborproben und Flächen"><div class="panel-head"><span class="eyebrow">ÜBERSICHT</span><button id="panel-close" class="tb" title="Liste ausblenden (L)" aria-label="Liste ausblenden">»</button></div><div class="panel-scroll">
 <section class="markers-section"><div class="section-heading"><h2>Markierungen</h2><span id="count" class="count">0</span></div><div id="marker-list"><p class="muted empty-list">Ihre Proben und Brandherde<br>erscheinen hier.</p></div><div id="inspector" hidden><label>Kennung<input id="label" maxlength="16" autocomplete="off"></label><label>Notiz <span class="optional">optional · nur im Projekt</span><textarea id="note" maxlength="500" rows="2" placeholder="z. B. Wischprobe, Fensterbank"></textarea></label><div class="inspector-actions"><button id="offset">Beschriftung versetzen</button><button id="recenter" title="Beschriftung auf den Probenpunkt zurücksetzen">Zurück an Punkt</button><button id="delete" class="danger">Löschen</button></div></div></section>
 </div></aside></main>
-<dialog id="export-dialog" class="export-card" aria-label="Export"><form method="dialog"><button class="close" aria-label="Export schließen">×</button></form><span class="eyebrow">EXPORT</span><h2>Bild fürs Gutachten</h2><p class="muted">Vollständiger Plan mit Markierungen und Legende – unabhängig von Ihrer Ansicht.</p><label>Gutachtennummer <span class="optional">optional</span><input id="report" maxlength="100" placeholder="z. B. 2026-0142" disabled></label><label>Datum <span class="optional">optional</span><input id="date" type="date" disabled></label><label id="view-field" hidden>Darstellung<select id="view"><option value="plan">Probenplan</option><option value="results">Ergebniskarte</option></select></label><label id="scope-field" hidden>Umfang<select id="scope"><option value="one">Dieser Plan</option><option value="all">Alle Pläne</option></select></label><div class="export-row"><label>Dateiformat<select id="format"><option value="png">PNG · verlustfrei</option><option value="jpeg">JPG · hohe Qualität</option></select></label><label>Auflösung<select id="quality"><option value="3500">Standard · 3.500 px</option><option value="4600">Hoch · 4.600 px</option></select></label></div><div class="export-dim"><span>Ausgabeabmessungen</span><strong id="dimensions">— × — px</strong><small>Inklusive Rand und Legende</small></div><button id="export" class="primary wide" disabled>↓ Bild exportieren</button><div id="export-result" hidden><a id="export-link">Bild erneut herunterladen</a><button id="smaller" hidden>Kleineren Export versuchen</button></div></dialog>
+<dialog id="export-dialog" class="export-card" aria-label="Export"><form method="dialog"><button class="close" aria-label="Export schließen">×</button></form><span class="eyebrow">EXPORT</span><h2>Export fürs Gutachten</h2><p class="muted">Vollständiger Plan mit Markierungen und Legende – unabhängig von Ihrer Ansicht. PDF: Druckblatt mit Schriftfeld im genormten Maßstab.</p><label>Gutachtennummer <span class="optional">optional</span><input id="report" maxlength="100" placeholder="z. B. 2026-0142" disabled></label><label>Datum <span class="optional">optional</span><input id="date" type="date" disabled></label><label id="view-field" hidden>Darstellung<select id="view"><option value="plan">Probenplan</option><option value="results">Ergebniskarte</option></select></label><label id="scope-field" hidden>Umfang<select id="scope"><option value="one">Dieser Plan</option><option value="all">Alle Pläne</option></select></label><div class="export-row"><label>Dateiformat<select id="format"><option value="png">PNG · verlustfrei</option><option value="jpeg">JPG · hohe Qualität</option><option value="pdf-a4">PDF · A4</option><option value="pdf-a3">PDF · A3</option></select></label><label id="quality-field">Auflösung<select id="quality"><option value="3500">Standard · 3.500 px</option><option value="4600">Hoch · 4.600 px</option></select></label></div><div class="export-dim"><span>Ausgabeabmessungen</span><strong id="dimensions">— × — px</strong><small id="dimensions-note">Inklusive Rand und Legende</small></div><button id="export" class="primary wide" disabled>↓ Bild exportieren</button><div id="export-result" hidden><a id="export-link">Bild erneut herunterladen</a><button id="smaller" hidden>Kleineren Export versuchen</button></div></dialog>
 <div id="toast" role="status" aria-live="polite" hidden></div>
 <dialog id="choose-dialog"><form method="dialog"><button class="close" aria-label="Schließen">×</button></form><span class="eyebrow">PLANAUSWAHL</span><h2>Welchen Grundriss öffnen?</h2><p>SVG ist für einen scharfen Export empfohlen.</p><div id="choices"></div></dialog>
 <dialog id="replace-dialog"><h2>Aktuelles Projekt ersetzen?</h2><p>Der neue Plan ersetzt die automatische Zwischenspeicherung. Speichern Sie das aktuelle Projekt, um später daran weiterzuarbeiten.</p><div class="dialog-actions"><button id="replace-cancel">Abbrechen</button><button id="replace-save">Projekt sichern & weiter</button><button id="replace-yes" class="primary">Ersetzen</button></div></dialog>
@@ -46,11 +48,11 @@ const image=$('base-plan') as unknown as SVGImageElement;
 const marks=$('marks') as unknown as SVGGElement;
 document.querySelector('#welcome p')!.innerHTML='Öffnen Sie eine PDF, einen Polycam-Export oder ein Planbild.<br>Ihre Gebäudedaten bleiben im Browser.';
 document.querySelector('#help-dialog ol li')!.innerHTML='<b>Plan laden:</b> PDF, Polycam-ZIP, SVG, PNG oder JPG auswählen. Bei mehrseitigen PDFs eine Seite in der Vorschau wählen. Bei Polycam möglichst SVG verwenden.';
-document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Plan vorbereiten</h3><p>Unter „Plan vorbereiten“ jeweils 90° links/rechts drehen oder einen Bildausschnitt mit Maus/Finger aufziehen. Zuschnitt übernehmen oder abbrechen. Alle gesetzten Probenpunkte und Brandherde müssen im Ausschnitt liegen; ihre Positionen und versetzten Beschriftungen werden korrekt umgerechnet. Drehen und Zuschneiden sind rückgängig machbar. Die Originaldaten bleiben erhalten; eine perspektivische Entzerrung ist nicht enthalten.</p><p>PDF-Seiten werden lokal in hoher Auflösung gerendert (bis 4.600 px, auf Mobilgeräten/speicherarmen Geräten sinnvoll begrenzt). Bei Speicherproblemen wird eine kleinere Stufe versucht. JPG-/PNG-Originale werden beim Drehen und Zuschneiden nicht neu komprimiert. HEIC/HEIF bitte zuvor als JPG exportieren.</p>');
+document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Maßstäbliches PDF</h3><p>Liste → „Maßstab &amp; Norden“ → „Strecke messen“: zwei Punkte einer bekannten Strecke anklicken und die Länge in Metern eingeben. Im Export „PDF · A4“ oder „PDF · A3“ wählen – PlanKit nimmt den größten genormten Maßstab, der aufs Blatt passt, mit Schriftfeld, Legende, Maßstabsleiste und optionalem Nordpfeil. Beim Drucken „Tatsächliche Größe“ (100 %) wählen.</p><h3>Plan vorbereiten</h3><p>Unter „Plan vorbereiten“ jeweils 90° links/rechts drehen oder einen Bildausschnitt mit Maus/Finger aufziehen. Zuschnitt übernehmen oder abbrechen. Alle gesetzten Probenpunkte und Brandherde müssen im Ausschnitt liegen; ihre Positionen und versetzten Beschriftungen werden korrekt umgerechnet. Drehen und Zuschneiden sind rückgängig machbar. Die Originaldaten bleiben erhalten; eine perspektivische Entzerrung ist nicht enthalten.</p><p>PDF-Seiten werden lokal in hoher Auflösung gerendert (bis 4.600 px, auf Mobilgeräten/speicherarmen Geräten sinnvoll begrenzt). Bei Speicherproblemen wird eine kleinere Stufe versucht. JPG-/PNG-Originale werden beim Drehen und Zuschneiden nicht neu komprimiert. HEIC/HEIF bitte zuvor als JPG exportieren.</p>');
 document.querySelector('#help-dialog')!.insertAdjacentHTML('beforeend','<h3>Laborberichte und offene Proben</h3><p>Zuerst einen Grundriss laden. Unter „Laborbericht importieren …“ XML, PDF oder beide gemeinsam auswählen oder Dateien auf die App ziehen. Die Prüftabelle vor Übernahme korrigieren, ergänzen und sortieren. Bei belegten P-Nummern das gewünschte Vorgehen ausdrücklich wählen. Offene Laborproben auf den Plan ziehen oder auswählen und in den Plan tippen. Übernahme und Platzierung unterstützen Undo/Redo; Projektdatei und Autosicherung erhalten die offene Liste.</p><p>„Probenliste speichern“ erzeugt eine JSON-Datei für andere Apps. Im Speicherdialog den Projektordner und „Laborergebnisse“ wählen; Browser ohne nativen Dialog laden die Datei herunter. Gespeicherte Herkunft bleibt nach erneutem Öffnen erhalten; bei mehreren Berichten den gewünschten Eintrag wählen. Nur bei älteren Projekten fehlende Herkunftsangaben ergänzen. PDF-Scans oder unbekannte Tabellenlayouts benötigen XML oder manuelle Eingabe. Alle Laborwerte bleiben lokal; die Ergebniskarte nutzt Ihre Skala oder die ausdrücklich gewählte VdS-Hintergrundreferenz.</p>');
 input('file').accept='.zip,.svg,.png,.jpg,.jpeg,.pdf,.heic,.heif,application/pdf,image/png,image/jpeg';
 $('plan-name').textContent='PDF, Polycam-ZIP, SVG, PNG oder JPG';
-document.getElementById('app-version')!.textContent='v1.9.0';
+document.getElementById('app-version')!.textContent='v1.10.0';
 const colorOptions=PALETTE.map(c=>`<option value="${c.color}">${c.title} · ${c.suggestion}</option>`).join('');
 document.querySelector('.modes')!.insertAdjacentHTML('beforeend','<button data-mode="area-draw" class="mode" disabled><span class="tool-icon">⬡</span><span>Fläche zeichnen<small>Eckpunkte setzen & abschließen</small></span></button><button data-mode="area-edit" class="mode" disabled><span class="tool-icon">◇</span><span>Fläche bearbeiten<small>Ecken oder ganze Fläche ziehen</small></span></button>');
 document.querySelector('.markers-section')!.insertAdjacentHTML('afterend',`<section class="areas-section"><div class="section-heading"><h2>Schadensflächen</h2><span id="area-count" class="count">0</span></div><div id="area-draft" hidden><label>Farbe<select id="draft-color">${colorOptions}</select></label><label>Deckkraft <output id="draft-opacity-value">30 %</output><input id="draft-opacity" type="range" min="5" max="70" value="30"></label><p id="draft-status" class="tiny"></p><div class="inspector-actions"><button id="area-last">Letzten Eckpunkt entfernen</button><button id="area-cancel">Abbrechen</button><button id="area-finish" class="primary">Fläche abschließen</button></div></div><div id="area-list"></div><div id="area-inspector" hidden><label>Kennung<input id="area-label" maxlength="16"></label><label>Bezeichnung<textarea id="area-name" maxlength="160" rows="3"></textarea></label><label>Farbe<select id="area-color">${colorOptions}</select></label><label>Deckkraft <output id="area-opacity-value"></output><input id="area-opacity" type="range" min="5" max="70"></label><p class="tiny">Eckpunkte oder die ganze Fläche im Plan ziehen. Die Bezeichnung bestimmt die gemeinsame Legendenkategorie.</p><button id="area-delete" class="danger wide">Fläche löschen</button></div><p class="tiny">Farben und Bezeichnungen dokumentieren Ihre Eingabe. Sie stellen keine chemische Bewertung oder Freigabe fest.</p></section>`);
@@ -62,7 +64,7 @@ const ns='http://www.w3.org/2000/svg',planGroup=document.createElementNS(ns,'g')
 clip.id='plan-clip';clip.append(clipRect);svg.prepend(clip);image.before(planGroup);planGroup.append(image);planGroup.setAttribute('clip-path','url(#plan-clip)');
 const cropLayer=document.createElementNS(ns,'g');cropLayer.id='crop-overlay';cropLayer.setAttribute('pointer-events','none');svg.append(cropLayer);
 const areaLayer=document.createElementNS(ns,'g');areaLayer.id='areas';marks.before(areaLayer);
-let selectedArea:string|null=null,draftPoints:Point[]=[];
+let selectedArea:string|null=null,draftPoints:Point[]=[],measurePoints:Point[]=[];
 let labUI:LabUI|null=null;
 let project:Project|null=null,selected:string|null=null,mode='navigate',history=new History(),busy=false;
 let cropping=false,cropRect:Rect|null=null,cropDrag:{id:number;start:{x:number;y:number}}|null=null;
@@ -87,9 +89,9 @@ function updateCamera(){svg.setAttribute('viewBox',`${camera.x} ${camera.y} ${ca
 function fit(){if(!project)return;const b=bounds(project),rect=svg.getBoundingClientRect(),ratio=rect.width/rect.height||1;let w=b.width*1.14,h=b.height*1.14;if(w/h<ratio)w=h*ratio;else h=w/ratio;camera={x:b.x+(b.width-w)/2,y:b.y+(b.height-h)/2,width:w,height:h};fitWidth=w;updateCamera();}
 function point(e:{clientX:number;clientY:number}){const matrix=svg.getScreenCTM();if(!matrix)return{x:0,y:0};const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(matrix.inverse());return{x:p.x,y:p.y};}
 function zoom(factor:number,anchor?:{x:number;y:number}){if(!project)return;const ratio=Math.min(20,Math.max(.25,fitWidth/(camera.width*factor)));factor=fitWidth/(ratio*camera.width);const c=anchor||{x:camera.x+camera.width/2,y:camera.y+camera.height/2};camera={x:c.x-(c.x-camera.x)*factor,y:c.y-(c.y-camera.y)*factor,width:camera.width*factor,height:camera.height*factor};updateCamera();}
-function setMode(next:string){mode=next;document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(b=>{b.classList.toggle('active',b.dataset.mode===mode);b.setAttribute('aria-pressed',String(b.dataset.mode===mode));});$('stage').dataset.mode=mode;$('mode-hint').textContent=({navigate:'Ansicht bewegen · Mausrad oder zwei Finger zum Zoomen',sample:'Tippen setzt eine Probe · Ziehen verschiebt die Ansicht',fire:'Tippen setzt einen Brandherd · Ziehen verschiebt die Ansicht',edit:'Markierung wählen · Punkt oder Beschriftung ziehen','area-draw':'Eckpunkte setzen · anschließend Fläche abschließen','area-edit':'Fläche wählen · Eckpunkte oder Fläche ziehen','lab-place':'Ausgewählte Laborprobe durch Tippen platzieren · Ziehen verschiebt die Ansicht'} as Record<string,string>)[mode];}
+function setMode(next:string){mode=next;document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(b=>{b.classList.toggle('active',b.dataset.mode===mode);b.setAttribute('aria-pressed',String(b.dataset.mode===mode));});$('stage').dataset.mode=mode;if(next!=='measure'&&measurePoints.length){measurePoints=[];renderMeasure();}$('mode-hint').textContent=({measure:'Strecke messen: ersten Punkt anklicken · Ziehen verschiebt die Ansicht · Esc bricht ab',navigate:'Ansicht bewegen · Mausrad oder zwei Finger zum Zoomen',sample:'Tippen setzt eine Probe · Ziehen verschiebt die Ansicht',fire:'Tippen setzt einen Brandherd · Ziehen verschiebt die Ansicht',edit:'Markierung wählen · Punkt oder Beschriftung ziehen','area-draw':'Eckpunkte setzen · anschließend Fläche abschließen','area-edit':'Fläche wählen · Eckpunkte oder Fläche ziehen','lab-place':'Ausgewählte Laborprobe durch Tippen platzieren · Ziehen verschiebt die Ansicht'} as Record<string,string>)[mode];}
 let showResults=false;
-function renderMarkers(){if(project){const fills=showResults?rateMarkers(project).fill:null;marks.innerHTML=project.markers.map(m=>markerSVG(project!,m,m.id===selected,camera.width/Math.max(1,svg.clientWidth)*12*Math.min(1,markerScale(project!)),fills?.get(m.id))).join('');renderAreas();}}
+function renderMarkers(){if(project){const fills=showResults?rateMarkers(project).fill:null;marks.innerHTML=project.markers.map(m=>markerSVG(project!,m,m.id===selected,camera.width/Math.max(1,svg.clientWidth)*12*Math.min(1,markerScale(project!)),fills?.get(m.id))).join('');renderAreas();renderMeasure();}}
 function selectedPolygon(){return project?.areas?.find(a=>a.id===selectedArea);}
 function renderAreas(){
   if(!project)return;
@@ -104,7 +106,18 @@ function renderAreas(){
   $('area-count').textContent=String(project.areas?.length||0);
 }
 function requireFinished(){if(!draftPoints.length)return true;toast('Bitte die gezeichnete Fläche zuerst abschließen oder abbrechen.',true);return false;}
-function dimensions(){if(!project)return;const l=exportLayout(project,Number(input('quality').value));$('dimensions').textContent=`${l.pixelWidth.toLocaleString('de-DE')} × ${l.pixelHeight.toLocaleString('de-DE')} px`;}
+function exportFormat(){return input('format').value as 'png'|'jpeg'|'pdf-a4'|'pdf-a3';}
+function dimensions(){if(!project)return;const format=exportFormat(),pdf=format.startsWith('pdf');
+  // Beschriftung nur bei Änderung und nie während eines Exports setzen: WebKit verwirft einen Klick, wenn der Text
+  // unter dem Mauszeiger zwischen Drücken und Loslassen ersetzt wird (z. B. Neuzeichnen nach Verlassen eines Feldes).
+  $('quality-field').hidden=pdf;const label=pdf?'↓ PDF exportieren':'↓ Bild exportieren';if(!busy&&$('export').textContent!==label)$('export').textContent=label;
+  if(!pdf){const l=exportLayout(project,Number(input('quality').value));$('dimensions').textContent=`${l.pixelWidth.toLocaleString('de-DE')} × ${l.pixelHeight.toLocaleString('de-DE')} px`;$('dimensions-note').textContent='Inklusive Rand und Legende';return;}
+  if(!$<HTMLDialogElement>('export-dialog').open)return;
+  const resultsView=!$('view-field').hidden&&input('view').value==='results',all=sheetCount(project)>1&&input('scope').value==='all';
+  try{const l=sheetLayout(project,format.slice(4) as Paper,resultsView?rateMarkers(project):null);$('dimensions').textContent=`${PAPERS[l.paper].label} ${l.landscape?'quer':'hoch'} · ${l.ratio?`M 1:${l.ratio.toLocaleString('de-DE')}`:'ohne Maßstab'}`;
+    $('dimensions-note').textContent=!metersPerUnit(project.plan)?'Plan nicht kalibriert: Liste → „Strecke messen“ für einen echten Maßstab.':!l.ratio?'Plan zu groß für 1:5.000 – auf Blattgröße eingepasst.':all?'Dieser Plan; jedes Blatt erhält seinen eigenen Maßstab.':'Schriftfeld, Legende, Maßstabsleiste'+(northAngle(project.plan)!==null?', Nordpfeil':'');}
+  catch(e){$('dimensions').textContent='—';$('dimensions-note').textContent=e instanceof Error?e.message:'';}
+}
 function renderCrop(){
   if(!cropping||!project){cropLayer.replaceChildren();return;}
   const w=project.plan.width,h=project.plan.height,c=cropRect||{x:0,y:0,width:0,height:0},stroke=camera.width/Math.max(1,svg.clientWidth)*2;
@@ -132,7 +145,7 @@ svg.addEventListener('pointerup',e=>{if(cropping&&cropDrag?.id===e.pointerId)cro
 svg.addEventListener('pointercancel',e=>{if(cropping&&cropDrag?.id===e.pointerId){cropDrag=null;cropRect=null;$<HTMLButtonElement>('crop-confirm').disabled=true;renderCrop();}},{capture:true});
 window.addEventListener('keydown',e=>{if(e.key==='Escape'&&cropping)endCrop();});
 function render(){
-  const p=project;labUI?.render(p); $('welcome').hidden=!!p;$('mode-hint').hidden=!p;if(!p){renderSheets();renderResults();updateSizeUI();}
+  const p=project;labUI?.render(p); $('welcome').hidden=!!p;$('mode-hint').hidden=!p;if(!p){renderSheets();renderResults();updateSizeUI();updateScaleUI();}
   ['save-project','export','export-open','next','report','date'].forEach(id=>($<HTMLButtonElement>(id).disabled=!p));
   document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(b=>b.disabled=!p&&b.dataset.mode!=='navigate');
   $<HTMLButtonElement>('undo').disabled=!history.past.length;$<HTMLButtonElement>('redo').disabled=!history.future.length;
@@ -153,7 +166,7 @@ function render(){
   $('count').textContent=String(p.markers.length);
   $('marker-list').innerHTML=DOMPurify.sanitize(p.markers.length?p.markers.map(m=>`<button class="marker-row ${m.id===selected?'selected':''}" data-select="${m.id}"><span class="marker-badge ${m.kind}">${escape(m.label)}</span><span>${m.kind==='sample'?'Probenahmestelle':'Brandherd'}${showResults&&p.results&&valueOf(m,p.results.parameter)?`<small>${escape(shortParameter(p.results.parameter))}: ${escape(valueOf(m,p.results.parameter)!.r)} ${escape(valueOf(m,p.results.parameter)!.u)}</small>`:m.note?`<small>${escape(m.note)}</small>`:''}</span><span class="row-arrow">›</span></button>`).join(''):'<p class="muted empty-list">Noch keine Markierungen gesetzt.</p>');
   const m=selectedMarker();$('inspector').hidden=!m;if(m){input('label').value=m.label;input('note').value=m.note;}let labFields=document.getElementById('marker-lab');if(!labFields){labFields=document.createElement('p');labFields.id='marker-lab';labFields.className='lab-fields';$('inspector').append(labFields);}labFields.textContent=m?.lab?['Referenz: '+m.lab.ref,'Probenart: '+(m.lab.art||'—'),'Labor-Nr.: '+(m.lab.labNr||'—'),'Probenahme: '+(m.lab.datum||'—'),'Bericht: '+(m.lab.bericht||'—')].join(' · '):'';
-  renderMarkers();dimensions();renderSheets();renderResults();updateSizeUI();
+  renderMarkers();dimensions();renderSheets();renderResults();updateSizeUI();updateScaleUI();
 }
 async function install(p:Project,fromFolder=false,transition?:()=>void){await preserveUnsavedProject();transition?.();if(folder&&!fromFolder){folderDirty=true;if(!p.report)p.report=folder.name;}labUI?.reset();project=p;selected=null;selectedArea=null;draftPoints=[];history.clear();cropping=false;cropRect=null;setMode('navigate');render();fit();persist(!fromFolder);$('export-result').hidden=true;}
 function saveProject(){if(project&&requireFinished()&&folder){void saveToFolder(true);return;}if(project&&requireFinished())void download(new Blob([JSON.stringify(project)],{type:'application/json'}),`${project.report||'Probenplan'}.probenplan`);}
@@ -218,6 +231,7 @@ $('undo').onclick=undo;$('redo').onclick=redo;
 window.addEventListener('keydown',e=>{
   const editing=(target:EventTarget|null)=>target instanceof Element&&(!!target.closest('input,textarea,select,dialog,[role="dialog"],[role="textbox"]')||(target instanceof HTMLElement&&target.isContentEditable));
   if(e.defaultPrevented||e.isComposing||editing(e.target)||editing(document.activeElement)||document.querySelector('dialog:modal,[role="dialog"][aria-modal="true"]'))return;
+  if(e.key==='Escape'&&mode==='measure'){e.preventDefault();setMode('navigate');toast('Messen abgebrochen.');return;}
   if(e.key==='Escape'&&(selected||selectedArea)){e.preventDefault();selected=null;selectedArea=null;render();return;}
   if((e.key==='<'||e.key==='>')&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&project&&!cropping){e.preventDefault();setMarkerScale(stepMarkerScale(markerScale(project),e.key==='>'?1:-1));toast(`Punktgröße ${Math.round(markerScale(project)*100)} %`);return;}
   if((e.key==='Delete'||e.key==='Backspace')&&!e.ctrlKey&&!e.metaKey&&!e.altKey){
@@ -238,7 +252,7 @@ let drag:Drag|null=null,pinch:{distance:number;camera:typeof camera;anchor:{x:nu
 svg.addEventListener('pointerdown',e=>{if(!project||cropping||e.button>0)return;svg.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{clientX:e.clientX,clientY:e.clientY});if(pointers.size===2){if(drag?.before&&drag.original&&drag.marker)Object.assign(drag.marker,drag.original);if(drag?.area&&drag.areaOriginal)Object.assign(drag.area,drag.areaOriginal);drag=null;const [a,b]=[...pointers.values()];pinch={distance:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),camera:{...camera},anchor:point({clientX:(a.clientX+b.clientX)/2,clientY:(a.clientY+b.clientY)/2})};renderMarkers();return;}
   const target=e.target as Element,m=project.markers.find(m=>m.id===target.closest('[data-id]')?.getAttribute('data-id'));
   if(m&&['sample','fire','edit'].includes(mode)){selected=m.id;render();reveal('inspector');}
-  const placing=mode==='sample'||mode==='fire'||mode==='lab-place';
+  const placing=mode==='sample'||mode==='fire'||mode==='lab-place'||mode==='measure';
   // Only free-space gestures in placement tools pan; editor gestures stay unchanged.
   drag={id:e.pointerId,start:point(e),screen:{x:e.clientX,y:e.clientY},camera:{...camera},pan:mode==='navigate'||(placing&&!m),threshold:placing&&!m?(e.pointerType==='touch'?8:6):4,moved:false};
   if(mode==='area-edit'){const a=project.areas?.find(a=>a.id===target.closest('[data-area]')?.getAttribute('data-area'));if(a){selected=null;selectedArea=a.id;reveal('area-inspector');drag.area=a;drag.areaOriginal=clone(a);drag.before=clone(project);const vertex=target.closest('[data-vertex]')?.getAttribute('data-vertex');if(vertex!==null&&vertex!==undefined)drag.vertex=Number(vertex);render();}}
@@ -260,6 +274,7 @@ function endPointer(e:PointerEvent,cancel=false){if(cropping)return;pointers.del
   // Some devices deliver the last movement only on release. It must not become a tap.
   if(d.pan&&Math.hypot(e.clientX-d.screen.x,e.clientY-d.screen.y)>d.threshold)d.moved=true;
   if(d.area&&d.areaOriginal&&d.before){const error=polygonError(d.area.points,project.plan);if(error){Object.assign(d.area,d.areaOriginal);render();toast(error,true);}else if(d.moved){history.push(d.before);changed();}}
+  else if(!d.moved&&mode==='measure'){measureClick(point(e));}
   else if(!d.moved&&mode==='lab-place'){labUI?.placeAt(point(e));}
   else if(!d.moved&&mode==='area-draw'){const pt=point(e);if(pt.x<0||pt.y<0||pt.x>project.plan.width||pt.y>project.plan.height){toast('Bitte innerhalb des Grundrisses zeichnen.');return;}if(draftPoints.length>=MAX_POINTS){toast(`Höchstens ${MAX_POINTS} Eckpunkte pro Fläche.`,true);return;}draftPoints.push(pt);render();}
   else if(d.marker&&d.moved&&d.before){history.push(d.before);changed();}
@@ -267,15 +282,35 @@ function endPointer(e:PointerEvent,cancel=false){if(cropping)return;pointers.del
 }
 svg.addEventListener('pointerup',e=>endPointer(e));svg.addEventListener('pointercancel',e=>endPointer(e,true));
 new ResizeObserver(()=>{if(project){const rect=svg.getBoundingClientRect(),h=camera.width*rect.height/rect.width;if(Number.isFinite(h)){camera.y+=(camera.height-h)/2;camera.height=h;updateCamera();}}}).observe($('stage'));
-input('quality').onchange=dimensions;
-function exportName(p:Project,format:'png'|'jpeg',results=false){const floor=floorName(p);return `${`${folder?`Probenplan ${folder.name}`:p.report||'Probenplan'}${floor?` - ${floor}`:''}${results?' - Ergebniskarte':''}`.replace(/[<>:"/\\|?*]/g,'_')}.${format==='jpeg'?'jpg':'png'}`;}
-async function runExport(){if(!project||busy||!requireFinished())return;busy=true;$<HTMLButtonElement>('export').disabled=true;$('export').textContent='Bild wird erstellt …';$('smaller').hidden=true;
-  const resultsView=!$('view-field').hidden&&input('view').value==='results',all=sheetCount(project)>1&&input('scope').value==='all',format=input('format').value as 'png'|'jpeg',quality=Number(input('quality').value);
+input('quality').onchange=dimensions;input('format').addEventListener('change',dimensions);input('view').addEventListener('change',dimensions);input('scope').addEventListener('change',dimensions);
+function exportName(p:Project,format:'png'|'jpeg'|'pdf',results=false,allFloors=false){const floor=allFloors?'':floorName(p);return `${`${folder?`Probenplan ${folder.name}`:p.report||'Probenplan'}${floor?` - ${floor}`:''}${results?' - Ergebniskarte':''}`.replace(/[<>:"/\\|?*]/g,'_')}.${format==='jpeg'?'jpg':format}`;}
+/** Ein Druckblatt rendern; bei Speichermangel automatisch mit 200 statt 300 dpi. */
+async function sheetPage(view:Project,paper:Paper,rated:ReturnType<typeof rateMarkers>|null,page:number,pages:number):Promise<PdfPage>{
+  const layout=sheetLayout(view,paper,rated),info={objekt:String(projectData.objekt||'').trim(),page,pages};
+  for(const dpi of [300,200]){let canvas:HTMLCanvasElement|null=null;
+    try{canvas=await renderSheet(view,layout,rated,info,dpi);return {widthMm:layout.width,heightMm:layout.height,pixelWidth:canvas.width,pixelHeight:canvas.height,rgb:canvasRGB(canvas)};}
+    catch(e){if(dpi===200)throw Error(`${e instanceof Error?e.message:'PDF-Erstellung fehlgeschlagen.'} Bitte A4 wählen oder andere Apps schließen.`);}
+    finally{if(canvas){canvas.width=1;canvas.height=1;}}
+  }
+  throw Error('PDF-Erstellung fehlgeschlagen.');
+}
+async function runPdf(paper:Paper,resultsView:boolean,all:boolean){
+  if(!project)return;const views=all?Array.from({length:sheetCount(project)},(_,i)=>clone(sheetProject(project!,i))):[clone(project)],pages:PdfPage[]=[];
+  for(const [i,view] of views.entries()){$('export').textContent=views.length>1?`Blatt ${i+1} von ${views.length} wird erstellt …`:'PDF wird erstellt …';pages.push(await sheetPage(view,paper,resultsView?rateMarkers(view):null,i+1,views.length));}
+  const name=exportName(project,'pdf',resultsView,all),blob=buildPdf(pages,{title:name.replace(/\.pdf$/,''),subject:[project.report&&`Gutachten ${project.report}`,String(projectData.objekt||'').trim()].filter(Boolean).join(' · '),author:COMPANY.name});
+  if(exportURL)URL.revokeObjectURL(exportURL);exportURL=URL.createObjectURL(blob);const a=$<HTMLAnchorElement>('export-link');a.hidden=false;a.href=exportURL;a.download=name;a.textContent='PDF erneut herunterladen';$('export-result').hidden=false;
+  const uncalibrated=views.filter(v=>!metersPerUnit(v.plan)).length,hint=uncalibrated?` ${uncalibrated===views.length?'Ohne':'Teilweise ohne'} Maßstab – Plan in der Liste kalibrieren („Strecke messen“).`:'';
+  if(folder){await writeFile(folder.plaene,name,blob);toast(`PDF gespeichert: ${PLAENE}/${name}.${hint}`,!!uncalibrated);}else{a.click();toast(`PDF erstellt (${pages.length} ${pages.length===1?'Blatt':'Blätter'}). Der Download ist bereit.${hint}`,!!uncalibrated);}
+}
+async function runExport(){if(!project||busy||!requireFinished())return;busy=true;$<HTMLButtonElement>('export').disabled=true;$('smaller').hidden=true;
+  const resultsView=!$('view-field').hidden&&input('view').value==='results',all=sheetCount(project)>1&&input('scope').value==='all',chosen=exportFormat(),pdf=chosen.startsWith('pdf'),format=chosen as 'png'|'jpeg',quality=Number(input('quality').value);
+  $('export').textContent=pdf?'PDF wird erstellt …':'Bild wird erstellt …';$('export-link').textContent='Bild erneut herunterladen';
   try{
+    if(pdf)await runPdf(chosen.slice(4) as Paper,resultsView,all);else
     if(all){const count=sheetCount(project);for(let i=0;i<count;i++){$('export').textContent=`Bild ${i+1} von ${count} wird erstellt …`;const view=clone(sheetProject(project,i));const image=await exportImage(view,quality,format,resultsView?rateMarkers(view):null,footerExtra()),name=exportName(view,format,resultsView);if(folder)await writeFile(folder.plaene,name,image);else await download(image,name);}
       $('export-result').hidden=true;toast(folder?`${count} Bilder in „${PLAENE}“ gespeichert – je Plan ein Bild.`:`${count} Bilder erstellt – je Plan ein Bild. Der Browser fragt eventuell einmal, ob mehrere Downloads erlaubt sind.`);}
     else{const blob=await exportImage(clone(project),quality,format,resultsView?rateMarkers(project):null,footerExtra());if(exportURL)URL.revokeObjectURL(exportURL);exportURL=URL.createObjectURL(blob);const a=$<HTMLAnchorElement>('export-link');a.hidden=false;a.href=exportURL;a.download=exportName(project,format,resultsView);$('export-result').hidden=false;if(folder){await writeFile(folder.plaene,a.download,blob);toast(`Bild gespeichert: ${PLAENE}/${a.download}`);}else{a.click();toast('Bild erstellt. Der Download ist bereit.');}}
-  }catch(e){fail(e);$('export-result').hidden=false;$('export-link').hidden=!exportURL||all;$('smaller').hidden=quality<=3500;}finally{busy=false;$<HTMLButtonElement>('export').disabled=false;$('export').textContent='↓ Bild exportieren';render();}}
+  }catch(e){fail(e);$('export-result').hidden=false;$('export-link').hidden=!exportURL||all||pdf;$('smaller').hidden=pdf||quality<=3500;}finally{busy=false;$<HTMLButtonElement>('export').disabled=false;dimensions();render();}}
 $('export').onclick=runExport;$('smaller').onclick=()=>{input('quality').value='3500';dimensions();void runExport();};$('help').onclick=()=>$<HTMLDialogElement>('help-dialog').showModal();
 async function offline(){if(!('serviceWorker' in navigator)){ $('offline').textContent='○ Offline nicht verfügbar';return;}const update=()=>{$('offline').textContent=navigator.serviceWorker.controller?'● Offline bereit':'● Offline nach erneutem Öffnen bereit';$('offline').classList.add('ready');};navigator.serviceWorker.addEventListener('controllerchange',update);try{await navigator.serviceWorker.register('./sw.js');await navigator.serviceWorker.ready;update();}catch{if(navigator.serviceWorker.controller)update();else $('offline').textContent='○ Offline nicht eingerichtet';}}
 labUI=new LabUI({project:()=>project,blocked:()=>busy||cropping||!!draftPoints.length,busy:value=>{busy=value;render();},mutate,point,mode:next=>{if(next==='lab-place'){selected=null;selectedArea=null;}setMode(next);render();},error:fail,selected:id=>{selected=id;selectedArea=null;}});
@@ -309,7 +344,7 @@ $('marker-list').addEventListener('click',()=>reveal('inspector'));
 $('area-list').addEventListener('click',()=>reveal('area-inspector'));
 document.addEventListener('plankit:reveal',e=>reveal((e as CustomEvent<string>).detail));
 const exportCard=$<HTMLDialogElement>('export-dialog');
-$('export-open').onclick=()=>{if(exportCard.open)exportCard.close();else{dimensions();exportCard.show();}};
+$('export-open').onclick=()=>{if(exportCard.open)exportCard.close();else{exportCard.show();dimensions();}};
 window.addEventListener('keydown',e=>{
   if(e.defaultPrevented||e.isComposing||e.ctrlKey||e.metaKey||e.altKey)return;
   const editing=(t:EventTarget|null)=>t instanceof Element&&(!!t.closest('input,textarea,select,[role="textbox"]')||(t instanceof HTMLElement&&t.isContentEditable));
@@ -348,7 +383,7 @@ function renderSheets(){
 }
 function showSheet(index:number){
   if(!project||busy||cropping||!requireFinished())return;const count=sheetCount(project);if(count<2||index<0||index>=count||index===(project.active??0))return;
-  switchSheet(project,index);selected=null;selectedArea=null;$('export-result').hidden=true;render();fit();persist();
+  if(mode==='measure')setMode('navigate');switchSheet(project,index);selected=null;selectedArea=null;$('export-result').hidden=true;render();fit();persist();
 }
 let menuIndex=0;
 function openSheetMenu(index:number){if(!project||busy||cropping||!requireFinished())return;if(index!==(project.active??0))showSheet(index);menuIndex=project.active??0;const d=$<HTMLDialogElement>('sheet-dialog'),count=sheetCount(project);input('sheet-name').value=project.sheets?.[menuIndex]?.name||'EG';$<HTMLButtonElement>('sheet-left').disabled=menuIndex===0;$<HTMLButtonElement>('sheet-right').disabled=menuIndex>=count-1;$<HTMLButtonElement>('sheet-delete').disabled=count<2;if(!d.open)d.showModal();input('sheet-name').select();}
@@ -388,6 +423,50 @@ input('marker-size').addEventListener('input',()=>setMarkerScale(Number(input('m
 // Nach dem Ziehen den Fokus abgeben, damit < > und Strg+Z sofort wieder funktionieren (Tastaturbedienung per Pfeiltasten bleibt möglich).
 input('marker-size').addEventListener('pointerup',()=>input('marker-size').blur());
 $('size-reset').onclick=()=>setMarkerScale(1);
+// Maßstab je Plan (zwei Punkte + wahre Länge) und optionaler Nordpfeil für das maßstäbliche PDF.
+$('size-section').insertAdjacentHTML('afterend','<section class="size-section" id="scale-section" hidden><div class="section-heading"><h2>Maßstab &amp; Norden</h2><span id="scale-value" class="size-value">–</span></div><p class="tiny" id="scale-status"></p><div class="size-row"><button id="measure-start" class="tb" title="Zwei Punkte einer bekannten Strecke anklicken, dann die Länge eingeben">📏 Strecke messen …</button><button id="scale-clear" class="tb" hidden>Maßstab entfernen</button></div><label class="check-row"><input type="checkbox" id="north-on"> Nordpfeil im PDF</label><div class="size-row" id="north-controls" hidden><button id="north-left" class="tb" title="15° gegen den Uhrzeigersinn">↺</button><input id="north-angle" type="number" min="0" max="359" step="1" aria-label="Nordrichtung in Grad (0 = oben, 90 = rechts)"><span>°</span><button id="north-right" class="tb" title="15° im Uhrzeigersinn">↻</button><svg id="north-preview" viewBox="-12 -12 24 24" width="28" height="28" aria-hidden="true"><circle r="11" fill="none" stroke="currentColor" stroke-width="1"/><g id="north-needle"><path d="M0-9 3 6 0 3Z" fill="none" stroke="currentColor" stroke-width="1"/><path d="M0-9-3 6 0 3Z" fill="currentColor"/></g></svg></div><p class="tiny">Gilt je Plan. Norden: 0° = oben, 90° = rechts; beim Drehen des Plans dreht der Pfeil mit.</p></section>');
+document.body.insertAdjacentHTML('beforeend','<dialog id="measure-dialog" aria-labelledby="measure-title"><form method="dialog" id="measure-form"><span class="eyebrow">MASSSTAB</span><h2 id="measure-title">Wie lang ist diese Strecke in Wirklichkeit?</h2><label>Länge in Metern<input id="measure-length" inputmode="decimal" autocomplete="off" placeholder="z. B. 4,85"></label><p class="tiny" id="measure-info"></p><p class="tiny error-text" id="measure-error" hidden></p><div class="dialog-actions"><button value="ok" class="primary" id="measure-ok">Maßstab übernehmen</button><button value="cancel" id="measure-cancel">Abbrechen</button></div></form></dialog>');
+const measureLayer=document.createElementNS(ns,'g');measureLayer.id='measure-layer';measureLayer.setAttribute('pointer-events','none');svg.append(measureLayer);
+const deNum=(n:number,digits=2)=>n.toLocaleString('de-DE',{maximumFractionDigits:digits});
+/** Deutsche oder internationale Dezimalzahl (4,85 oder 4.85), ohne Tausendertrennzeichen. */
+function parseMeters(text:string){const t=text.trim().replace(/\s*m$/i,'');if(!/^\d{1,6}([.,]\d{1,4})?$/.test(t))return null;const v=Number(t.replace(',','.'));return v>0&&v<=100_000?v:null;}
+function renderMeasure(){
+  if(!measurePoints.length){measureLayer.innerHTML='';return;}
+  const r=camera.width/Math.max(1,svg.clientWidth)*6,[a,b]=measurePoints;
+  measureLayer.innerHTML=`${b?`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="white" stroke-width="${r*.9}"/><line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" stroke="#c0392b" stroke-width="${r*.4}" stroke-dasharray="${r*1.5} ${r}"/>`:''}${measurePoints.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="${r}" fill="white" stroke="#c0392b" stroke-width="${r*.4}"/>`).join('')}`;
+}
+function measureClick(pt:Point){
+  if(!project)return;if(pt.x<0||pt.y<0||pt.x>project.plan.width||pt.y>project.plan.height){toast('Bitte innerhalb des Grundrisses messen.');return;}
+  if(measurePoints.length>=2)measurePoints=[];measurePoints.push(pt);renderMeasure();
+  if(measurePoints.length===1){$('mode-hint').textContent='Strecke messen: zweiten Punkt anklicken · Esc bricht ab';return;}
+  const units=Math.hypot(measurePoints[1].x-measurePoints[0].x,measurePoints[1].y-measurePoints[0].y);
+  if(units<Math.max(project.plan.width,project.plan.height)/200){measurePoints=[pt];renderMeasure();toast('Die Punkte liegen zu dicht beieinander. Bitte eine möglichst lange bekannte Strecke wählen.');return;}
+  const mpu=metersPerUnit(project.plan);input('measure-length').value=mpu?deNum(units*mpu):'';
+  $('measure-info').textContent=mpu?`Nach dem bisherigen Maßstab: ${deNum(units*mpu)} m. Zum Prüfen einfach abbrechen.`:'Je länger die Strecke, desto genauer der Maßstab – z. B. eine ganze Wand statt einer Tür.';
+  $('measure-error').hidden=true;$<HTMLDialogElement>('measure-dialog').showModal();input('measure-length').select();
+}
+$('measure-form').addEventListener('submit',e=>{const submitter=(e as SubmitEvent).submitter as HTMLButtonElement|null;if(submitter?.value==='cancel')return;if(parseMeters(input('measure-length').value)===null){e.preventDefault();$('measure-error').textContent='Bitte eine Länge in Metern eingeben, z. B. 4,85.';$('measure-error').hidden=false;}});
+$('measure-dialog').addEventListener('close',()=>{
+  const dialog=$<HTMLDialogElement>('measure-dialog'),meters=parseMeters(input('measure-length').value);
+  if(dialog.returnValue==='ok'&&meters!==null&&project&&measurePoints.length===2){const units=Math.hypot(measurePoints[1].x-measurePoints[0].x,measurePoints[1].y-measurePoints[0].y);
+    mutate(p=>{p.plan.calibration={units,meters};});const b=bounds(project),mpu=meters/units;setMode('navigate');toast(`Maßstab gesetzt: Plan ca. ${deNum(b.width*mpu,1)} × ${deNum(b.height*mpu,1)} m. Rückgängig mit Strg+Z.`);}
+  else{measurePoints=[];renderMeasure();if(mode==='measure')$('mode-hint').textContent='Strecke messen: ersten Punkt anklicken · Esc bricht ab';}
+  dialog.returnValue='';
+});
+$('measure-start').onclick=()=>{if(!project||busy||cropping)return;setMode('measure');measurePoints=[];renderMeasure();toast('Zwei Punkte einer bekannten Strecke anklicken.');};
+$('scale-clear').onclick=()=>{if(project?.plan.calibration)mutate(p=>{delete p.plan.calibration;});};
+function setNorth(value:number|null){if(!project)return;const v=value===null?null:((Math.round(value)%360)+360)%360;if(v===northAngle(project.plan))return;mutate(p=>{if(v===null)delete p.plan.north;else p.plan.north=v;});}
+input('north-on').addEventListener('change',()=>setNorth(input('north-on').checked?0:null));
+input('north-angle').addEventListener('change',()=>{const v=Number(input('north-angle').value);if(Number.isFinite(v))setNorth(v);else updateScaleUI();});
+$('north-left').onclick=()=>setNorth((northAngle(project!.plan)??0)-15);$('north-right').onclick=()=>setNorth((northAngle(project!.plan)??0)+15);
+function updateScaleUI(){
+  const sec=$('scale-section');sec.hidden=!project;if(!project)return;const plan=project.plan,mpu=metersPerUnit(plan),north=northAngle(plan);
+  $('scale-value').textContent=mpu?'kalibriert':'–';$('scale-clear').hidden=!mpu;
+  if(mpu){const b=bounds(project);$('scale-status').textContent=`Gemessen: ${deNum(plan.calibration!.meters)} m. Plan ca. ${deNum(b.width*mpu,1)} × ${deNum(b.height*mpu,1)} m. Prüfen: erneut messen, der bisherige Wert wird angezeigt.`;}
+  else $('scale-status').textContent='Nicht kalibriert. Für maßstäbliche PDFs eine bekannte Strecke messen, z. B. eine Wandlänge.';
+  input('north-on').checked=north!==null;$('north-controls').hidden=north===null;if(north!==null&&document.activeElement!==$('north-angle'))input('north-angle').value=String(Math.round(north));
+  $('north-needle').setAttribute('transform',`rotate(${north??0})`);
+}
 document.querySelector('.panel-scroll')!.insertAdjacentHTML('afterbegin','<section class="results-section" id="results-section" hidden><div class="section-heading"><h2>Ergebniskarte</h2></div><label>Bewerteter Parameter<select id="result-param"></select></label><label>Nutzung / Referenz<select id="result-usage"><option value="">Eigene / FotoKit-Skala</option><option value="residential">VdS 2357 · Wohn-/Büroräume · 10 µg/m²</option><option value="industrial">VdS 2357 · Industrie · 100 µg/m²</option></select></label><div id="result-scales"></div><p class="tiny">Kategorien aufsteigend: Ein Wert gehört zur letzten Kategorie, deren „ab“-Wert er erreicht; Unter BG nur bei „unter BG“ oder „&lt;“ mit gültiger Zahl. n.n.: Nicht nachgewiesen. n.b.: Nicht bestimmt / Bedeutung prüfen. Diese Angaben sind keine gemessenen Nullwerte; fehlerhafte „&lt;“-Angaben bleiben ohne Bewertung. Mehrdeutige Zahlen (z. B. 1.234) bleiben ohne Bewertung. Die Skalen gelten auch für die Ergebnistabelle in FotoKit. Farben werden im Projekt gespeichert. VdS 2357: Hintergrundreferenzen nur für Σ16 EPA-PAK auf Oberflächen, keine pauschalen Freigabe- oder Sanierungsgrenzwerte. Originalwerte und Einheiten bleiben erhalten.</p></section>');
 document.querySelector('.canvas-footer')!.insertAdjacentHTML('beforeend','<span id="result-legend" hidden></span>');
 let resultSignature='';
