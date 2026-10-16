@@ -56,5 +56,15 @@ try{
   const save=async(p,text)=>p.evaluate(async({name,revision,text})=>{const m=await import('/folder.mjs'),dir=await(await navigator.storage.getDirectory()).getDirectoryHandle(name),f={dir,name,nr:'26.0123',ort:'Synthetic',plaene:await dir.getDirectoryHandle('Pläne')};try{await m.saveFolderProject(f,text,revision);return 'saved';}catch(e){return e instanceof m.FolderConflict?'conflict':String(e);}}, {...f,text});
   assert.deepEqual((await Promise.all([save(page,'tab A'),save(other,'tab B')])).sort(),['conflict','saved']);await other.close();
  });
+ await check('Office safety: old "vorher" backups are pruned; recovery files and manual copies stay',async()=>{
+  const got=await page.evaluate(async()=>{const m=await import('/folder.mjs'),f=await make();let rev=null;
+   await m.writeFile(f.plaene,`Probenplan ${f.name} (Kopie manuell).probenplan`,'copy');
+   for(let i=0;i<15;i++)rev=(await m.saveFolderProject(f,'v'+i,rev)).revision;
+   const files=await names(f),backups=files.filter(n=>n.includes('(vorher '));
+   return {count:backups.length,texts:await Promise.all(backups.map(n=>read(f,n))),copy:files.some(n=>n.includes('(Kopie manuell)')),main:await read(f),recovery:files.filter(n=>n.includes('Wiederherstellung')).length};
+  });
+  assert.equal(got.count,10);assert.equal(got.main,'v14');assert.ok(got.copy);assert.equal(got.recovery,0);
+  assert.ok(got.texts.includes('v13'),'newest backup kept');assert.ok(!got.texts.includes('v0'),'oldest backup pruned');
+ });
  await context.close();
 }finally{await browser.close();await new Promise(r=>server.close(r));}

@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.8.3 – 16. Oktober 2026
+
+- Sicherungskopien „(vorher …)“ sammeln sich nicht mehr unbegrenzt im Ordner „Pläne“: PlanKit behält die neuesten 10 und je Tag die jeweils neueste der letzten 30 Tage. Wiederherstellungsdateien, manuelle Kopien und die Projektdatei werden nie gelöscht; ein Fehler beim Aufräumen lässt das Speichern nie scheitern.
+
 ## 1.8.2 – 16. Oktober 2026
 
 - Büro-Dateisicherheit für Windows mit Chrome/Edge: Inhaltsvergleich statt Zeitstempeltoleranz, Konflikte auch bei gelöschten/ersetzten Dateien und erneute Prüfung nach der Konfliktentscheidung.
