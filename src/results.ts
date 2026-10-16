@@ -1,0 +1,64 @@
+// Ergebniskarte: Probenmarker nach Bewertungskategorie einfärben.
+// Die Skalen sind dieselben wie in FotoKits „Ergebnistabelle“ (gleicher Browser-Speicher „bu-scales“ unter
+// kaspersebastian83-dot.github.io): je Parameter und Einheit eine Liste von Kategorien mit „ab“-Wert.
+// Für die Karte wird die Skala zusätzlich mit Farben im Projekt gespeichert, damit Kollegen dieselbe Karte sehen.
+import {allMarkers,type Category,type Marker,type Project,type ResultSettings,type Scale,type Wert} from './model';
+
+export const UNRATED='#c3ccd5';
+const AUTO=['#4caf50','#f2c94c','#f2994a','#e0453a','#8e2424'];
+/** Farben nach Reihenfolge: unterste Kategorie grün, oberste rot. */
+export function autoColors(n:number):string[]{
+  if(n<=1)return [AUTO[0]];if(n===2)return [AUTO[0],AUTO[3]];if(n===3)return [AUTO[0],AUTO[1],AUTO[3]];if(n===4)return AUTO.slice(0,4);
+  return Array.from({length:n},(_,i)=>AUTO[Math.round(i*(AUTO.length-1)/(n-1))]);
+}
+export const scaleKey=(parameter:string,unit:string)=>`${parameter}|${unit}`;
+/** Wie FotoKit: "1300" → 1300, "1,9" → 1,9, "1.300,5" → 1300,5, "< 0,50" / "(n.b.)" → 0 (unter BG), sonst NaN. */
+export function labNumber(raw:string){
+  const t=String(raw||'').trim();if(/^</.test(t)||/n\.\s*b\.|n\.\s*n\./i.test(t))return 0;
+  const v=parseFloat(t.replace(/\./g,'').replace(',','.'));return Number.isFinite(v)?v:NaN;
+}
+export const belowLimit=(raw:string)=>/^\s*</.test(raw||'')||/n\.\s*b\.|n\.\s*n\./i.test(raw||'');
+export function shortParameter(p:string){return p.replace(/^Summe 16 EPA-PAK.*$/i,'Σ16 EPA-PAK').replace(/^Benzo\[a\]pyren$/i,'BaP');}
+
+const werte=(p:Project)=>[...allMarkers(p).flatMap(m=>m.lab?.werte||[]),...(p.pending||[]).flatMap(r=>r.werte||[])];
+export function hasValues(p:Project){return werte(p).length>0;}
+/** Alle Parameter mit Zahlenwert in Berichtsreihenfolge. */
+export function parameters(p:Project){const seen:string[]=[];for(const w of werte(p))if(!seen.includes(w.p)&&Number.isFinite(labNumber(w.r)))seen.push(w.p);return seen;}
+export function defaultParameter(list:string[]){return list.find(x=>/^Summe 16 EPA-PAK.*exkl/i.test(x))||list.find(x=>/^Summe 16 EPA-PAK/i.test(x))||list[0]||'';}
+export function valueOf(m:Marker,parameter:string):Wert|undefined{return m.lab?.werte?.find(w=>w.p===parameter);}
+/** Index der Kategorie: letzte Kategorie, deren „ab“-Wert erreicht ist (wie in FotoKit). */
+export function rate(scale:Scale|undefined,value:number){if(!scale?.cats.length||!Number.isFinite(value))return -1;let index=0;scale.cats.forEach((c,i)=>{if(i>0&&value>=c.from)index=i;});return index;}
+
+type Shared=Record<string,{name?:string;cats?:{name:string;from:number}[];geaendert?:string}>;
+export function sharedScales():Shared{try{const v=JSON.parse(localStorage.getItem('bu-scales')||'{}');return v&&typeof v==='object'?v:{};}catch{return {};}}
+export function saveShared(key:string,scale:Scale|null){try{const all=sharedScales();if(scale)all[key]={name:scale.name,cats:scale.cats.map(c=>({name:c.name,from:c.from})),geaendert:new Date().toISOString()};else delete all[key];localStorage.setItem('bu-scales',JSON.stringify(all));}catch{/* Speicher nicht verfügbar */}}
+/** Skala aus FotoKit übernehmen (mit automatischen Farben), falls vorhanden. */
+export function fromShared(key:string):Scale|null{
+  const s=sharedScales()[key];const cats=(s?.cats||[]).filter(c=>c&&typeof c.name==='string'&&c.name.trim()).map((c,i)=>({name:c.name.trim().slice(0,60),from:i===0?0:Number(c.from)})).filter(c=>Number.isFinite(c.from)&&c.from>=0).sort((a,b)=>a.from-b.from).slice(0,12);
+  if(!cats.length)return null;cats[0].from=0;const colors=autoColors(cats.length);return {name:String(s?.name||'').slice(0,160),cats:cats.map((c,i)=>({...c,color:colors[i]}))};
+}
+/** Einstellungen ergänzen: Standardparameter und fehlende Skalen aus FotoKit. Gibt true zurück, wenn sich etwas geändert hat. */
+export function prepare(p:Project):boolean{
+  const list=parameters(p);if(!list.length)return false;let changed=false;
+  if(!p.results||!list.includes(p.results.parameter)){p.results={parameter:defaultParameter(list),scales:p.results?.scales||{}};changed=true;}
+  for(const unit of units(p,p.results.parameter)){const key=scaleKey(p.results.parameter,unit);if(!p.results.scales[key]){const s=fromShared(key);if(s){p.results.scales[key]=s;changed=true;}}}
+  return changed;
+}
+export function units(p:Project,parameter:string){const seen:string[]=[];for(const w of werte(p))if(w.p===parameter&&!seen.includes(w.u))seen.push(w.u);return seen;}
+
+export interface Rated {fill:Map<string,string>;groups:{key:string;unit:string;scale:Scale|undefined;cats:(Category&{labels:string[]})[]}[];unrated:string[];parameter:string}
+/** Farben je Marker und Legende für die Marker des übergebenen (Teil-)Projekts. */
+export function rateMarkers(p:Project,markers:Marker[]=p.markers,settings:ResultSettings|undefined=p.results):Rated{
+  const fill=new Map<string,string>(),unrated:string[]=[],parameter=settings?.parameter||'';const groups=new Map<string,Rated['groups'][number]>();
+  for(const m of markers){if(m.kind!=='sample')continue;const w=valueOf(m,parameter);
+    if(!w){unrated.push(m.label);fill.set(m.id,UNRATED);continue;}
+    const key=scaleKey(parameter,w.u),scale=settings?.scales[key];if(!groups.has(key))groups.set(key,{key,unit:w.u,scale,cats:(scale?.cats||[]).map(c=>({...c,labels:[]}))});
+    const g=groups.get(key)!,i=rate(scale,labNumber(w.r));if(i<0){unrated.push(m.label);fill.set(m.id,UNRATED);continue;}
+    g.cats[i].labels.push(m.label);fill.set(m.id,g.cats[i].color);}
+  const order=(a:string,b:string)=>a.localeCompare(b,'de',{numeric:true});
+  for(const g of groups.values())g.cats.forEach(c=>c.labels.sort(order));
+  return {fill,groups:[...groups.values()],unrated:unrated.sort(order),parameter};
+}
+export function rangeText(scale:Scale,i:number,unit:string){const c=scale.cats[i],next=scale.cats[i+1],n=(v:number)=>v.toLocaleString('de-DE');return next?(i===0?`< ${n(next.from)} ${unit}`:`${n(c.from)} – < ${n(next.from)} ${unit}`):(i===0?`alle Werte`:`≥ ${n(c.from)} ${unit}`);}
+/** Gut lesbare Schriftfarbe auf einer Füllfarbe. */
+export function ink(color:string){const n=parseInt(color.slice(1),16),r=n>>16,g=n>>8&255,b=n&255;return (r*299+g*587+b*114)/1000>150?'#1d2a33':'#ffffff';}

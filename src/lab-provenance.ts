@@ -25,7 +25,7 @@ export function applyLabImport(project:Project,report:LabReport,choices:Readonly
   const choice=choices.get(input),hit=[...allMarkers(next),...allAreas(next),...next.pending].find(r=>r.label.toUpperCase()===input.label.toUpperCase());
   if(choice==='skip')continue;
   if(hit&&choice!=='update'&&choice!=='next')throw Error(`${input.label}: Herkunftskonflikt bitte ausdrücklich auflösen.`);
-  const row:LabSample={label:input.label,ref:input.ref,desc:input.desc,...(input.art!==undefined?{art:input.art}:{}),...(input.labNr!==undefined?{labNr:input.labNr}:{}),...(input.datum!==undefined?{datum:input.datum}:{}),bericht:origin.bericht,reportId:origin.id};
+  const row:LabSample={label:input.label,ref:input.ref,desc:input.desc,...(input.art!==undefined?{art:input.art}:{}),...(input.labNr!==undefined?{labNr:input.labNr}:{}),...(input.datum!==undefined?{datum:input.datum}:{}),...(input.werte?{werte:input.werte.map(w=>({...w}))}:{}),bericht:origin.bericht,reportId:origin.id};
   if(choice==='update'){
    if(!hit||('kind' in hit&&hit.kind!=='sample')||'points' in hit)throw Error(`${input.label}: Nur Laborproben oder Probenmarker können ersetzt werden.`);
    const {label,...lab}=row;if('kind' in hit){hit.note=row.desc;hit.lab=lab;}else Object.assign(hit,row);
