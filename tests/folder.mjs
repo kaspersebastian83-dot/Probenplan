@@ -1,7 +1,7 @@
 // Projektordner: Öffnen aus der Projektzentrale (?projekt=), automatisches Speichern in „Pläne“, Bilder dorthin,
 // Grundrisse und Laborberichte aus dem Projekt, Konflikt bei fremder Änderung, Sicherungskopie beim Ersetzen.
 // Der Archivordner wird im privaten Dateisystem des Browsers (OPFS) nachgebildet; nur Chromium kennt die Ordner-API.
-import {chromium} from './runtime.mjs';
+import {chromium,openExport,closeExport} from './runtime.mjs';
 import {labXML} from './lab-fixtures.mjs';
 import assert from 'node:assert/strict';
 const base=process.env.TEST_URL||'http://localhost:4173';
@@ -22,6 +22,7 @@ const fs=(page,action,...args)=>page.evaluate(async([action,args])=>{
  if(action==='write'){const d=await dir(args[0]);const w=await(await d.getFileHandle(args[1],{create:true})).createWritable();await w.write(args[2]);await w.close();return true;}
 },[action,args]);
 const saved=async page=>{await page.locator('#saved',{hasText:/^✓ In „Pläne“ gespeichert$/}).waitFor({state:'attached'});for(let i=0;i<40;i++){const t=await fs(page,'read',[NAME,'Pläne'],FILE);if(t)return JSON.parse(t);await page.waitForTimeout(100);}throw Error('Projektdatei fehlt');};
+const editReport=async(page,text)=>{await openExport(page);await page.locator('#report').fill(text);await page.locator('#report').press('Tab');await closeExport(page);};
 const browserDraft=page=>page.evaluate(name=>new Promise((resolve,reject)=>{const r=indexedDB.open('probenplan',1);r.onsuccess=()=>{const q=r.result.transaction('projects').objectStore('projects').get(`projekt:${name}`);q.onsuccess=()=>{r.result.close();resolve(q.result);};q.onerror=()=>reject(q.error);};r.onerror=()=>reject(r.error);}),NAME);
 const recoveryProjects=async page=>Promise.all((await fs(page,'list',[NAME,'Pläne'])).filter(n=>n.includes('(Wiederherstellung ')).map(async name=>{try{return {name,project:JSON.parse(await fs(page,'read',[NAME,'Pläne'],name))};}catch{return {name,project:null};}}));
 const browser=await chromium.launch();
@@ -102,7 +103,7 @@ try{
  await check('Conflict choices preserve the current unsaved revision; failed recovery creation blocks replacement',async()=>{
   await page.evaluate(()=>{const original=FileSystemFileHandle.prototype.createWritable;window.failRecovery=true;FileSystemFileHandle.prototype.createWritable=async function(...args){if(this.name.includes('(Wiederherstellung ')&&window.failRecovery)throw Error('Synthetic recovery creation failure');return original.apply(this,args);};});
   const external=JSON.parse(await fs(page,'read',[NAME,'Pläne'],FILE));external.report='External discard';await fs(page,'write',[NAME,'Pläne'],FILE,JSON.stringify(external));
-  await page.locator('#report').fill('Unsaved protect');await page.locator('#report').press('Tab');await page.locator('#saved',{hasText:/^⚠ Nicht im Projektordner gespeichert$/}).waitFor();
+  await editReport(page,'Unsaved protect');await page.locator('#saved',{hasText:/^⚠ Nicht im Projektordner gespeichert$/}).waitFor();
   assert.equal(await page.locator('#ask-dialog').isVisible(),false);assert.equal(await page.locator('#report').inputValue(),'Unsaved protect');const draft=await browserDraft(page);assert.equal(draft.dirty,true);assert.equal(draft.project.report,'Unsaved protect');assert.equal(JSON.parse(await fs(page,'read',[NAME,'Pläne'],FILE)).report,'External discard');
   await page.evaluate(()=>window.failRecovery=false);await page.locator('#save-project').click();await page.locator('#ask-dialog').waitFor();
   assert.ok((await recoveryProjects(page)).some(r=>JSON.stringify(r.project)===JSON.stringify(draft.project)),'Verified recovery must exist before the destructive option is offered');
@@ -116,7 +117,7 @@ try{
   assert.ok((await recoveryProjects(page)).some(r=>JSON.stringify(r.project)===JSON.stringify(draft.project)),'Replacing the browser draft must leave the unsaved project recoverable');
  });
  await check('Import cannot discard unsaved work when recovery-file creation fails',async()=>{
-  await page.evaluate(()=>window.failRecovery=true);await page.locator('#report').fill('Unsaved import');await page.locator('#report').press('Tab');
+  await page.evaluate(()=>window.failRecovery=true);await editReport(page,'Unsaved import');
   await page.locator('#file').setInputFiles({name:'Discard.svg',mimeType:'image/svg+xml',buffer:Buffer.from(svg)});await page.locator('#replace-yes').click();await page.locator('#import-status').waitFor({state:'hidden'});
   assert.equal(await page.locator('#report').inputValue(),'Unsaved import');assert.notEqual(await page.locator('#canvas-name').textContent(),'Discard.svg');assert.equal((await browserDraft(page)).project.report,'Unsaved import');
   await page.evaluate(()=>window.failRecovery=false);await page.locator('#save-project').click();assert.equal((await saved(page)).report,'Unsaved import');
@@ -126,8 +127,8 @@ try{
    new MutationObserver(()=>{const el=document.querySelector('#toast');if(!el.hidden&&/^Gespeichert:/.test(el.textContent))window.confirmations.push(el.textContent);}).observe(document.querySelector('#toast'),{childList:true,subtree:true,attributes:true});
    FileSystemFileHandle.prototype.createWritable=async function(...args){const stream=await original.apply(this,args);if(this.name!==file)return stream;return new Proxy(stream,{get(target,key){if(key==='close')return async()=>{if(window.holdMain)await new Promise(resolve=>window.closeReleases.push(resolve));return target.close();};return typeof target[key]==='function'?target[key].bind(target):target[key];}});};
   },FILE);
-  await page.locator('#report').fill('Snapshot A');await page.locator('#report').press('Tab');await page.locator('#save-project').click();await page.waitForFunction(()=>window.closeReleases.length===1);
-  await page.locator('#report').fill('Snapshot B');await page.locator('#report').press('Tab');await page.evaluate(()=>window.closeReleases.shift()());
+  await editReport(page,'Snapshot A');await page.locator('#save-project').click();await page.waitForFunction(()=>window.closeReleases.length===1);
+  await editReport(page,'Snapshot B');await page.evaluate(()=>window.closeReleases.shift()());
   await page.waitForFunction(()=>window.closeReleases.length===1);assert.equal(JSON.parse(await fs(page,'read',[NAME,'Pläne'],FILE)).report,'Snapshot A');assert.equal((await browserDraft(page)).project.report,'Snapshot B');
   assert.deepEqual(await page.evaluate(()=>window.confirmations),[]);assert.doesNotMatch(await page.locator('#saved').textContent(),/^✓/);assert.equal((await browserDraft(page)).dirty,true);
   await page.evaluate(()=>{window.holdMain=false;window.closeReleases.shift()();});assert.equal((await saved(page)).report,'Snapshot B');
@@ -137,7 +138,7 @@ try{
   // Isolate the cold-start draft from earlier, already asserted recovery candidates.
   await page.evaluate(async name=>{const root=await navigator.storage.getDirectory(),archive=await root.getDirectoryHandle('Mosaik Archivordner'),dir=await(await archive.getDirectoryHandle(name)).getDirectoryHandle('Pläne');for await(const h of dir.values())if(h.name.includes('(Wiederherstellung '))await dir.removeEntry(h.name);},NAME);
   await context.addInitScript(()=>{window.failRecovery=localStorage.getItem('synthetic:failRecovery')==='yes';const original=FileSystemFileHandle.prototype.createWritable;FileSystemFileHandle.prototype.createWritable=async function(...args){if(window.failRecovery&&this.name.includes('(Wiederherstellung '))throw Error('Synthetic recovery creation failure');return original.apply(this,args);};});
-  await page.evaluate(()=>{window.failRecovery=true;localStorage.setItem('synthetic:failRecovery','yes');});await page.locator('#report').fill('Cold dirty draft');await page.locator('#report').press('Tab');await page.locator('#saved',{hasText:/^⚠ Nicht im Projektordner gespeichert$/}).waitFor();const draft=await browserDraft(page);
+  await page.evaluate(()=>{window.failRecovery=true;localStorage.setItem('synthetic:failRecovery','yes');});await editReport(page,'Cold dirty draft');await page.locator('#saved',{hasText:/^⚠ Nicht im Projektordner gespeichert$/}).waitFor();const draft=await browserDraft(page);
   page.once('dialog',dialog=>dialog.accept());await page.reload();await page.locator('#ask-title',{hasText:'Ungespeicherte Browser-Fassung'}).waitFor();await page.locator('#ask-actions button',{hasText:'Datei verwenden'}).click();await page.locator('#toast.error',{hasText:'Synthetic recovery creation failure'}).waitFor();
   assert.deepEqual(await browserDraft(page),draft);assert.equal(JSON.parse(await fs(page,'read',[NAME,'Pläne'],FILE)).report,'Snapshot B');assert.equal(await page.locator('#welcome').isVisible(),true);
   await page.evaluate(async name=>{window.failRecovery=false;localStorage.removeItem('synthetic:failRecovery');const root=await navigator.storage.getDirectory(),archive=await root.getDirectoryHandle('Mosaik Archivordner'),dir=await(await archive.getDirectoryHandle(name)).getDirectoryHandle('Pläne');for await(const h of dir.values())if(h.name.includes('(Wiederherstellung ')&&(await h.getFile()).size===0)await dir.removeEntry(h.name);},NAME);await page.reload();await page.locator('#ask-title',{hasText:'Ungespeicherte Browser-Fassung'}).waitFor();await page.locator('#ask-actions button',{hasText:'Datei verwenden'}).click();await page.locator('#welcome').waitFor({state:'hidden'});
