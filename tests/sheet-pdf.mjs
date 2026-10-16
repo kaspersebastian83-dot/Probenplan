@@ -61,12 +61,12 @@ for(const engine of ['chromium','webkit']){
    await page.locator('#measure-dialog').waitFor();await page.locator('#measure-length').fill('zehn');await page.locator('#measure-ok').click();
    assert.equal(await page.locator('#measure-error').isVisible(),true);assert.equal(await page.locator('#measure-dialog').evaluate(d=>d.open),true);
    await page.locator('#measure-length').fill('10,0');await page.locator('#measure-ok').click();await page.locator('#measure-dialog').waitFor({state:'hidden'});
-   await page.locator('#scale-status',{hasText:'Gemessen: 10 m'}).waitFor();assert.match(await page.locator('#scale-status').textContent(),/20 × 15 m/);
-   const saved=await savedProject(page);assert.equal(saved.plan.calibration.meters,10);assert.ok(Math.abs(saved.plan.calibration.units-2000)<1);
+   await page.locator('#scale-status',{hasText:'Gemessen: 10 m'}).waitFor();assert.match(await page.locator('#scale-status').textContent(),/(19,9|20(,1)?) × 15(,1)? m/);
+   const saved=await savedProject(page);assert.equal(saved.plan.calibration.meters,10);assert.ok(Math.abs(saved.plan.calibration.units-2000)<10,`gemessen ${saved.plan.calibration.units} Einheiten`);
   });
   await check(`${engine}: erneutes Messen zeigt die Länge nach bisherigem Maßstab; Abbrechen ändert nichts`,async()=>{
    await page.locator('#measure-start').click();await tap(page,.25,.3);await tap(page,.5,.3);await page.locator('#measure-dialog').waitFor();
-   assert.equal(await page.locator('#measure-length').inputValue(),'5');await page.locator('#measure-cancel').click();await page.keyboard.press('Escape');
+   const shown=Number((await page.locator('#measure-length').inputValue()).replace(',','.'));assert.ok(Math.abs(shown-5)<.05,`Kontrollmessung ${shown} m`);await page.locator('#measure-cancel').click();await page.keyboard.press('Escape');
    assert.equal((await savedProject(page)).plan.calibration.meters,10);
   });
   await check(`${engine}: Nordpfeil je Plan, Drehen dreht den Pfeil mit, Rückgängig`,async()=>{
@@ -77,9 +77,11 @@ for(const engine of ['chromium','webkit']){
   });
   await check(`${engine}: A4 wählt 1:200, A3 1:100 – Strecken auf dem Blatt stimmen auf 0,2 mm`,async()=>{
    await openExport(page);await page.locator('#format').selectOption('pdf-a4');assert.match(await page.locator('#dimensions').textContent(),/A4 quer · M 1:200/);assert.match(await page.locator('#dimensions-note').textContent(),/Nordpfeil/);
-   let {pages}=await pdfExport(page);assert.equal(pages[0].width,3508);let gap=lineGap(pages[0]);assert.ok(gap&&Math.abs(gap-50)<.2,`A4: 10 m bei 1:200 = 50 mm, gemessen ${gap}`);
+   // Soll-Abstand aus dem tatsächlich gespeicherten Maßstab (Mausklicks treffen nicht pixelgenau 2000 Einheiten).
+   const cal=(await savedProject(page)).plan.calibration,mm=n=>2000*cal.meters/cal.units*1000/n;
+   let {pages}=await pdfExport(page);assert.equal(pages[0].width,3508);let gap=lineGap(pages[0]);assert.ok(gap&&Math.abs(gap-mm(200))<.2,`A4 1:200: Soll ${mm(200)} mm, gemessen ${gap}`);
    await page.locator('#format').selectOption('pdf-a3');assert.match(await page.locator('#dimensions').textContent(),/A3 quer · M 1:100/);
-   ({pages}=await pdfExport(page));assert.ok(Math.abs(pages[0].mmW-420)<.05&&Math.abs(pages[0].mmH-297)<.05);gap=lineGap(pages[0]);assert.ok(gap&&Math.abs(gap-100)<.2,`A3: 10 m bei 1:100 = 100 mm, gemessen ${gap}`);
+   ({pages}=await pdfExport(page));assert.ok(Math.abs(pages[0].mmW-420)<.05&&Math.abs(pages[0].mmH-297)<.05);gap=lineGap(pages[0]);assert.ok(gap&&Math.abs(gap-mm(100))<.2,`A3 1:100: Soll ${mm(100)} mm, gemessen ${gap}`);
    await closeExport(page);
   });
   await check(`${engine}: Maßstab und Norden überstehen Speichern/Öffnen; ungültige Werte werden abgewiesen`,async()=>{
@@ -101,7 +103,7 @@ for(const engine of ['chromium','webkit']){
    file.version=5;file.areas=[{id:'area-1',label:'F1',name:'Rußbelag auf Wandflächen',color:'#d34c42',opacity:.3,points:[{x:500,y:500},{x:2000,y:500},{x:2000,y:2500},{x:500,y:2500}]}];file.nextArea=2;
    await page.locator('#project-file').setInputFiles({name:'f.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(file))});await page.locator('#replace-yes').click().catch(()=>{});await page.waitForTimeout(800);
    await openExport(page);await page.locator('#format').selectOption('pdf-a4');assert.match(await page.locator('#dimensions').textContent(),/A4 hoch · M 1:250/);
-   let {pages}=await pdfExport(page);assert.ok(Math.abs(pages[0].mmW-210)<.05&&Math.abs(pages[0].mmH-297)<.05,'Hochformat');let gap=lineGap(pages[0]);assert.ok(gap&&Math.abs(gap-40)<.2,`1:250 → 40 mm, gemessen ${gap}`);
+   let {pages}=await pdfExport(page);assert.ok(Math.abs(pages[0].mmW-210)<.05&&Math.abs(pages[0].mmH-297)<.05,'Hochformat');const c=og.calibration;let gap=lineGap(pages[0]);const soll=2000*c.meters/c.units*1000/250;assert.ok(gap&&Math.abs(gap-soll)<.2,`1:250: Soll ${soll} mm, gemessen ${gap}`);
    await page.locator('#scope').selectOption('all');assert.match(await page.locator('#dimensions-note').textContent(),/eigenen Maßstab/);
    const all=await pdfExport(page);assert.equal(all.pages.length,2);assert.equal(all.name,'26.0142.pdf');
    const sizes=all.pages.map(p=>`${Math.round(p.mmW)}x${Math.round(p.mmH)}`).sort();assert.deepEqual(sizes,['210x297','297x210']);
