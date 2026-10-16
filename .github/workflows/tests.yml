@@ -37,5 +37,6 @@ jobs:
         with:
           name: probenplan-test-failures
           path: .test-output/
+          include-hidden-files: true
           if-no-files-found: warn
           retention-days: 7

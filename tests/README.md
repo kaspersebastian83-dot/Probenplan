@@ -9,7 +9,7 @@ pnpm build
 pnpm test
 ```
 
-`pnpm test` startet Vites Produktionsvorschau auf einem freien Loopback-Port, führt alle dreizehn Suites aus und beendet den Server auch bei Testfehlern. Es wird keine bereits laufende Anwendung verwendet. Einzelne Suites können zur Diagnose mit `TEST_URL` gegen einen bewusst gestarteten Testserver ausgeführt werden.
+`pnpm test` startet Vites Produktionsvorschau auf einem freien Loopback-Port, führt alle vierzehn Suites aus und beendet den Server auch bei Testfehlern. Es wird keine bereits laufende Anwendung verwendet. Einzelne Suites können zur Diagnose mit `TEST_URL` gegen einen bewusst gestarteten Testserver ausgeführt werden.
 
 - `browser.mjs`: synthetisches Polycam-ZIP, SVG/Ressourcen, Markierungen, Zoom/Touch, Undo/Redo, Projekt-Roundtrip, PNG/JPG und Offlinebetrieb.
 - `edge-cases.mjs`: unabhängig erzeugtes Projekt und Rasterbilder, ungültige Kennungen, äußere Beschriftungen, Exportfehler und Ersatzexport.
@@ -36,3 +36,7 @@ Echte Exporte sind nicht Teil dieser Suite. Etwaige manuelle Kompatibilitätspr�
 Manuelle Laborbeispiele und ihre Screenshots/Extraktionen ausschließlich im ignorierten `.manual-checks/` ablegen. Der automatisierte Runner liest diesen Ordner nicht und lädt ihn nicht als Diagnose hoch.
 
 `lab-regressions.mjs` erweitert die isolierten Parserprüfungen um synthetische deutsche/internationale Zahlen, mehrdeutige/ungültige Eingaben, gültige numerische BG, getrennte Qualifikatoren n.n./n.b., fehlerhafte `<`-Angaben ohne Bewertung, BG ohne Nullwert, VdS-Grenzfälle und Einheiten, unveränderte Rohwerte sowie XML/PDF-Metadaten. `results.mjs` prüft außerdem Nutzungsauswahl, Undo/Redo, Projekt-Roundtrip und unveränderte FotoKit-Skalen. Ausführung in GitHub Actions; für 1.8.1 wurden lokal weder Abhängigkeiten installiert noch Builds oder Tests ausgeführt.
+
+- `folder-safety.mjs`: synthetische Dateien im privaten Browserdateisystem; eindeutige geprüfte Sicherungen, Inhaltskonflikte bei gleicher Dateizeit, Löschung/Neuanlage, Fehler vor Sicherung bzw. bei Schreiben/Schließen, erhaltene Wiederherstellungsdateien, Zugriffsverlust und konkurrierende Tabs. `folder.mjs` ergänzt UI-Rettung nach fehlgeschlagenem Schließen, Browserentwurf/Notfallkopie und erneuten Konflikt während einer Entscheidung. Kein echtes Büroarchiv und keine Host-Dateien.
+
+Zusätzliche 1.8.2-Regressionsgruppen in `folder.mjs`: aktuelle ungespeicherte Fassung vor Konfliktwahl erhalten; fehlgeschlagene Wiederherstellungsdatei verhindert Laden/Import und Überschreiben des Browserentwurfs; kalter Start mit „Datei verwenden“; verzögertes Schließen einer expliziten Speicherung mit neueren Änderungen und ausbleibender veralteter Erfolgsnachricht. Fehler und Wartebarrieren werden nur in synthetischen Browserdateien injiziert.
