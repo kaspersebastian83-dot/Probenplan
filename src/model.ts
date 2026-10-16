@@ -1,7 +1,13 @@
 export type Kind = 'sample' | 'fire';
 export interface LabSources {xml?:string;pdf?:string}
 export interface LabOrigin {id:string;bericht:string;labor:string;auftragsreferenz:string;batch?:string;sources:LabSources}
-export interface LabData {ref:string;desc:string;art?:string;labNr?:string;datum?:string;bericht?:string;reportId?:string}
+/** Ein Messwert aus dem Laborbericht: Parameter, Ergebnis wie gedruckt (z. B. "< 0,50"), Einheit. */
+export interface Wert {p:string;r:string;u:string}
+export interface LabData {ref:string;desc:string;art?:string;labNr?:string;datum?:string;bericht?:string;reportId?:string;werte?:Wert[]}
+/** Ergebniskarte: Kategorie ab einem Wert (erste Kategorie ab 0), Farbe als #rrggbb. */
+export interface Category {name:string;from:number;color:string}
+export interface Scale {name:string;cats:Category[]}
+export interface ResultSettings {parameter:string;scales:Record<string,Scale>}
 export interface LabSample extends LabData {label:string}
 export interface Marker { id: string; kind: Kind; label: string; note: string; x: number; y: number; lx: number; ly: number; lab?:LabData }
 export interface Rect { x:number; y:number; width:number; height:number }
@@ -13,7 +19,7 @@ export interface Plan { name: string; width: number; height: number; data: strin
 // in sheets[active] nur Kennung und Name. Alle anderen Pläne liegen vollständig in sheets.
 export interface Sheet { id:string; name:string; plan?:Plan; markers?:Marker[]; areas?:Area[] }
 export type Version = 1|2|3|4|5;
-export interface Project { format: 'probenplan'; version: Version; plan: Plan; markers: Marker[]; nextSample: number; nextFire: number; report: string; date: string; areas?:Area[]; nextArea?:number; pending?:LabSample[]; labReports?:LabOrigin[]; sheets?:Sheet[]; active?:number }
+export interface Project { format: 'probenplan'; version: Version; plan: Plan; markers: Marker[]; nextSample: number; nextFire: number; report: string; date: string; areas?:Area[]; nextArea?:number; pending?:LabSample[]; labReports?:LabOrigin[]; sheets?:Sheet[]; active?:number; results?:ResultSettings }
 const clonePlan=(plan:Plan):Plan=>({...plan,...(plan.preparation?{preparation:structuredClone(plan.preparation)}:{}),...(plan.pdf?{pdf:{...plan.pdf}}:{})});
 const cloneMarkers=(markers:Marker[])=>markers.map(m=>({...m,...(m.lab?{lab:{...m.lab}}:{})}));
 const cloneAreas=(areas:Area[])=>areas.map(a=>({...a,points:a.points.map(pt=>({...pt}))}));
@@ -22,7 +28,7 @@ export const clone = <T>(value: T): T => {
     const p=value as unknown as Project;
     // Image data is immutable. Share the large string across history snapshots;
     // only coordinates and preparation metadata need independent copies.
-    return {...p,plan:clonePlan(p.plan),markers:cloneMarkers(p.markers),...(p.pending?{pending:p.pending.map(r=>({...r}))}:{}),...(p.labReports?{labReports:p.labReports.map(r=>({...r,sources:{...r.sources}}))}:{}),...(p.areas?{areas:cloneAreas(p.areas)}:{}),
+    return {...p,plan:clonePlan(p.plan),markers:cloneMarkers(p.markers),...(p.pending?{pending:p.pending.map(r=>({...r}))}:{}),...(p.labReports?{labReports:p.labReports.map(r=>({...r,sources:{...r.sources}}))}:{}),...(p.areas?{areas:cloneAreas(p.areas)}:{}),...(p.results?{results:structuredClone(p.results)}:{}),
       ...(p.sheets?{sheets:p.sheets.map(sh=>({...sh,...(sh.plan?{plan:clonePlan(sh.plan)}:{}),...(sh.markers?{markers:cloneMarkers(sh.markers)}:{}),...(sh.areas?{areas:cloneAreas(sh.areas)}:{})}))}:{})} as T;
   }
   return structuredClone(value);
@@ -42,11 +48,13 @@ export function bounds(p:Project) {
   for(const m of p.markers){const rx=labelRadius(p,m)*(m.kind==='fire'?1.2:1)+r*.3;x=Math.min(x,m.x-r,m.lx-rx);y=Math.min(y,m.y-r,m.ly-r*1.5);right=Math.max(right,m.x+r,m.lx+rx);bottom=Math.max(bottom,m.y+r,m.ly+r*1.5);}
   return {x,y,width:right-x,height:bottom-y};
 }
-export function markerSVG(p:Project,m:Marker,selected=false,minSize=0) {
+/** fill: Füllfarbe für die Ergebniskarte (sonst weiß). */
+export function markerSVG(p:Project,m:Marker,selected=false,minSize=0,fill?:string) {
   const r=Math.max(markerSize(p),minSize),rx=r*Math.max(1,m.label.length*.34),color=m.kind==='sample'?'#17665e':'#ae4328';
+  const n=fill?parseInt(fill.slice(1),16):0,text=fill?((n>>16)*299+(n>>8&255)*587+(n&255)*114)/1000>150?'#1d2a33':'#ffffff':color;
   const displaced=Math.hypot(m.x-m.lx,m.y-m.ly)>.01;
   const shape=m.kind==='sample'?`<ellipse cx="${m.lx}" cy="${m.ly}" rx="${rx}" ry="${r}"/>`:`<path d="M ${m.lx} ${m.ly-r*1.3} L ${m.lx+rx*1.2} ${m.ly} L ${m.lx} ${m.ly+r*1.3} L ${m.lx-rx*1.2} ${m.ly} Z"/>`;
-  return `<g data-id="${m.id}">${selected?`<ellipse cx="${m.lx}" cy="${m.ly}" rx="${rx+r*.6}" ry="${r*1.8}" fill="none" stroke="#e0ae42" stroke-width="${r*.2}" stroke-dasharray="${r*.3} ${r*.2}"/>`:''}${displaced?`<path d="M${m.x} ${m.y} L${m.lx} ${m.ly}" stroke="white" stroke-width="${r*.3}"/><path d="M${m.x} ${m.y} L${m.lx} ${m.ly}" stroke="${color}" stroke-width="${r*.12}"/><g data-drag="point"><circle cx="${m.x}" cy="${m.y}" r="${Math.max(r*.85,minSize*1.85)}" fill="transparent"/><circle cx="${m.x}" cy="${m.y}" r="${r*.24}" fill="${color}" stroke="white" stroke-width="${r*.1}"/><path d="M${m.x-r*.45} ${m.y}h${r*.9}M${m.x} ${m.y-r*.45}v${r*.9}" stroke="${color}" stroke-width="${r*.1}"/></g>`:''}<g data-drag="${displaced?'label':'point'}" fill="white" stroke="${color}" stroke-width="${r*.18}">${minSize?`<ellipse cx="${m.lx}" cy="${m.ly}" rx="${Math.max(rx,minSize*1.85)}" ry="${Math.max(r,minSize*1.85)}" fill="transparent" stroke="none"/>`:''}${shape}</g><text data-drag="${displaced?'label':'point'}" x="${m.lx}" y="${m.ly+r*.3}" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="${r*.87}" fill="${color}">${escape(m.label)}</text></g>`;
+  return `<g data-id="${m.id}">${selected?`<ellipse cx="${m.lx}" cy="${m.ly}" rx="${rx+r*.6}" ry="${r*1.8}" fill="none" stroke="#e0ae42" stroke-width="${r*.2}" stroke-dasharray="${r*.3} ${r*.2}"/>`:''}${displaced?`<path d="M${m.x} ${m.y} L${m.lx} ${m.ly}" stroke="white" stroke-width="${r*.3}"/><path d="M${m.x} ${m.y} L${m.lx} ${m.ly}" stroke="${color}" stroke-width="${r*.12}"/><g data-drag="point"><circle cx="${m.x}" cy="${m.y}" r="${Math.max(r*.85,minSize*1.85)}" fill="transparent"/><circle cx="${m.x}" cy="${m.y}" r="${r*.24}" fill="${color}" stroke="white" stroke-width="${r*.1}"/><path d="M${m.x-r*.45} ${m.y}h${r*.9}M${m.x} ${m.y-r*.45}v${r*.9}" stroke="${color}" stroke-width="${r*.1}"/></g>`:''}<g data-drag="${displaced?'label':'point'}" fill="${fill||'white'}" stroke="${fill?'#1d2a33':color}" stroke-width="${r*.18}">${minSize?`<ellipse cx="${m.lx}" cy="${m.ly}" rx="${Math.max(rx,minSize*1.85)}" ry="${Math.max(r,minSize*1.85)}" fill="transparent" stroke="none"/>`:''}${shape}</g><text data-drag="${displaced?'label':'point'}" x="${m.lx}" y="${m.ly+r*.3}" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="${r*.87}" fill="${text}">${escape(m.label)}</text></g>`;
 }
 export class History {
   past:Project[]=[]; future:Project[]=[];

@@ -96,6 +96,26 @@ body{height:100dvh;overflow:hidden}
 /* Meldungen über der Planleiste, damit „＋ Plan“ frei bleibt */
 #toast{bottom:76px}
 
+/* Ergebniskarte */
+#results-toggle::before{content:"";display:inline-block;width:10px;height:10px;margin-right:6px;border-radius:50%;vertical-align:-1px;background:conic-gradient(#4caf50 0 33%,#f2c94c 0 66%,#e0453a 0);box-shadow:0 0 0 1px #fff}
+#results-toggle[aria-pressed=true]{background:#fff;color:var(--kit-accent);border-color:#fff}
+.results-section h3{font-size:12px;margin:14px 0 4px}
+.results-section label{margin-top:10px}
+.result-scale{margin-top:6px;padding-top:4px;border-top:1px dashed var(--kit-line)}
+.scale-name input{min-height:32px;padding:5px 8px;font-size:12px}
+.scale-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:11px}
+.scale-table th{text-align:left;font-weight:600;color:var(--kit-muted);padding:2px 3px}
+.scale-table td{padding:2px 3px;vertical-align:middle}
+.scale-table input{min-height:30px;height:30px;padding:3px 6px;margin:0;font-size:12px}
+.scale-table input[type=color]{width:30px;padding:2px;cursor:pointer}
+.scale-table td:nth-child(3){width:78px}
+.scale-table button{min-height:26px;height:26px;width:26px;padding:0;border:0;background:none;color:var(--kit-muted);font-size:16px}
+.scale-table .cat-samples td{font-size:10px;color:var(--kit-muted);padding-bottom:6px}
+#result-legend{display:flex;gap:10px;margin-left:6px;padding-left:10px;border-left:1px solid var(--kit-line)}
+#result-legend[hidden]{display:none}
+#result-legend span{display:flex;align-items:center;gap:4px}
+#result-legend i{width:10px;height:10px;border-radius:50%;border:1px solid #1d2a33;display:inline-block}
+
 /* Liste rechts – standardmäßig eingeklappt */
 .kit-panel{display:none;width:300px;flex:0 0 auto;background:#fff;border-left:1px solid var(--kit-line);flex-direction:column;min-height:0}
 body.panel-open .kit-panel{display:flex}

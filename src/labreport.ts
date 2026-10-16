@@ -3,6 +3,7 @@ import {sourceFilename} from './lab-provenance';
 export interface TextItem {text:string;x:number;y:number;width:number;height:number}
 export interface TextPage {width:number;height:number;items:TextItem[]}
 export interface LabReport {bericht:string;labor:string;auftragsreferenz:string;quelle:string;batch:string;sources:LabSources;rows:LabSample[];expected:number|null;references:string[];warnings:string[];results:{ref:string;parameter:string;result:string;unit:string;loq:string}[]}
+export const MAX_WERTE=300;
 const tidy=(s:string)=>s.normalize('NFC').replace(/\s+/g,' ').trim();
 const norm=(s:string)=>tidy(s).toLocaleLowerCase('de').replace(/[^\p{L}\p{N}]/gu,'');
 export function referenceLabel(ref:string){const s=tidy(ref),match=s.match(/^(?:Probe|P)\s*(\d+)$/i)||s.match(/-(\d+)$/);if(!match)return '';const n=Number(match[1]);return Number.isSafeInteger(n)&&n>0&&n<1e9?`P${n}`:'';}
@@ -34,6 +35,7 @@ export function parseLabXML(text:string,quelle=''):LabReport{
    if(date&&!row.datum)report.warnings.push(`Probenahmedatum für ${ref||row.labNr} konnte nicht erkannt werden.`);
    const order=value(sample,'SampleOrder');rows.push({row,order:order&&Number.isFinite(Number(order))?Number(order):Infinity,index:rows.length});
    const lines=child(sample,'Lines');for(const line of lines?children(lines,'AnalyticalReportLine'):[])report.results.push({ref,parameter:value(line,'ParameterName')||value(line,'ParameterDescription'),result:value(line,'Result'),unit:value(line,'Unit'),loq:value(line,'LOQ')});
+   const werte=report.results.filter(r=>r.ref===ref&&r.parameter&&r.result).slice(-MAX_WERTE).map(r=>({p:r.parameter.slice(0,160),r:r.result.slice(0,40),u:r.unit.slice(0,40)}));if(werte.length)row.werte=werte;
   }
  }
  if(rows.length>1000)throw Error('Mehr als 1000 Proben. Bitte einen kleineren Export verwenden.');

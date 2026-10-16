@@ -1,5 +1,13 @@
 # Änderungen
 
+## 1.7.0 – 16. Oktober 2026
+
+- **Ergebniskarte:** „Ergebnisse“ in der Kopfzeile (Taste K) färbt Probenmarker nach Bewertungskategorie; Proben ohne Wert oder Skala grau. Kleine Legende unten links im Plan.
+- Der XML-Import speichert die Messwerte je Probe (Parameter, Ergebnis wie gedruckt, Einheit); bereits platzierte Proben erhalten sie durch erneuten Import mit „Aktualisieren“.
+- Parameter wählbar (Standard Σ16 EPA-PAK exkl. BG); Skala je Parameter und Einheit in der Liste rechts: Kategorien mit „ab“-Wert, Farben automatisch grün → rot oder einzeln. Gemeinsame Skalen mit FotoKits Ergebnistabelle; Skala und Farben zusätzlich im Projekt.
+- Export „Darstellung: Probenplan oder Ergebniskarte“, auch für alle Pläne; Legende mit Kategorien, Wertebereichen und Probennummern.
+- Neue Testsuite `results`.
+
 ## 1.6.0 – 16. Oktober 2026
 
 - **Mehrere Pläne pro Projekt** (z. B. EG, 1. OG, 2. OG): Planleiste unter dem Plan mit Vorschaubildern, „＋ Plan“, Wechsel per Klick oder Bild↑/Bild↓; Umbenennen, Verschieben und Löschen per Doppelklick, Rechtsklick oder „⋯“.
