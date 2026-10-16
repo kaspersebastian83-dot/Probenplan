@@ -1,0 +1,35 @@
+// Probenerfassung aus LabelKit („…_Daten.json“ im Ordner „Laboraufträge“) als offene Proben übernehmen.
+// LabelKit nummeriert PAK → Chlorid → Asbest → Sonstige fortlaufend (Feld _nr) und übergibt dem Labor „Probe <Nr>“.
+// Genau diese Referenz steht später im Laborbericht – beim Import des Berichts werden die Proben daher per
+// „Aktualisieren“ um Labordaten und Messwerte ergänzt.
+import {blankReport,validDate,type LabReport} from './labreport';
+import type {LabSample} from './model';
+
+type Probe={_nr?:unknown;chloridNr?:unknown;id?:unknown;matrix?:string;datum?:string;z2?:string;z3?:string;z4?:string;cm2?:string|number;tiefe?:string;bkBez?:string;bkVon?:string|number;bkBis?:string|number;bkGesamt?:string|number;bkRueck?:string};
+const LISTS:[string,string][]=[['proben','PAK'],['chloridProben','Chlorid'],['asbestProben','Asbest'],['sonstigeProben','Sonstige']];
+const str=(v:unknown)=>v===undefined||v===null?'':String(v).replace(/\s+/g,' ').trim();
+function number(p:Probe){for(const v of [p._nr,p.chloridNr,p.id]){const n=Number(v);if(Number.isSafeInteger(n)&&n>0&&n<1e9)return n;}return 0;}
+function description(p:Probe){
+  if(p.matrix==='Bohrkern'){const parts=[str(p.bkBez)];if(str(p.bkVon)&&str(p.bkBis))parts.push(`${str(p.bkVon)}–${str(p.bkBis)} cm`);if(str(p.bkGesamt))parts.push(`Gesamtl. ${str(p.bkGesamt)} cm`);if(str(p.bkRueck))parts.push(`Rückst.: ${str(p.bkRueck)}`);return parts.filter(Boolean).join(' · ');}
+  return [str(p.z2),str(p.z3),str(p.z4),p.matrix==='Wischprobe'&&str(p.cm2)?`${str(p.cm2)} cm²`:'',str(p.tiefe)?`Tiefe: ${str(p.tiefe)}`:''].filter(Boolean).join(', ');
+}
+function isoDate(v:unknown){const s=str(v);if(validDate(s))return s;const m=/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(s);if(m){const iso=`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;if(validDate(iso))return iso;}return '';}
+
+/** LabelKit-Projektdatei → Prüfliste (ohne Messwerte). */
+export function labelkitReport(text:string,quelle:string,project:string):LabReport{
+  let data:Record<string,unknown>;try{data=JSON.parse(text);}catch{throw Error(`„${quelle}“ ist keine gültige LabelKit-Projektdatei.`);}
+  if(!data||typeof data!=='object'||!LISTS.some(([k])=>Array.isArray(data[k])))throw Error(`„${quelle}“ enthält keine Proben aus LabelKit.`);
+  const report=blankReport();report.quelle=quelle;report.labor='LabelKit (Probenerfassung)';report.bericht='';report.auftragsreferenz=project;report.sources={};
+  const seen=new Set<number>();
+  for(const [key,type] of LISTS)for(const raw of (Array.isArray(data[key])?data[key] as Probe[]:[])){
+    if(!raw||typeof raw!=='object')continue;const n=number(raw);
+    if(!n){report.warnings.push(`${type}: eine Probe ohne Nummer wurde übersprungen.`);continue;}
+    if(seen.has(n)){report.warnings.push(`Probe ${n} ist in LabelKit doppelt vergeben (${type}) und wurde übersprungen.`);continue;}seen.add(n);
+    const row:LabSample={label:`P${n}`,ref:`Probe ${n}`,desc:description(raw).slice(0,500),art:`${type}${str(raw.matrix)?` · ${str(raw.matrix)}`:''}`.slice(0,160)};
+    const datum=isoDate(raw.datum);if(datum)row.datum=datum;
+    report.rows.push(row);
+  }
+  report.rows.sort((a,b)=>Number(a.label.slice(1))-Number(b.label.slice(1)));report.expected=report.rows.length;
+  if(!report.rows.length)report.warnings.push('Die LabelKit-Datei enthält noch keine PAK-, Chlorid-, Asbest- oder sonstigen Proben.');
+  return report;
+}

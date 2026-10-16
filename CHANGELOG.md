@@ -7,6 +7,7 @@
 - Kein stilles Überschreiben: Hat jemand anderes die Datei gespeichert, wählen Sie zwischen „Andere Fassung laden“, „Meine Fassung als Kopie sichern“ und „Meine Fassung übernehmen“. Beim Ersetzen bleibt die alte Datei als „(vorher …)“-Kopie.
 - Bildexport direkt in „Pläne“ („Probenplan <Projekt> - <Plan>.png“); Objekt aus _Projekt.json in der Fußzeile; Gutachtennummer standardmäßig der Ordnername.
 - Grundrisse aus „Pläne“ und Laborberichte aus „Laborergebnisse“ direkt zur Auswahl.
+- **LabelKit → PlanKit:** Die Probenerfassung aus LabelKit (neueste `…_Daten.json` in „Laboraufträge“) wird vorab zu „Noch zu platzieren“ – Probe <Nr> wird P<Nr>, Beschreibung, Probenart und Datum wie in der Laborübergabe. Kommt der Laborbericht, ergänzt der neue Knopf „Alle Konflikte: Aktualisieren“ Labordaten und Messwerte in einem Schritt (auch bei bereits platzierten Proben).
 - Kopfzeile kompakter („＋ Plan“, „↓ Export …“). Neue Testsuite `folder`.
 
 ## 1.7.0 – 16. Oktober 2026

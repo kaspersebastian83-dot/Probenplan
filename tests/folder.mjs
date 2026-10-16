@@ -13,9 +13,9 @@ async function tap(page,fx,fy){const pt=await page.locator('#drawing').evaluate(
 const fs=(page,action,...args)=>page.evaluate(async([action,args])=>{
  const root=await navigator.storage.getDirectory(),archiv=await root.getDirectoryHandle('Mosaik Archivordner',{create:true});
  const dir=async path=>{let d=archiv;for(const p of path)d=await d.getDirectoryHandle(p,{create:true});return d;};
- if(action==='setup'){const [name,svg,xml]=args;const proj=await dir([name]);for(const sub of ['Pläne','Laborergebnisse','Fotos'])await proj.getDirectoryHandle(sub,{create:true});
+ if(action==='setup'){const [name,svg,xml]=args;const proj=await dir([name]);for(const sub of ['Pläne','Laborergebnisse','Laboraufträge','Fotos'])await proj.getDirectoryHandle(sub,{create:true});
   const write=async(d,n,t)=>{const w=await(await d.getFileHandle(n,{create:true})).createWritable();await w.write(t);await w.close();};
-  await write(proj,'_Projekt.json',JSON.stringify({format:'mosaik-projekt',version:1,objekt:'Wohnhaus Musterstraße 1'}));await write(await dir([name,'Pläne']),'Grundriss EG.svg',svg);await write(await dir([name,'Laborergebnisse']),'AR-999.xml',xml);
+  await write(proj,'_Projekt.json',JSON.stringify({format:'mosaik-projekt',version:1,objekt:'Wohnhaus Musterstraße 1'}));await write(await dir([name,'Pläne']),'Grundriss EG.svg',svg);await write(await dir([name,'Laborergebnisse']),'AR-999.xml',xml);await write(await dir([name,'Laboraufträge']),'26.0123_15.10.2026_Daten.json',JSON.stringify({version:'4.24.0',projekt:{nr:'26.0123'},proben:[{id:1,_nr:1,matrix:'Wischprobe',z2:'Küche',z3:'Fensterbank',cm2:'400',datum:'2026-10-15'}],chloridProben:[{id:7,_nr:2,chloridNr:2,matrix:'Wischprobe',z2:'Flur',z3:'Wand',cm2:'100',datum:'2026-10-15'}],asbestProben:[],sonstigeProben:[]}));
   await new Promise((res,rej)=>{const r=indexedDB.open('mosaik-suite',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>{const tx=r.result.transaction('kv','readwrite');tx.objectStore('kv').put(archiv,'archiv');tx.oncomplete=()=>{r.result.close();res();};tx.onerror=()=>rej(tx.error);};r.onerror=()=>rej(r.error);});return true;}
  if(action==='list'){const d=await dir(args[0]);const out=[];for await(const h of d.values())out.push(h.name);return out.sort();}
  if(action==='read'){const d=await dir(args[0]);try{return await(await(await d.getFileHandle(args[1])).getFile()).text();}catch{return null;}}
@@ -41,11 +41,15 @@ try{
   await page.locator('#export-open').click();await page.locator('#export').click();await page.locator('#toast',{hasText:'Bild gespeichert'}).waitFor({timeout:60000});
   assert.ok((await fs(page,'list',[NAME,'Pläne'])).includes(`Probenplan ${NAME}.png`));await page.locator('#export-dialog .close').click();
  });
- await check('Laborbericht aus „Laborergebnisse“ mit einem Klick',async()=>{
-  await page.locator('#lab-import').click();await page.locator('#lab-folder-dialog [data-lab-file]',{hasText:'AR-999.xml'}).click();await page.locator('#lab-review').waitFor();await page.locator('#lab-review .lab-conflict select').first().waitFor();
-  for(const s of await page.locator('#lab-review .lab-conflict select').all())await s.selectOption('next');
+ await check('Probenerfassung aus LabelKit wird vorab zu offenen Proben',async()=>{
+  await page.locator('#lab-import').click();await page.locator('#lab-folder-dialog [data-labelkit]').click();await page.locator('#lab-review').waitFor();await page.locator('#lab-update-all:visible').click();
+  await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});await page.waitForTimeout(900);
+  const file=await saved(page);assert.equal(file.markers[0].lab.desc,'Küche, Fensterbank, 400 cm²');assert.deepEqual(file.pending.map(r=>[r.label,r.ref,r.desc,r.art,r.datum]),[['P2','Probe 2','Flur, Wand, 100 cm²','Chlorid · Wischprobe','2026-10-15']]);
+ });
+ await check('Laborbericht aus „Laborergebnisse“ ergänzt die LabelKit-Proben per „Alle Konflikte: Aktualisieren“',async()=>{
+  await page.locator('#lab-import').click();await page.locator('#lab-folder-dialog [data-lab-file]',{hasText:'AR-999.xml'}).click();await page.locator('#lab-review').waitFor();await page.locator('#lab-update-all:visible').click();
   await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});
-  await page.waitForTimeout(900);assert.ok((await saved(page)).pending.length>=8);
+  await page.waitForTimeout(900);const file=await saved(page);assert.equal(file.pending.length,8);const p2=file.pending.find(r=>r.label==='P2');assert.ok(p2.labNr&&p2.werte?.length,'P2 mit Labordaten');assert.ok(file.markers[0].lab.werte?.length,'P1 mit Messwerten');
  });
  await check('Neu laden mit ?projekt= öffnet die Datei aus dem Ordner',async()=>{
   await page.reload();await page.locator('#welcome').waitFor({state:'hidden'});assert.equal(await page.locator('#count').textContent(),'1');assert.match(await page.locator('#saved').textContent(),/Pläne/);

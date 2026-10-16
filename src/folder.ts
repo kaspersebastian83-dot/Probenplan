@@ -9,7 +9,7 @@ type Handle=FileSystemHandle&{queryPermission?:(m:Mode)=>Promise<PermissionState
 type Dir=FileSystemDirectoryHandle&{values():AsyncIterable<FileSystemHandle>;resolve(h:FileSystemHandle):Promise<string[]|null>};
 export interface ProjectFolder {dir:Dir;name:string;nr:string;ort:string;plaene:Dir}
 export interface FolderFile {name:string;handle:FileSystemFileHandle;lastModified:number}
-export const PLAENE='Pläne',LABOR='Laborergebnisse',PJ_FILE='_Projekt.json';
+export const PLAENE='Pläne',LABOR='Laborergebnisse',AUFTRAEGE='Laboraufträge',PJ_FILE='_Projekt.json';
 export const supported=()=>'showDirectoryPicker' in window;
 
 export function parseProjName(name:string){const m=/^(\d{2})\.(\d{2,6})(?:[\s_-]+(.*))?$/.exec(String(name).normalize('NFC').trim());return m?{nr:`${m[1]}.${m[2]}`,ort:(m[3]||'').trim()}:null;}
