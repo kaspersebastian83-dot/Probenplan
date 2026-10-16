@@ -12,22 +12,48 @@ export function autoColors(n:number):string[]{
   return Array.from({length:n},(_,i)=>AUTO[Math.round(i*(AUTO.length-1)/(n-1))]);
 }
 export const scaleKey=(parameter:string,unit:string)=>`${parameter}|${unit}`;
-/** Wie FotoKit: "1300" → 1300, "1,9" → 1,9, "1.300,5" → 1300,5, "< 0,50" / "(n.b.)" → 0 (unter BG), sonst NaN. */
-export function labNumber(raw:string){
-  const t=String(raw||'').trim();if(/^</.test(t)||/n\.\s*b\.|n\.\s*n\./i.test(t))return 0;
-  const v=parseFloat(t.replace(/\./g,'').replace(',','.'));return Number.isFinite(v)?v:NaN;
+/** Strict locale-independent parsing. A single separator followed by three digits
+ * (1.234 / 1,234) is ambiguous without a declared locale: leave it unrated. */
+export function labNumber(raw:string):number{
+ const t=String(raw??'').trim().replace(/−/g,'-');
+ if(belowLimit(t))return NaN;
+ const match=t.match(/^([+-]?)([\d., \u00a0\u202f]+)([eE][+-]?\d+)?$/);if(!match)return NaN;
+ let body=match[2].trim();const exponent=match[3]||'';
+ if(/[ \u00a0\u202f]/.test(body)){
+  if(!/^\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?$/.test(body))return NaN;
+  body=body.replace(/[ \u00a0\u202f]/g,'').replace(',','.');
+ }else if(body.includes('.')&&body.includes(',')){
+  const decimal=body.lastIndexOf('.')>body.lastIndexOf(',')?'.':',',group=decimal==='.'?',':'.';
+  const parts=body.split(decimal);if(parts.length!==2||!/^\d+$/.test(parts[1])||!new RegExp('^\\d{1,3}(?:\\'+group+'\\d{3})+$').test(parts[0]))return NaN;
+  body=parts[0].split(group).join('')+'.'+parts[1];
+ }else if(/[.,]/.test(body)){
+  const parts=body.split(/[.,]/);
+  if(parts.length===2){if(!/^\d+$/.test(parts[0])||!/^\d+$/.test(parts[1])||(parts[1].length===3&&/^[1-9]\d{0,2}$/.test(parts[0])))return NaN;body=parts.join('.');}
+  else {if(!/^\d{1,3}([.,])\d{3}(?:\1\d{3})+$/.test(body))return NaN;body=parts.join('');}
+ }
+ const v=Number(match[1]+body+exponent);return Number.isFinite(v)?v:NaN;
 }
-export const belowLimit=(raw:string)=>/^\s*</.test(raw||'')||/n\.\s*b\.|n\.\s*n\./i.test(raw||'');
+export const belowLimit=(raw:string)=>/^\s*</.test(raw||'')||/^\s*\(?\s*(?:n\.\s*[bn]\.|(?:unter|<)\s*(?:BG|LOQ)|<\s*Bestimmungsgrenze)\s*\)?\s*$/i.test(raw||'');
+export const BELOW_LIMIT='#749bb5';
+/** VdS 2357 background references; only Σ16 EPA-PAK in surface units.
+ * Source: LANUV, Bericht Steinhagen 15.02.2023, p. 7 (see README). */
+export function vdsScale(parameter:string,unit:string,usage:ResultSettings['usage']):Scale|undefined{
+ if(!usage||!(/^(?:Summe|Σ)\s*16\s*EPA[-– ]PAK(?:\s.*)?$/i.test(parameter)))return;
+ const u=unit.replace(/μ/g,'µ').replace(/²/g,'2').replace(/\s+/g,'').toLowerCase();
+ const factor=({'µg/m2':1,'µg/100cm2':.01,'mg/m2':.001,'ng/m2':1000} as Record<string,number>)[u];if(!factor)return;
+ const limit=(usage==='residential'?10:100)*factor;
+ return {name:`VdS 2357 · ${usage==='residential'?'Wohn-/Büroräume':'Industrie'} · Hintergrundreferenz`,cats:[{name:'unter Referenzwert',from:0,color:'#4caf50'},{name:'Referenzwert erreicht/überschritten',from:limit,color:'#e0453a'}]};
+}
 export function shortParameter(p:string){return p.replace(/^Summe 16 EPA-PAK.*$/i,'Σ16 EPA-PAK').replace(/^Benzo\[a\]pyren$/i,'BaP');}
 
 const werte=(p:Project)=>[...allMarkers(p).flatMap(m=>m.lab?.werte||[]),...(p.pending||[]).flatMap(r=>r.werte||[])];
 export function hasValues(p:Project){return werte(p).length>0;}
-/** Alle Parameter mit Zahlenwert in Berichtsreihenfolge. */
-export function parameters(p:Project){const seen:string[]=[];for(const w of werte(p))if(!seen.includes(w.p)&&Number.isFinite(labNumber(w.r)))seen.push(w.p);return seen;}
+/** Alle Parameter in Berichtsreihenfolge, auch reine BG-/unklare Ergebnisse. */
+export function parameters(p:Project){const seen:string[]=[];for(const w of werte(p))if(!seen.includes(w.p))seen.push(w.p);return seen;}
 export function defaultParameter(list:string[]){return list.find(x=>/^Summe 16 EPA-PAK.*exkl/i.test(x))||list.find(x=>/^Summe 16 EPA-PAK/i.test(x))||list[0]||'';}
 export function valueOf(m:Marker,parameter:string):Wert|undefined{return m.lab?.werte?.find(w=>w.p===parameter);}
 /** Index der Kategorie: letzte Kategorie, deren „ab“-Wert erreicht ist (wie in FotoKit). */
-export function rate(scale:Scale|undefined,value:number){if(!scale?.cats.length||!Number.isFinite(value))return -1;let index=0;scale.cats.forEach((c,i)=>{if(i>0&&value>=c.from)index=i;});return index;}
+export function rate(scale:Scale|undefined,value:number){if(!scale?.cats.length||!Number.isFinite(value)||value<0)return -1;let index=0;scale.cats.forEach((c,i)=>{if(i>0&&value>=c.from)index=i;});return index;}
 
 type Shared=Record<string,{name?:string;cats?:{name:string;from:number}[];geaendert?:string}>;
 export function sharedScales():Shared{try{const v=JSON.parse(localStorage.getItem('bu-scales')||'{}');return v&&typeof v==='object'?v:{};}catch{return {};}}
@@ -40,24 +66,25 @@ export function fromShared(key:string):Scale|null{
 /** Einstellungen ergänzen: Standardparameter und fehlende Skalen aus FotoKit. Gibt true zurück, wenn sich etwas geändert hat. */
 export function prepare(p:Project):boolean{
   const list=parameters(p);if(!list.length)return false;let changed=false;
-  if(!p.results||!list.includes(p.results.parameter)){p.results={parameter:defaultParameter(list),scales:p.results?.scales||{}};changed=true;}
+  if(!p.results||!list.includes(p.results.parameter)){p.results={...p.results,parameter:defaultParameter(list),scales:p.results?.scales||{}};changed=true;}
   for(const unit of units(p,p.results.parameter)){const key=scaleKey(p.results.parameter,unit);if(!p.results.scales[key]){const s=fromShared(key);if(s){p.results.scales[key]=s;changed=true;}}}
   return changed;
 }
 export function units(p:Project,parameter:string){const seen:string[]=[];for(const w of werte(p))if(w.p===parameter&&!seen.includes(w.u))seen.push(w.u);return seen;}
 
-export interface Rated {fill:Map<string,string>;groups:{key:string;unit:string;scale:Scale|undefined;cats:(Category&{labels:string[]})[]}[];unrated:string[];parameter:string}
+export interface Rated {fill:Map<string,string>;groups:{key:string;unit:string;scale:Scale|undefined;cats:(Category&{labels:string[]})[]}[];unrated:string[];below:string[];parameter:string}
 /** Farben je Marker und Legende für die Marker des übergebenen (Teil-)Projekts. */
 export function rateMarkers(p:Project,markers:Marker[]=p.markers,settings:ResultSettings|undefined=p.results):Rated{
-  const fill=new Map<string,string>(),unrated:string[]=[],parameter=settings?.parameter||'';const groups=new Map<string,Rated['groups'][number]>();
+  const fill=new Map<string,string>(),unrated:string[]=[],below:string[]=[],parameter=settings?.parameter||'';const groups=new Map<string,Rated['groups'][number]>();
   for(const m of markers){if(m.kind!=='sample')continue;const w=valueOf(m,parameter);
     if(!w){unrated.push(m.label);fill.set(m.id,UNRATED);continue;}
-    const key=scaleKey(parameter,w.u),scale=settings?.scales[key];if(!groups.has(key))groups.set(key,{key,unit:w.u,scale,cats:(scale?.cats||[]).map(c=>({...c,labels:[]}))});
+    const key=scaleKey(parameter,w.u),scale=settings?.usage?vdsScale(parameter,w.u,settings.usage):settings?.scales[key];if(!groups.has(key))groups.set(key,{key,unit:w.u,scale,cats:(scale?.cats||[]).map(c=>({...c,labels:[]}))});
+    if(belowLimit(w.r)){below.push(m.label);fill.set(m.id,BELOW_LIMIT);continue;}
     const g=groups.get(key)!,i=rate(scale,labNumber(w.r));if(i<0){unrated.push(m.label);fill.set(m.id,UNRATED);continue;}
     g.cats[i].labels.push(m.label);fill.set(m.id,g.cats[i].color);}
   const order=(a:string,b:string)=>a.localeCompare(b,'de',{numeric:true});
   for(const g of groups.values())g.cats.forEach(c=>c.labels.sort(order));
-  return {fill,groups:[...groups.values()],unrated:unrated.sort(order),parameter};
+  return {fill,groups:[...groups.values()],unrated:unrated.sort(order),below:below.sort(order),parameter};
 }
 export function rangeText(scale:Scale,i:number,unit:string){const c=scale.cats[i],next=scale.cats[i+1],n=(v:number)=>v.toLocaleString('de-DE');return next?(i===0?`< ${n(next.from)} ${unit}`:`${n(c.from)} – < ${n(next.from)} ${unit}`):(i===0?`alle Werte`:`≥ ${n(c.from)} ${unit}`);}
 /** Gut lesbare Schriftfarbe auf einer Füllfarbe. */

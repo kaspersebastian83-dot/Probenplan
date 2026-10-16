@@ -1,5 +1,12 @@
 # Änderungen
 
+## 1.8.1 – 16. Oktober 2026
+
+- Sichere Zahleninterpretation für deutsche/internationale Formate; mehrdeutige und ungültige Angaben bleiben ohne Bewertung. Originalwerte und Einheiten bleiben erhalten.
+- Unter BG separat in Karte und Export, ohne gemessenen Nullwert.
+- Explizite VdS-2357-Nutzung: Wohn-/Büroräume 10 µg/m² oder Industrie 100 µg/m² für Σ16 EPA-PAK auf Oberflächen, mit passender Einheit und Referenz in der Legende. Eigene und FotoKit-Skalen bleiben erhalten.
+- XML/PDF-Abgleich prüft Labor-IDs, Probenahmedaten und Probenarten. Synthetische Regressionstests für Parsing, BG, Referenzgrenzen, Projektroundtrip und FotoKit-Kompatibilität.
+
 ## 1.8.0 – 16. Oktober 2026
 
 - **Projektordner:** Öffnen aus der Projektzentrale („Plan bearbeiten“, `?projekt=`) oder über „📁 Projekt“. Projektnummer und Ort als Kennung in der Kopfzeile.

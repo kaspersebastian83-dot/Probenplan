@@ -137,7 +137,8 @@ export function validResults(value:unknown):ResultSettings{
   const r=value as ResultSettings;if(!r||typeof r!=='object'||typeof r.parameter!=='string'||r.parameter.length>160||!r.scales||typeof r.scales!=='object'||Array.isArray(r.scales)||Object.keys(r.scales).length>100)throw Error('Ungültige Einstellungen der Ergebniskarte.');
   const scales:Record<string,Scale>={};
   for(const [key,s] of Object.entries(r.scales)){if(key.length>330||!s||typeof s.name!=='string'||s.name.length>160||!Array.isArray(s.cats)||!s.cats.length||s.cats.length>12||!s.cats.every((c,i)=>!!c&&typeof c.name==='string'&&!!c.name.trim()&&c.name.length<=60&&Number.isFinite(c.from)&&c.from>=0&&(i===0||c.from>=s.cats[i-1].from)&&typeof c.color==='string'&&/^#[0-9a-f]{6}$/i.test(c.color)))throw Error('Ungültige Bewertungsskala in der Projektdatei.');scales[key]={name:s.name,cats:s.cats.map(c=>({name:c.name,from:c.from,color:c.color.toLowerCase()}))};}
-  return {parameter:r.parameter,scales};
+  if(r.usage!==undefined&&!['residential','industrial'].includes(r.usage))throw Error('Ungültige Nutzungskategorie der Ergebniskarte.');
+  return {parameter:r.parameter,scales,...(r.usage?{usage:r.usage}:{})};
 }
 
 export function validLab(row:unknown):row is LabData{const r=row as LabData;return !!r&&typeof r.ref==='string'&&r.ref.length<=160&&typeof r.desc==='string'&&r.desc.length<=500&&(['art','labNr','bericht'] as const).every(k=>r[k as 'art'|'labNr'|'bericht']===undefined||(typeof r[k]==='string'&&r[k].length<=160))&&(r.reportId===undefined||(typeof r.reportId==='string'&&/^[\w-]{1,80}$/.test(r.reportId)))&&(r.datum===undefined||r.datum===''||validDate(r.datum))&&(r.werte===undefined||(Array.isArray(r.werte)&&r.werte.length<=300&&r.werte.every(w=>!!w&&typeof w.p==='string'&&w.p.length<=160&&typeof w.r==='string'&&w.r.length<=40&&typeof w.u==='string'&&w.u.length<=40)));}

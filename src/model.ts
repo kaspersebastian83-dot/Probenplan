@@ -7,7 +7,7 @@ export interface LabData {ref:string;desc:string;art?:string;labNr?:string;datum
 /** Ergebniskarte: Kategorie ab einem Wert (erste Kategorie ab 0), Farbe als #rrggbb. */
 export interface Category {name:string;from:number;color:string}
 export interface Scale {name:string;cats:Category[]}
-export interface ResultSettings {parameter:string;scales:Record<string,Scale>}
+export interface ResultSettings {usage?:'residential'|'industrial';parameter:string;scales:Record<string,Scale>}
 export interface LabSample extends LabData {label:string}
 export interface Marker { id: string; kind: Kind; label: string; note: string; x: number; y: number; lx: number; ly: number; lab?:LabData }
 export interface Rect { x:number; y:number; width:number; height:number }

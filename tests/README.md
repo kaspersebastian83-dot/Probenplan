@@ -34,3 +34,5 @@ Unter `.test-output/` liegen Suite-Logs, eine Zusammenfassung, Fehler-Stacks, Sc
 Echte Exporte sind nicht Teil dieser Suite. Etwaige manuelle Kompatibilitätsprüfungen müssen ausdrücklich separat aufgesetzt werden; deren Daten und Ergebnisse gehören nicht in CI-Artefakte oder dieses Repository.
 
 Manuelle Laborbeispiele und ihre Screenshots/Extraktionen ausschließlich im ignorierten `.manual-checks/` ablegen. Der automatisierte Runner liest diesen Ordner nicht und lädt ihn nicht als Diagnose hoch.
+
+`lab-regressions.mjs` erweitert die isolierten Parserprüfungen um synthetische deutsche/internationale Zahlen, mehrdeutige/ungültige Eingaben, BG ohne Nullwert, VdS-Grenzfälle und Einheiten, unveränderte Rohwerte sowie XML/PDF-Metadaten. `results.mjs` prüft außerdem Nutzungsauswahl, Undo/Redo, Projekt-Roundtrip und unveränderte FotoKit-Skalen. Ausführung in GitHub Actions; für 1.8.1 wurden lokal weder Abhängigkeiten installiert noch Builds oder Tests ausgeführt.

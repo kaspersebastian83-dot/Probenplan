@@ -1,4 +1,4 @@
-# PlanKit 1.8 (früher Probenplan)
+# PlanKit 1.8.1 (früher Probenplan)
 
 PlanKit gehört zur Familie von LabelKit und FotoKit und sieht genauso aus. Webadresse, Repository, Startdatei und das Dateiformat `.probenplan` behalten den bisherigen Namen – bestehende Projekte, Lesezeichen und installierte Apps funktionieren unverändert weiter.
 
@@ -170,3 +170,11 @@ In den Repository-Einstellungen unter **Pages → Build and deployment → Sourc
 Vite verwendet relative Assetpfade. Die App funktioniert dadurch sowohl lokal als auch im GitHub-Pages-Unterverzeichnis `/Probenplan/`.
 
 Für Version 1.3 wird ausschließlich `codex/feature/lab-report-import` gepusht. Ausgangspunkt ist der aktuelle Remote-`main` einschließlich des Pan-Features. Der bestehende Pages-Workflow veröffentlicht nur Pushes auf `main` (oder einen ausdrücklich ausgelösten manuellen Lauf). Den Pull Request erst nach Freigabe mergen; dadurch wird die automatische Veröffentlichung ausgelöst.
+
+## Laborergebnisse ab 1.8.1
+
+Zahlen werden vollständig geprüft: Dezimalkomma und Dezimalpunkt, korrekt gruppierte deutsche/internationale Tausenderzahlen sowie Exponenten. Ohne Formatangabe sind `1.234` und `1,234` mehrdeutig; sie bleiben grau, statt still einen Faktor 1000 anzunehmen. Originale Ergebnisstrings und Einheiten bleiben unverändert im Projekt. Negative oder nicht erkannte Werte erhalten keine Kategorie. Unter-BG-Angaben (`< …`, `n.b.`, `n.n.`) erscheinen separat blau, auch wenn die BG über einer Referenz liegt; daraus wird kein gemessener Nullwert oder Unterschreiten der Referenz abgeleitet.
+
+Unter „Nutzung / Referenz“ ausdrücklich „Wohn-/Büroräume“ (10 µg/m²) oder „Industrie“ (100 µg/m²) wählen. Diese VdS-2357-Hintergrundreferenzen gelten ausschließlich für Σ16 EPA-PAK auf Oberflächen, nicht als allgemeine Freigabe-/Sanierungsgrenzwerte. Quelle: [LANUV, Bericht Steinhagen vom 15.02.2023, Seite 7](https://www.lanuv.nrw.de/fileadmin/lanuv/umwelt/schadensfaelle/sondereinsatz/2023/Bericht_Steinhagen.pdf). Unterstützt werden µg/m² (auch μg/m2), µg/100 cm², mg/m² und ng/m²; die Referenz wird in die Originaleinheit umgerechnet. Bei anderen Parametern oder Einheiten bleibt die Bewertung aus. Der Export nennt Nutzung und Referenzbereiche.
+
+Bestehende Projekte verwenden weiter ihre eigenen / FotoKit-Skalen. Die optionale Nutzung wird im bisherigen Projektformat gespeichert und kann per Undo/Redo geändert werden. Der VdS-Modus überschreibt weder eigene Skalen noch den gemeinsamen FotoKit-Speicher `bu-scales`. XML/PDF-Abgleich meldet zusätzlich fehlende oder abweichende Labor-IDs, Probenahmedaten und Probenarten. Eingangsdatum wird nicht als Probenahmedatum verwendet.
