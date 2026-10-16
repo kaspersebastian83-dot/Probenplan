@@ -79,6 +79,24 @@ export async function saveFolderProject(f:ProjectFolder,text:string,expected:str
   // Older interrupted attempts with the exact committed bytes are resolved too.
   // Different candidates and all previous-file backups remain untouched.
   try{for(const candidate of await listFiles(f.plaene,/\.probenplan$/i))if(candidate.name.startsWith(`Probenplan ${f.name} (Wiederherstellung `)&&await fileRevision(await candidate.handle.getFile())===wanted)await f.plaene.removeEntry(candidate.name);}catch{/* Keep candidates if cleanup is unavailable. */}
+  await pruneBackups(f);
   return {revision:wanted,backup};
  });
+}
+
+/** Every save keeps the previous file as a backup. To stop them piling up in the shared folder, keep the newest
+ * KEEP_RECENT plus the newest one of each of the last KEEP_DAYS days. Only "(vorher …)" backups are touched –
+ * recovery files, manual copies and the project file itself are never removed. Failures here never fail a save. */
+export const KEEP_RECENT=10,KEEP_DAYS=30;
+export async function pruneBackups(f:ProjectFolder){
+ try{
+  const prefix=`Probenplan ${f.name} (vorher `,names:string[]=[];
+  for await(const h of f.plaene.values())if(h.kind==='file'&&h.name.startsWith(prefix)&&h.name.endsWith(').probenplan'))names.push(h.name);
+  names.sort().reverse();
+  const keep=new Set(names.slice(0,KEEP_RECENT)),days=new Set<string>();
+  for(const n of names){const day=n.slice(prefix.length,prefix.length+10);
+   if(!/^\d{4}-\d{2}-\d{2}$/.test(day)){keep.add(n);continue;}
+   if(!days.has(day)&&days.size<KEEP_DAYS){days.add(day);keep.add(n);}}
+  for(const n of names)if(!keep.has(n))await f.plaene.removeEntry(n).catch(()=>{});
+ }catch{/* pruning is best effort */}
 }

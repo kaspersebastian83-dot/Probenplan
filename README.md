@@ -1,4 +1,4 @@
-# PlanKit 1.8.2 (früher Probenplan)
+# PlanKit 1.8.3 (früher Probenplan)
 
 PlanKit gehört zur Familie von LabelKit und FotoKit und sieht genauso aus. Webadresse, Repository, Startdatei und das Dateiformat `.probenplan` behalten den bisherigen Namen – bestehende Projekte, Lesezeichen und installierte Apps funktionieren unverändert weiter.
 
@@ -185,7 +185,7 @@ Produktionsumgebung ist das Windows-Büroterminal mit Chrome oder Edge. Der Mac 
 
 Jede Änderung wird im Browser gesichert und nach kurzer Ruhezeit in `Pläne/Probenplan <Projekt>.probenplan` geschrieben. Die Anzeige unterscheidet ungespeicherte Änderungen, Fehler und bestätigtes Speichern im Projektordner. „Gespeichert“ erscheint erst nach geschlossenem Schreibstrom und erfolgreichem Inhaltsvergleich. Änderungen während eines laufenden Schreibens bleiben als ungespeichert erkennbar und werden anschließend gespeichert. Fehlender Zugriff: „Speichern“ klicken und den Chrome-/Edge-Ordnerzugriff erneut erlauben. „Notfallkopie“ lädt die geöffnete Fassung zusätzlich als normale kompatible Projektdatei herunter.
 
-Vor jedem Überschreiben legt PlanKit eine geprüfte Datei `(vorher <Zeit>-<eindeutige Kennung>).probenplan` und eine `(Wiederherstellung …).probenplan` mit der neuen Fassung an. Scheitert die Sicherung, wird die Hauptdatei nicht angefasst. Die Wiederherstellungsdatei wird erst nach bestätigtem Speichern entfernt. Sicherungen werden nicht automatisch überschrieben oder gelöscht; bei großen Plänen entsprechend Speicherplatz vorsehen.
+Vor jedem Überschreiben legt PlanKit eine geprüfte Datei `(vorher <Zeit>-<eindeutige Kennung>).probenplan` und eine `(Wiederherstellung …).probenplan` mit der neuen Fassung an. Scheitert die Sicherung, wird die Hauptdatei nicht angefasst. Die Wiederherstellungsdatei wird erst nach bestätigtem Speichern entfernt. Ab 1.8.3 räumt PlanKit nach jedem bestätigten Speichern nur die `(vorher …)`-Sicherungen auf: die neuesten 10 und je Tag die neueste der letzten 30 Tage bleiben erhalten. Wiederherstellungsdateien, manuelle Kopien und die Projektdatei werden nie automatisch gelöscht.
 
 Inhaltsprüfsummen erkennen fremde Änderungen auch bei gleicher/älterer Dateizeit, gleich großer Datei, Austausch oder Löschung. Browser-Web-Locks koordinieren PlanKit-Tabs derselben Webadresse. Bei Konflikten: abbrechen, andere Fassung laden, eigene Kopie sichern oder eigene Fassung ausdrücklich übernehmen. Ändert sich die Datei während der Entscheidung nochmals, fragt PlanKit erneut. Die übernommene fremde Fassung wird vorher gesichert. Andere Programme nehmen nicht am Browser-Lock teil; der unmittelbar vor dem Schreiben wiederholte Inhaltsvergleich reduziert dieses verbleibende Zeitfenster, ersetzt jedoch keine Betriebssystem-Transaktion mit externen Programmen.
 
