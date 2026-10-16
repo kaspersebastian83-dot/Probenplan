@@ -197,3 +197,6 @@ dialog.export-card #export{min-height:44px}
 #measure-dialog label{display:block;margin:12px 0 4px}
 #measure-dialog .dialog-actions{display:flex;gap:8px;margin-top:12px}
 #measure-dialog .error-text{color:#b3261e}
+dialog.export-card label.export-check{display:flex;flex-direction:row;align-items:center;gap:8px;font-weight:400}
+dialog.export-card label.export-check input{width:auto;margin:0}
+#view-note{display:block;margin-top:4px;color:#9a5b00;font-weight:400;line-height:1.35}

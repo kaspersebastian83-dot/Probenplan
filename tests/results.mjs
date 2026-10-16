@@ -69,7 +69,23 @@ for(const engine of ['chromium','webkit']){
   await check(`${engine}: Export als Ergebniskarte und als neutraler Probenplan`,async()=>{
    await openExport(page);await page.locator('#view-field').waitFor();await page.locator('#view').selectOption('results');
    let d=page.waitForEvent('download');await page.locator('#export').click();assert.match((await d).suggestedFilename().replace(/_/g,' '),/^Probenplan - Ergebniskarte\.png$/);
-   await page.locator('#view').selectOption('plan');d=page.waitForEvent('download');await page.locator('#export').click();assert.equal((await d).suggestedFilename(),'Probenplan.png');await closeExport(page);
+   await page.locator('#view').selectOption('plan');d=page.waitForEvent('download');await page.locator('#export').click();const head=await (await import('node:fs/promises')).readFile(await (await d).path());if(process.env.SHOTS)await (await import('node:fs/promises')).writeFile(process.env.SHOTS+'/probenplan-bild.png',head);
+   assert.equal((await d).suggestedFilename(),'Probenplan.png');
+   // Bild mit Schriftfeld (Standard): Seitenverhältnis A4 wie das PDF
+   const w=head.readUInt32BE(16),h=head.readUInt32BE(20),ratio=Math.max(w,h)/Math.min(w,h);assert.ok(Math.abs(ratio-297/210)<.01,`A4-Verhältnis, ist ${w}×${h}`);
+   assert.match(await page.locator('#dimensions-note').textContent(),/Schriftfeld mit Firmenlogo/);
+   await page.locator('#framed').uncheck();assert.match(await page.locator('#dimensions-note').textContent(),/ohne Schriftfeld/);await page.locator('#framed').check();
+   // Ergebniskarte ohne Skala für den Parameter: nicht exportieren, sondern erklären
+   await closeExport(page);
+   // Ergebniskarte ohne Skala (Projekt ohne Skalen, ohne FotoKit-Skalen): nicht exportieren, sondern erklären
+   const orig=await downloadedProject(page),shared=await page.evaluate(()=>localStorage.getItem('bu-scales')),ohne=structuredClone(orig);ohne.results={...ohne.results,scales:{}};delete ohne.results.usage;
+   await page.evaluate(()=>localStorage.removeItem('bu-scales'));
+   await page.locator('#project-file').setInputFiles({name:'ohne.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(ohne))});await page.locator('#replace-yes').click();await page.locator('#toast:not(.error)').waitFor();
+   await openExport(page);await page.locator('#view').selectOption('results');
+   assert.match(await page.locator('#view-note').textContent(),/keine Bewertungsskala/);
+   await page.locator('#export').click();await page.locator('#toast.error').waitFor();assert.match(await page.locator('#toast').textContent(),/alle Proben blieben grau|Ergebniskarte wäre grau/);
+   await closeExport(page);await page.evaluate(v=>localStorage.setItem('bu-scales',v),shared);
+   await page.locator('#project-file').setInputFiles({name:'orig.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(orig))});await page.locator('#replace-yes').click();await page.locator('#toast:not(.error)').waitFor();
   });
   await check(`${engine}: Projektdatei behält Skala und Farben; ungültige Farbe wird abgewiesen`,async()=>{
    const file=await downloadedProject(page);assert.equal(file.results.parameter,SUM);assert.equal(file.markers[2].lab.werte[0].r,'45');

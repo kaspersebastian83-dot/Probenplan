@@ -1,5 +1,11 @@
 # Änderungen
 
+## 1.12.0 – 16. Oktober 2026
+
+- **PNG/JPG mit Schriftfeld (Standard):** Bilder fürs Gutachten sehen jetzt aus wie das PDF – Seitenleiste mit Legende, Maßstabsleiste/Nordpfeil und Schriftfeld mit Firmenlogo, Objekt, Gutachten-Nr., Datum und „PROBENPLAN“ bzw. „ERGEBNISKARTE“; Seitenverhältnis A4 ohne Heftrand. „Mit Schriftfeld …“ abwählen ergibt das bisherige Bild (nur Plan mit Legende).
+- **Ergebniskarte nur mit Bewertung:** „Darstellung“ ist immer sichtbar; ohne Laborwerte ist „Ergebniskarte (erst nach Import der Laborwerte)“ gesperrt. Ist für den gewählten Parameter keine Skala festgelegt (alle Proben wären grau), sagt der Export das und erstellt keine Ergebniskarte, die wie der Probenplan aussieht.
+- **Aus der Projektzentrale direkt zur Anlage:** `?aktion=anlage` öffnet nach dem Laden den Export mit „Word · Anlage Probenahme“.
+
 ## 1.11.0 – 16. Oktober 2026
 
 - Neu im Export: **„Word · Anlage Probenahme“** – Word-Datei zum Einfügen in den Bericht (Einfügen › Objekt › Text aus Datei): Arial, direkte Formatierung, keine Kopf-/Fußzeile, A4 mit den Rändern des Berichts.
