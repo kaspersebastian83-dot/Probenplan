@@ -8,11 +8,13 @@ import type {Rated} from './results';
 import logoUrl from './assets/firmenlogo.png?inline';
 
 export const COMPANY={name:'Dr. Schiffers & Partner',address:'Gouleystr. 59 · 52146 Würselen'};
-export type Paper='a4'|'a3';
-export const PAPERS:Record<Paper,{long:number;short:number;label:string}>={a4:{long:297,short:210,label:'A4'},a3:{long:420,short:297,label:'A3'}};
+export type Paper='a4'|'a3'|'anlage';
+/** „anlage“: Planseite für die Word-Anlage – passt hochkant in den Textbereich des Berichts (A4, 25 mm Ränder,
+ *  Briefkopf oben), ohne eigenen Heftrand. Das Bild wird in Word in genau dieser Größe eingesetzt, der Maßstab bleibt. */
+export const PAPERS:Record<Paper,{long:number;short:number;label:string}>={a4:{long:297,short:210,label:'A4'},a3:{long:420,short:297,label:'A3'},anlage:{long:192,short:159,label:'Anlage'}};
 /** Genormte Maßstäbe 1:N, aufsteigend. */
 export const SCALES=[10,20,25,50,100,200,250,500,1000,2000,2500,5000];
-const MARGIN={left:20,top:10,right:10,bottom:10},PAD=3,TITLE_H=46,NS_H=24;
+const MARGIN={left:20,top:10,right:10,bottom:10},NO_MARGIN={left:.3,top:.3,right:.3,bottom:.3},PAD=3,TITLE_H=46,NS_H=24;
 const title=(paper:Paper)=>({width:paper==='a3'?100:82});
 const font=(paper:Paper)=>paper==='a3'?2.8:2.5;
 interface Box {x:number;y:number;w:number;h:number}
@@ -36,9 +38,10 @@ export function sheetLayout(p:Project,paper:Paper,rated?:Rated|null):SheetLayout
   const b=contentBounds(p),mpu=metersPerUnit(p.plan),fs=font(paper),tw=title(paper).width;
   const candidates:SheetLayout[]=[];
   // Reihenfolge = Vorrang bei gleichem Maßstab: quer mit Seitenleiste, hoch mit Fußleiste.
-  for(const landscape of [true,false])for(const style of (landscape?['side','band']:['band','side']) as ('side'|'band')[]){
+  const M=paper==='anlage'?NO_MARGIN:MARGIN;
+  for(const landscape of (paper==='anlage'?[false]:[true,false]))for(const style of (landscape?['side','band']:['band','side']) as ('side'|'band')[]){
     const width=landscape?PAPERS[paper].long:PAPERS[paper].short,height=landscape?PAPERS[paper].short:PAPERS[paper].long;
-    const frame={x:MARGIN.left,y:MARGIN.top,w:width-MARGIN.left-MARGIN.right,h:height-MARGIN.top-MARGIN.bottom};
+    const frame={x:M.left,y:M.top,w:width-M.left-M.right,h:height-M.top-M.bottom};
     let plan:Box,legend:Box,ns:Box,titleBox:Box;
     if(style==='side'){
       const x=frame.x+frame.w-tw;titleBox={x,y:frame.y+frame.h-TITLE_H,w:tw,h:TITLE_H};ns={x,y:titleBox.y-NS_H,w:tw,h:NS_H};legend={x,y:frame.y,w:tw,h:ns.y-frame.y};
@@ -56,7 +59,7 @@ export function sheetLayout(p:Project,paper:Paper,rated?:Rated|null):SheetLayout
     else mm=Math.min(iw/b.width,ih/b.height);
     candidates.push({paper,landscape,width,height,style,frame,plan,legend,ns,title:titleBox,ratio,mmPerUnit:mm,bounds:b});
   }
-  if(!candidates.length)throw Error(`Die Legende passt nicht auf ${PAPERS[paper].label}. Bitte ${paper==='a4'?'A3 wählen oder ':''}Bezeichnungen kürzen bzw. Kategorien zusammenfassen.`);
+  if(!candidates.length)throw Error(paper==='anlage'?'Die Legende passt nicht auf die Planseite der Anlage. Bitte Bezeichnungen kürzen bzw. Kategorien zusammenfassen.':`Die Legende passt nicht auf ${PAPERS[paper].label}. Bitte ${paper==='a4'?'A3 wählen oder ':''}Bezeichnungen kürzen bzw. Kategorien zusammenfassen.`);
   // Größter Maßstab (kleinstes N) gewinnt; bei Gleichstand die größere Darstellung, sonst die Reihenfolge oben.
   return candidates.reduce((best,c)=>{const nb=best.ratio??Infinity,nc=c.ratio??Infinity;if(nc!==nb)return nc<nb?c:best;return c.mmPerUnit>best.mmPerUnit*1.0001?c:best;});
 }
@@ -119,7 +122,7 @@ export async function renderSheet(p:Project,layout:SheetLayout,rated:Rated|null|
     field('Objekt',info.objekt,T.x,y,T.w);y+=rowH;ctx.beginPath();ctx.moveTo(T.x*k,y*k);ctx.lineTo((T.x+T.w)*k,y*k);ctx.moveTo((T.x+half)*k,y*k);ctx.lineTo((T.x+half)*k,(T.y+T.h)*k);ctx.stroke();
     field('Gutachten-Nr.',p.report,T.x,y,half);field('Datum',p.date?p.date.split('-').reverse().join('.'):'',T.x+half,y,half);y+=rowH;ctx.beginPath();ctx.moveTo(T.x*k,y*k);ctx.lineTo((T.x+T.w)*k,y*k);ctx.stroke();
     field('Maßstab',L.ratio?`M 1:${L.ratio.toLocaleString('de-DE')}`:'ohne (nicht kalibriert)',T.x,y,half);
-    field('Blatt',`${PAPERS[L.paper].label} ${L.landscape?'quer':'hoch'}${info.pages>1?` · ${info.page}/${info.pages}`:''}`,T.x+half,y,half);
+    field('Blatt',L.paper==='anlage'?`Anlage${info.pages>1?` · Plan ${info.page}/${info.pages}`:''}`:`${PAPERS[L.paper].label} ${L.landscape?'quer':'hoch'}${info.pages>1?` · ${info.page}/${info.pages}`:''}`,T.x+half,y,half);
   }
   return canvas;
 }
