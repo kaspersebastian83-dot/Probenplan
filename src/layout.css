@@ -116,6 +116,18 @@ body{height:100dvh;overflow:hidden}
 #result-legend span{display:flex;align-items:center;gap:4px}
 #result-legend i{width:10px;height:10px;border-radius:50%;border:1px solid #1d2a33;display:inline-block}
 
+/* Projektordner */
+@media(max-width:1600px){body.in-project #canvas-name{display:none}#offline{max-width:30px;overflow:hidden;white-space:nowrap;padding-left:9px;padding-right:0}body.in-project .tb-doc{margin-left:0;padding-left:6px}}
+.project-badge{font:600 12px var(--kit-sans);background:#fff;color:var(--kit-accent-2);border-radius:4px;padding:5px 9px;white-space:nowrap;flex:0 0 auto}
+.project-badge b{font-family:var(--kit-mono);font-weight:600}
+.project-badge[hidden]{display:none}
+.folder-prompt{margin-top:18px;display:flex;flex-direction:column;align-items:center;gap:10px}
+.folder-prompt[hidden],.folder-plans[hidden]{display:none}
+.folder-plans{margin-top:18px;display:flex;flex-wrap:wrap;justify-content:center;gap:6px;max-width:560px}
+.folder-plans .eyebrow{width:100%;text-align:center}
+.folder-plans button{min-height:34px;padding:6px 12px;font-size:12px}
+#lab-folder-list .choice small{display:block;font-weight:400;color:var(--kit-muted);font-size:11px;margin-top:3px}
+
 /* Liste rechts – standardmäßig eingeklappt */
 .kit-panel{display:none;width:300px;flex:0 0 auto;background:#fff;border-left:1px solid var(--kit-line);flex-direction:column;min-height:0}
 body.panel-open .kit-panel{display:flex}

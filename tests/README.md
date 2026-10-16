@@ -9,7 +9,7 @@ pnpm build
 pnpm test
 ```
 
-`pnpm test` startet Vites Produktionsvorschau auf einem freien Loopback-Port, führt alle zwölf Suites aus und beendet den Server auch bei Testfehlern. Es wird keine bereits laufende Anwendung verwendet. Einzelne Suites können zur Diagnose mit `TEST_URL` gegen einen bewusst gestarteten Testserver ausgeführt werden.
+`pnpm test` startet Vites Produktionsvorschau auf einem freien Loopback-Port, führt alle dreizehn Suites aus und beendet den Server auch bei Testfehlern. Es wird keine bereits laufende Anwendung verwendet. Einzelne Suites können zur Diagnose mit `TEST_URL` gegen einen bewusst gestarteten Testserver ausgeführt werden.
 
 - `browser.mjs`: synthetisches Polycam-ZIP, SVG/Ressourcen, Markierungen, Zoom/Touch, Undo/Redo, Projekt-Roundtrip, PNG/JPG und Offlinebetrieb.
 - `edge-cases.mjs`: unabhängig erzeugtes Projekt und Rasterbilder, ungültige Kennungen, äußere Beschriftungen, Exportfehler und Ersatzexport.
@@ -24,6 +24,7 @@ pnpm test
 
 - `floors.mjs`: mehrere Pläne – schmale Leiste bei einem Plan (bisheriges Format), „＋ Plan“, fortlaufende Nummern und gebäudeweit eindeutige Kennungen, Wechseln per Klick und Bild↓, Umbenennen, Undo/Redo springt zum betroffenen Plan, Laborprobe auf einem Obergeschoss platzieren und beim Löschen zurückgeben, Export „Alle Pläne“, Speichern/Öffnen von Format 5 inklusive Ablehnung doppelter Kennungen und mehrseitige PDF als einzelne Pläne.
 - `results.mjs`: Ergebniskarte – Messwerte aus der Labor-XML je Probe, Einfärbung nach FotoKit-Skala (grün → rot, ohne Wert grau), Skala bearbeiten mit Undo und Rückschreiben in den gemeinsamen Speicher, Parameterwechsel und „Skala anlegen“, Export als Ergebniskarte und Probenplan, Projektdatei mit Skala/Farben inklusive Ablehnung ungültiger Farben.
+- `folder.mjs` (nur Chromium, Archiv im privaten Browser-Dateisystem nachgebildet): Öffnen per `?projekt=`, Projektkennung, Grundrisse aus „Pläne“, automatisches Speichern statt Download, Bildexport in „Pläne“, Laborbericht aus „Laborergebnisse“, erneutes Öffnen aus der Datei, Konfliktabfrage bei fremder Änderung und Sicherungskopie beim Ersetzen. Lokal unter Linux mit `LANG=C.UTF-8` ausführen (Umlaute in Ordnernamen).
 - `layout.mjs`: Karte zuerst – Kartenanteil und keine Seitenscrollleiste bei 1366 × 658, standardmäßig eingeklappte Liste, Aufklappen bei Auswahl, Tastenkürzel (auch nicht beim Tippen), gemerkter Listenzustand und Exportkarte. Die übrigen Suites starten mit geöffneter Liste (`runtime.mjs`).
 
 `fixtures.mjs` generiert einen ZIP-Export mit SVG, PNG, PDF, Metadaten, Ressourcenverzeichnis und ignorierten macOS-Metadaten. Der Grundriss ist frei erfunden. Die kleine WOFF-Datei enthält eigens konstruierte geometrische Testglyphen; sie ist keine übernommene Produktschrift. PNG-Daten werden mit Node/zlib erzeugt, ZIPs mit dem bestehenden fflate. Keine zusätzlichen Laufzeitabhängigkeiten.

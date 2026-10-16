@@ -40,7 +40,7 @@ export function exportLayout(p:Project,longSide:number,rated?:Rated|null){
   const scale=longSide/Math.max(width,height);
   return {b,pad,width,height,scale,pixelWidth:Math.round(width*scale),pixelHeight:Math.round(height*scale),footer,legend,legendX,legendY,legendWidth,planWidth:right&&legend?legendX-pad:width};
 }
-export async function exportImage(p:Project,longSide:number,format:'png'|'jpeg',rated?:Rated|null):Promise<Blob>{
+export async function exportImage(p:Project,longSide:number,format:'png'|'jpeg',rated?:Rated|null,extra=''):Promise<Blob>{
   const l=exportLayout(p,longSide,rated);const canvas=document.createElement('canvas');canvas.width=l.pixelWidth;canvas.height=l.pixelHeight;
   try {
     const ctx=canvas.getContext('2d');if(!ctx)throw Error('Kein Bildspeicher verfügbar.');
@@ -58,7 +58,7 @@ export async function exportImage(p:Project,longSide:number,format:'png'|'jpeg',
     ctx.strokeStyle='#a8b1ac';ctx.lineWidth=fs*.05;ctx.beginPath();ctx.moveTo(l.pad,y);ctx.lineTo(l.planWidth-l.pad,y);ctx.stroke();
     ctx.fillStyle='#263b35';ctx.font=`bold ${fs*1.2}px Arial`;const floor=floorName(p),heading=rated?'ERGEBNISKARTE':'PROBENPLAN';ctx.fillText(floor?`${heading} · ${floor}`:heading,l.pad,y+fs*1.9,l.planWidth-2*l.pad);
     ctx.font=`${fs}px Arial`;
-    const meta=[p.report?`Gutachten ${p.report}`:'',p.date?`Datum ${p.date.split('-').reverse().join('.')}`:''].filter(Boolean).join('  ·  ');
+    const meta=[p.report?`Gutachten ${p.report}`:'',p.date?`Datum ${p.date.split('-').reverse().join('.')}`:'',extra].filter(Boolean).join('  ·  ');
     ctx.fillText(meta,l.pad,y+fs*3.5,l.planWidth-2*l.pad);
     const ly=y+fs*5.6,r=fs*.6;ctx.strokeStyle='#17665e';ctx.lineWidth=fs*.13;ctx.beginPath();ctx.arc(l.pad+r,ly,r,0,2*Math.PI);ctx.stroke();
     ctx.fillText('P · Probenahmestelle',l.pad+fs*2,ly+fs*.35);

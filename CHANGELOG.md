@@ -1,5 +1,14 @@
 # Änderungen
 
+## 1.8.0 – 16. Oktober 2026
+
+- **Projektordner:** Öffnen aus der Projektzentrale („Plan bearbeiten“, `?projekt=`) oder über „📁 Projekt“. Projektnummer und Ort als Kennung in der Kopfzeile.
+- Automatisches Speichern als „Probenplan <Projekt>.probenplan“ im Ordner „Pläne“; „Speichern“ schreibt sofort dorthin statt herunterzuladen. Zusätzliche Browsersicherung je Projekt mit Rückfrage, falls sie neuer als die Datei ist.
+- Kein stilles Überschreiben: Hat jemand anderes die Datei gespeichert, wählen Sie zwischen „Andere Fassung laden“, „Meine Fassung als Kopie sichern“ und „Meine Fassung übernehmen“. Beim Ersetzen bleibt die alte Datei als „(vorher …)“-Kopie.
+- Bildexport direkt in „Pläne“ („Probenplan <Projekt> - <Plan>.png“); Objekt aus _Projekt.json in der Fußzeile; Gutachtennummer standardmäßig der Ordnername.
+- Grundrisse aus „Pläne“ und Laborberichte aus „Laborergebnisse“ direkt zur Auswahl.
+- Kopfzeile kompakter („＋ Plan“, „↓ Export …“). Neue Testsuite `folder`.
+
 ## 1.7.0 – 16. Oktober 2026
 
 - **Ergebniskarte:** „Ergebnisse“ in der Kopfzeile (Taste K) färbt Probenmarker nach Bewertungskategorie; Proben ohne Wert oder Skala grau. Kleine Legende unten links im Plan.
