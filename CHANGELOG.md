@@ -1,5 +1,15 @@
 # Änderungen
 
+## 1.6.0 – 16. Oktober 2026
+
+- **Mehrere Pläne pro Projekt** (z. B. EG, 1. OG, 2. OG): Planleiste unter dem Plan mit Vorschaubildern, „＋ Plan“, Wechsel per Klick oder Bild↑/Bild↓; Umbenennen, Verschieben und Löschen per Doppelklick, Rechtsklick oder „⋯“.
+- Mehrseitige PDF: „Alle Seiten als einzelne Pläne“ übernimmt jede Seite als eigenen Plan (bis 20 Seiten).
+- Proben-, Brandherd- und Flächenkennungen laufen über alle Pläne fort und sind im ganzen Projekt eindeutig.
+- Laborbericht einmal importieren, offene Proben auf beliebigen Plänen platzieren; die Laborliste zeigt die Verteilung je Plan. Beim Löschen eines Plans kehren dessen Laborproben in „Noch zu platzieren“ zurück. Die Probenliste (JSON) umfasst alle Pläne.
+- Rückgängig/Wiederherstellen wechselt bei Bedarf zum betroffenen Plan.
+- Export: „Dieser Plan“ oder „Alle Pläne“ (je Plan ein Bild); Planname in Fußzeile und Dateiname.
+- Projektformat 5 für mehrere Pläne; Projekte mit einem Plan werden weiterhin im bisherigen Format gespeichert. Neue Testsuite `floors`.
+
 ## 1.5.0 – 15. Oktober 2026
 
 - **Karte zuerst:** Die Planfläche wächst von 38–47 % auf 87–92 % des Fensters (Liste eingeklappt) bzw. 66–77 % (Liste offen), gemessen bei 1280 × 720 bis 1920 × 1080. Keine Seitenscrollleiste mehr.

@@ -3,7 +3,7 @@ import type {LabData} from './model';
 import {copyOrigin,validOrigin} from './lab-provenance';
 import DOMPurify from 'dompurify';
 import { unzipSync } from 'fflate';
-import { type Plan, type Project, type Preparation, validLabel } from './model';
+import { type Plan, type Project, type Preparation, type Sheet, validLabel, MAX_SHEETS, cleanSheetName, allMarkers, allAreas } from './model';
 import {MAX_AREAS,MAX_POINTS,PALETTE,cleanName,polygonError} from './areas';
 const MAX=60*1024*1024;
 const safeData=(s:string)=>/^data:(?:image\/(?:png|jpeg|webp|gif)|font\/(?:woff2?|ttf|otf)|application\/(?:font-woff|x-font-ttf|vnd.ms-fontobject|octet-stream))(?:;charset=[\w-]+)?;base64,[a-z0-9+/=\s]+$/i.test(s);
@@ -69,6 +69,29 @@ export async function candidates(file:File):Promise<Candidate[]>{
 }
 export async function validateProject(value:unknown):Promise<Project>{
   const p=value as Project;
+  if(!p||p.format!=='probenplan'||p.version!==5)return validateSingle(p);
+  // Format 5: mehrere Pläne. Jeder Plan wird wie ein Projekt des Formats 4 geprüft,
+  // danach Kennungen und IDs über alle Pläne hinweg auf Eindeutigkeit.
+  const sheets=p.sheets,active=p.active;
+  if(!Array.isArray(sheets)||!sheets.length||sheets.length>MAX_SHEETS||!Number.isSafeInteger(active)||active!<0||active!>=sheets.length)throw Error('Ungültige Planliste in der Projektdatei.');
+  const sheetIds=new Set<string>();
+  for(const [i,sh] of sheets.entries()){if(!sh||typeof sh.id!=='string'||!/^[\w-]{1,80}$/.test(sh.id)||sheetIds.has(sh.id)||typeof sh.name!=='string'||!cleanSheetName(sh.name)||sh.name.length>40||(i===active)!==(sh.plan===undefined))throw Error('Ungültiger oder doppelter Plan in der Projektdatei.');sheetIds.add(sh.id);}
+  const base={format:'probenplan' as const,version:4 as const,nextSample:p.nextSample,nextFire:p.nextFire,report:p.report,date:p.date,...(p.labReports!==undefined?{labReports:p.labReports}:{})};
+  const own=await validateSingle({...base,plan:p.plan,markers:p.markers,...(p.areas!==undefined||p.nextArea!==undefined?{areas:p.areas??[],nextArea:p.nextArea}:{}),...(p.pending!==undefined?{pending:p.pending}:{})} as Project);
+  const out:Sheet[]=[];
+  for(const [i,sh] of sheets.entries()){
+    if(i===active){out.push({id:sh.id,name:cleanSheetName(sh.name)});continue;}
+    const v=await validateSingle({...base,plan:sh.plan,markers:sh.markers,...(sh.areas!==undefined||p.nextArea!==undefined?{areas:sh.areas??[],nextArea:p.nextArea}:{})} as Project);
+    out.push({id:sh.id,name:cleanSheetName(sh.name),plan:v.plan,markers:v.markers,...(v.areas?{areas:v.areas}:{})});
+  }
+  const result:Project={...own,version:5,sheets:out,active};
+  const ids=new Set<string>(),labels=new Set<string>();
+  for(const item of [...allMarkers(result),...allAreas(result)]){if(ids.has(item.id)||labels.has(item.label.toLocaleUpperCase()))throw Error('Doppelte Kennungen oder Markierungen über mehrere Pläne.');ids.add(item.id);labels.add(item.label.toLocaleUpperCase());}
+  for(const row of result.pending||[])if(labels.has(row.label.toUpperCase()))throw Error('Ungültige oder doppelte offene Probe.');
+  if(allMarkers(result).length>3000)throw Error('Zu viele Markierungen in der Projektdatei.');
+  return result;
+}
+async function validateSingle(p:Project):Promise<Project>{
   if(!p||p.format!=='probenplan'||![1,2,3,4].includes(p.version)||!p.plan||typeof p.plan.data!=='string'||!Array.isArray(p.markers)||p.markers.length>3000)throw Error('Ungültige oder nicht unterstützte Projektdatei.');
   if(typeof p.plan.name!=='string'||typeof p.report!=='string'||p.report.length>100||typeof p.date!=='string'||(p.date!==''&&!/^\d{4}-\d{2}-\d{2}$/.test(p.date)))throw Error('Ungültige Projektdaten.');
   if(p.plan.data.length>MAX*1.5)throw Error('Die Projektdatei enthält einen zu großen Plan.');
