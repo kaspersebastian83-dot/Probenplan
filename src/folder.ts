@@ -24,7 +24,7 @@ export async function permission(h:FileSystemHandle,request=false){const x=h as 
 export async function findSubdir(dir:Dir,name:string):Promise<Dir|null>{try{return await dir.getDirectoryHandle(name) as Dir;}catch{/* Schreibweise abweichend? */}const want=name.normalize('NFC').toLowerCase();for await(const h of dir.values())if(h.kind==='directory'&&h.name.normalize('NFC').toLowerCase()===want)return h as Dir;return null;}
 export async function listFiles(dir:Dir,pattern:RegExp):Promise<FolderFile[]>{const out:FolderFile[]=[];for await(const h of dir.values())if(h.kind==='file'&&pattern.test(h.name)){const f=await (h as FileSystemFileHandle).getFile();out.push({name:h.name,handle:h as FileSystemFileHandle,lastModified:f.lastModified});}return out.sort((a,b)=>b.lastModified-a.lastModified);}
 export async function fileInfo(dir:Dir,name:string){try{const h=await dir.getFileHandle(name);return await h.getFile();}catch(e){if((e as DOMException).name==='NotFoundError')return null;throw e;}}
-export async function writeFile(dir:Dir,name:string,data:Blob|string){const h=await dir.getFileHandle(name,{create:true}),w=await h.createWritable();try{await w.write(data);}catch(e){await w.abort().catch(()=>{});throw e;}await w.close();return (await h.getFile()).lastModified;}
+export async function writeFile(dir:Dir,name:string,data:Blob|string){const h=await dir.getFileHandle(name,{create:true}),w=await h.createWritable();try{await w.write(data);await w.close();}catch(e){await w.abort().catch(()=>{});throw e;}return (await h.getFile()).lastModified;}
 export async function readProjectData(f:ProjectFolder):Promise<Record<string,unknown>>{try{const file=await fileInfo(f.dir,PJ_FILE);const text=file?await file.text():'';return text.trim()?JSON.parse(text):{};}catch{return {};}}
 
 /** Projektordner öffnen; legt „Pläne“ bei Bedarf an (create). */
@@ -45,3 +45,37 @@ export async function pickFolder():Promise<Dir|null>{
   try{return await picker({mode:'readwrite',id:'plankit-projekt',...(root?{startIn:root}:{})});}catch(e){if((e as DOMException).name==='AbortError')return null;throw e;}
 }
 export async function fromArchiv(name:string):Promise<{root:Dir|null;dir?:Dir}>{const root=await archiv();if(!root)return {root:null};return {root,dir:await root.getDirectoryHandle(name) as Dir};}
+
+/** Content identity detects deletion and replacements even with equal/older timestamps. */
+export async function fileRevision(file:File|null):Promise<string|null>{
+ if(!file)return null;
+ const digest=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
+ return [...new Uint8Array(digest)].map(n=>n.toString(16).padStart(2,'0')).join('');
+}
+export class FolderConflict extends Error{
+ constructor(public current:File|null,public revision:string|null){super('Die Projektdatei wurde an anderer Stelle gespeichert, ersetzt oder gelöscht.');}
+}
+const uniqueName=(f:ProjectFolder,kind:string)=>`Probenplan ${f.name} (${kind} ${new Date().toISOString().replace(/[:.]/g,'-')}-${crypto.randomUUID()}).probenplan`;
+/** Always use a fresh filename: backups/recovery files are never recycled. */
+export async function writeProjectCopy(f:ProjectFolder,kind:string,text:string){const name=uniqueName(f,kind);await writeFile(f.plaene,name,text);if(await (await fileInfo(f.plaene,name))?.text()!==text)throw Error('Sicherungsdatei konnte nicht bestätigt werden.');return name;}
+/** Serialize cooperating tabs; detect external changes again immediately before replacement.
+ * File System Access commits a writable stream on close. A recovery file survives a failed close. */
+export async function saveFolderProject(f:ProjectFolder,text:string,expected:string|null){
+ if(!navigator.locks)throw Error('Sicheres Speichern benötigt Chrome oder Edge mit Web Locks.');
+ return navigator.locks.request(`plankit:project:${f.name}`,async()=>{
+  if(!await permission(f.dir))throw Error('Schreibzugriff fehlt. Bitte „Speichern“ klicken und den Zugriff erneut erlauben.');
+  const name=projectFileName(f),current=await fileInfo(f.plaene,name),revision=await fileRevision(current);
+  if(revision!==expected)throw new FolderConflict(current,revision);
+  // A failed backup must stop the save before touching the canonical project file.
+  const backup=current?await writeProjectCopy(f,'vorher',await current.text()):null;
+  const recovery=await writeProjectCopy(f,'Wiederherstellung',text);
+  const latest=await fileInfo(f.plaene,name),latestRevision=await fileRevision(latest);
+  if(latestRevision!==expected)throw new FolderConflict(latest,latestRevision);
+  await writeFile(f.plaene,name,text);
+  const committed=await fileInfo(f.plaene,name),wanted=await fileRevision(new File([text],name));
+  if(await fileRevision(committed)!==wanted)throw Error('Die geschriebene Datei konnte nicht bestätigt werden. Wiederherstellungsdatei bleibt erhalten.');
+  // Cleanup failure does not invalidate a verified save; the candidate remains available.
+  await f.plaene.removeEntry(recovery).catch(()=>{});
+  return {revision:wanted,backup};
+ });
+}

@@ -1,5 +1,12 @@
 # Änderungen
 
+## 1.8.2 – 16. Oktober 2026
+
+- Büro-Dateisicherheit für Windows mit Chrome/Edge: Inhaltsvergleich statt Zeitstempeltoleranz, Konflikte auch bei gelöschten/ersetzten Dateien und erneute Prüfung nach der Konfliktentscheidung.
+- Geprüfte, eindeutig benannte Sicherung vor jedem Überschreiben; Wiederherstellungsdatei vor dem Hauptschreiben, Erfolgsanzeige erst nach bestätigtem Speichern. Web Locks koordinieren PlanKit-Tabs.
+- Projektgebundene Browserentwürfe, erneute Zugriffserlaubnis über „Speichern“, Notfallkopie, explizite Wiederherstellung bei Abbruch/beschädigter Datei und Warnung vor dem Schließen ungespeicherter Änderungen.
+- Bestehendes Archiv, Projektformat und FotoKit-/LabelKit-Integration bleiben erhalten. Synthetische Browserregressionen in GitHub Actions; keine Cloud-/OneDrive- oder plattformspezifische Dateilogik.
+
 ## 1.8.1 – 16. Oktober 2026
 
 - Sichere Zahleninterpretation für deutsche/internationale Formate; mehrdeutige und ungültige Angaben bleiben ohne Bewertung. Originalwerte und Einheiten bleiben erhalten.

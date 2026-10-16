@@ -65,5 +65,37 @@ try{
   await page.locator('#replace-yes').click();await page.waitForTimeout(1000);const names=await fs(page,'list',[NAME,'Pläne']);
   assert.ok(names.some(n=>/^Probenplan 26\.0123 Köln \(vorher .*\)\.probenplan$/.test(n)),names.join(', '));assert.equal((await saved(page)).markers.length,0);
  });
+ await check('Interrupted close preserves the main file, browser draft and recovery candidate',async()=>{
+  const before=await fs(page,'read',[NAME,'Pläne'],FILE);
+  await page.evaluate(file=>{const original=FileSystemFileHandle.prototype.createWritable;window.failMainClose=true;
+   FileSystemFileHandle.prototype.createWritable=async function(...args){const stream=await original.apply(this,args),main=this.name===file;return new Proxy(stream,{get(target,key){if(key==='close')return async()=>{if(main&&window.failMainClose)throw Error('Synthetic interrupted close');return target.close();};return typeof target[key]==='function'?target[key].bind(target):target[key];}});};
+  },FILE);
+  await page.locator('[data-mode=sample]').click();await tap(page,.4,.4);await page.locator('#saved',{hasText:'Nicht im Projektordner gespeichert'}).waitFor();
+  assert.equal(await fs(page,'read',[NAME,'Pläne'],FILE),before);
+  const names=await fs(page,'list',[NAME,'Pläne']),recovery=names.find(n=>n.includes('(Wiederherstellung '));assert.ok(recovery);assert.equal(JSON.parse(await fs(page,'read',[NAME,'Pläne'],recovery)).markers.length,1);
+  const local=await page.evaluate(name=>new Promise((res,rej)=>{const r=indexedDB.open('probenplan',1);r.onsuccess=()=>{const q=r.result.transaction('projects').objectStore('projects').get(`projekt:${name}`);q.onsuccess=()=>{r.result.close();res(q.result);};q.onerror=()=>rej(q.error);};}),NAME);assert.equal(local.dirty,true);assert.equal(local.project.markers.length,1);
+  const d=page.waitForEvent('download');await page.locator('#emergency-copy').click();assert.match((await d).suggestedFilename(),/Notfallkopie/);
+  page.once('dialog',dialog=>dialog.accept());await page.reload();await page.locator('#ask-title',{hasText:'Ungespeicherte Browser-Fassung'}).waitFor();await page.locator('#ask-actions button',{hasText:'Browser-Fassung verwenden'}).click();
+  await page.locator('#saved',{hasText:'Wiederhergestellt'}).waitFor();assert.equal(await fs(page,'read',[NAME,'Pläne'],FILE),before);assert.equal(await page.locator('#count').textContent(),'1');
+  await page.locator('#save-project').click();await page.locator('#toast',{hasText:'Gespeichert'}).waitFor();assert.equal((await saved(page)).markers.length,1);
+ });
+ await check('Repeated edits during a conflict prompt ask again and backup the accepted external file',async()=>{
+  const other=JSON.parse(await fs(page,'read',[NAME,'Pläne'],FILE));other.report='External A';await fs(page,'write',[NAME,'Pläne'],FILE,JSON.stringify(other));
+  await page.locator('[data-mode=sample]').click();await tap(page,.6,.6);await page.locator('#ask-dialog').waitFor();
+  other.report='External B';await fs(page,'write',[NAME,'Pläne'],FILE,JSON.stringify(other));await page.locator('#ask-actions button',{hasText:'Meine Fassung übernehmen'}).click();
+  await page.locator('#ask-dialog').waitFor({state:'visible'});assert.equal(JSON.parse(await fs(page,'read',[NAME,'Pläne'],FILE)).report,'External B');
+  await page.locator('#ask-actions button',{hasText:'Meine Fassung übernehmen'}).click();await page.locator('#saved',{hasText:'gespeichert'}).waitFor();assert.equal((await saved(page)).markers.length,2);
+  const names=await fs(page,'list',[NAME,'Pläne']),backups=await Promise.all(names.filter(n=>n.includes('(vorher ')).map(n=>fs(page,'read',[NAME,'Pläne'],n)));assert.ok(backups.some(t=>JSON.parse(t).report==='External B'));
+  assert.equal(JSON.parse(await fs(page,'read',[NAME],'_Projekt.json')).objekt,'Wohnhaus Musterstraße 1');
+ });
+ await check('Damaged primary is recovered only by explicit selection; its original bytes are backed up',async()=>{
+  const candidate=`Probenplan ${NAME} (Wiederherstellung synthetic).probenplan`,valid=await fs(page,'read',[NAME,'Pläne'],FILE);
+  await fs(page,'write',[NAME,'Pläne'],candidate,valid);await fs(page,'write',[NAME,'Pläne'],FILE,'{interrupted');
+  await page.evaluate(name=>new Promise((res,rej)=>{const r=indexedDB.open('probenplan',1);r.onsuccess=()=>{const tx=r.result.transaction('projects','readwrite');tx.objectStore('projects').delete(`projekt:${name}`);tx.oncomplete=()=>{r.result.close();res();};tx.onerror=()=>rej(tx.error);};}),NAME);
+  await page.reload();await page.locator('#ask-title',{hasText:'Projektdatei fehlt oder ist beschädigt'}).waitFor();assert.equal(await fs(page,'read',[NAME,'Pläne'],FILE),'{interrupted');
+  await page.locator('#ask-actions button',{hasText:candidate}).click();await page.locator('#saved',{hasText:'Wiederhergestellt'}).waitFor();assert.equal(await page.locator('#count').textContent(),'2');assert.equal(await fs(page,'read',[NAME,'Pläne'],FILE),'{interrupted');
+  await page.locator('#save-project').click();await page.locator('#toast',{hasText:'Gespeichert'}).waitFor();assert.equal((await saved(page)).markers.length,2);
+  const names=await fs(page,'list',[NAME,'Pläne']);assert.ok((await Promise.all(names.filter(n=>n.includes('(vorher ')).map(n=>fs(page,'read',[NAME,'Pläne'],n)))).includes('{interrupted'));
+ });
  assert.deepEqual(errors,[]);
 }finally{await browser.close();}
