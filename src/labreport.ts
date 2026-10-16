@@ -34,8 +34,11 @@ export function parseLabXML(text:string,quelle=''):LabReport{
    const ref=value(sample,'Description'),date=value(sample,'SamplingDate'),row:LabSample={label:referenceLabel(ref),ref,desc:extra('SPLPT_NAME'),art:extra('SAMPLETYPE')||value(sample,'Matrix'),labNr:value(sample,'SamplePartnerCode'),datum:berlinDate(date),bericht:report.bericht};
    if(date&&!row.datum)report.warnings.push(`Probenahmedatum für ${ref||row.labNr} konnte nicht erkannt werden.`);
    const order=value(sample,'SampleOrder');rows.push({row,order:order&&Number.isFinite(Number(order))?Number(order):Infinity,index:rows.length});
-   const lines=child(sample,'Lines');for(const line of lines?children(lines,'AnalyticalReportLine'):[])report.results.push({ref,parameter:value(line,'ParameterName')||value(line,'ParameterDescription'),result:value(line,'Result'),unit:value(line,'Unit'),loq:value(line,'LOQ')});
-   const werte=report.results.filter(r=>r.ref===ref&&r.parameter&&r.result).slice(-MAX_WERTE).map(r=>({p:r.parameter.slice(0,160),r:r.result.slice(0,40),u:r.unit.slice(0,40)}));if(werte.length)row.werte=werte;
+   const resultStart=report.results.length,raw=(el:Element,name:string)=>child(el,name)?.textContent||'';
+   const lines=child(sample,'Lines');for(const line of lines?children(lines,'AnalyticalReportLine'):[])report.results.push({ref,parameter:value(line,'ParameterName')||value(line,'ParameterDescription'),result:raw(line,'Result'),unit:raw(line,'Unit'),loq:value(line,'LOQ')});
+   const results=report.results.slice(resultStart).filter(r=>r.parameter&&r.result);
+   if(results.length>MAX_WERTE||results.some(r=>r.parameter.length>160||r.result.length>40||r.unit.length>40))throw Error('Laborwerte überschreiten die unterstützte Länge oder Anzahl; Originalwerte wurden nicht gekürzt.');
+   const werte=results.map(r=>({p:r.parameter,r:r.result,u:r.unit}));if(werte.length)row.werte=werte;
   }
  }
  if(rows.length>1000)throw Error('Mehr als 1000 Proben. Bitte einen kleineren Export verwenden.');
@@ -61,7 +64,7 @@ export function parseLabPDF(pages:TextPage[],quelle=''):LabReport{
   const refs=line.items.filter(it=>it.x>line.items[0].x+30).map(it=>({...it,text:tidy(it.text)})).filter(it=>it.text&&!/probenreferenz|probenbezeichnung/i.test(it.text));
   for(let col=0;col<refs.length;col++){const ref=refs[col],next=refs[col+1],left=ref.x-12,right=next?next.x-12:Infinity;let datum='',prefix='',suffix='';for(const lower of lines.slice(i+1,i+7)){const text=lower.items.filter(it=>it.x>=left&&it.x<right).map(it=>it.text).join(' ');datum||=berlinDate(text.match(/\d{2}\.\d{2}\.\d{4}/)?.[0]||'');prefix||=text.match(/\d{3}-\d{4}-/)?.[0]||'';suffix||=text.match(/\b\d{8}\b/)?.[0]||'';}resultInfo.set(norm(ref.text),{datum,labNr:prefix+suffix});report.references.push(ref.text);}
  }
- let columns:{nr:number;lab:number;art:number;ref:number;desc:number;date:number}|null=null,active=false,current:LabSample|null=null;
+ let columns:{nr:number;lab:number;art:number;ref:number;desc:number;date:number;samplingDate:boolean}|null=null,active=false,current:LabSample|null=null;
  for(const lines of all)for(const line of lines){
   if(/Weitere\s+Erl[äa]uterungen/i.test(line.text)){active=true;current=null;continue;}
   // PDF.js may combine adjacent cells, e.g. "Nr. Probennummer", in one text item.
@@ -72,12 +75,12 @@ export function parseLabPDF(pages:TextPage[],quelle=''):LabReport{
   }
   const find=(re:RegExp)=>header.find(i=>re.test(norm(i.text)))?.x;
   const lab=find(/^(probennummer|probennr|labornr|labornummer)$/),desc=find(/^(probenbeschreibung|beschreibung)$/),ref=find(/^(probenreferenz|probenbezeichnung)$/),type=find(/^probenart$/),nr=find(/^(nr|nummer)$/),date=find(/^(eingangsdatum|probeneingang|probenahmedatum|datum)$/);
-  if(lab!==undefined&&desc!==undefined&&ref!==undefined&&type!==undefined){columns={nr:nr??0,lab,art:type,ref,desc,date:date??Infinity};active=true;current=null;continue;}
+  if(lab!==undefined&&desc!==undefined&&ref!==undefined&&type!==undefined){columns={nr:nr??0,lab,art:type,ref,desc,date:date??Infinity,samplingDate:header.some(h=>/^probenahmedatum$/.test(norm(h.text)))};active=true;current=null;continue;}
   if(!active||!columns)continue;
   if(/^(Labork[üu]rzelerkl[äa]rung|Kommentare|zu Ergebnissen|Pr[üu]fberichtsnummer|Seite\s+\d)/i.test(line.text)){current=null;continue;}
   const c=columns,bound=(a:number,b:number)=>joined(line.items.filter(i=>i.x>=a-3&&i.x<b-3)),number=bound(c.nr,c.lab),labNr=bound(c.lab,c.art),reference=bound(c.ref,c.desc),description=bound(c.desc,c.date);
   if(/^\d+\s*[.)]?$/.test(number)&&/\d/.test(labNr)){
-   const info=resultInfo.get(norm(reference));current={label:referenceLabel(reference),ref:tidy(reference),desc:tidy(description),art:tidy(bound(c.art,c.ref))||art,labNr:tidy(labNr),datum:info?.datum||coverDate,bericht:report.bericht};report.rows.push(current);
+   const info=resultInfo.get(norm(reference));current={label:referenceLabel(reference),ref:tidy(reference),desc:tidy(description),art:tidy(bound(c.art,c.ref))||art,labNr:tidy(labNr),datum:(c.samplingDate?berlinDate(bound(c.date,Infinity)):'')||info?.datum||coverDate,bericht:report.bericht};report.rows.push(current);
   }else if(current&&description&&!labNr&&!reference){current.desc=tidy(`${current.desc} ${description}`);}
  }
  if(report.rows.length>1000)throw Error('Mehr als 1000 PDF-Proben. Bitte einen kleineren Bericht verwenden.');
@@ -93,9 +96,21 @@ export function reportWarnings(report:LabReport,p?:Project){
  const number=(s:string)=>s.match(/\b\d{2}\.\d{3,}\b/)?.[0];if(p?.report&&report.auftragsreferenz&&number(p.report)!==number(report.auftragsreferenz)&&p.report!==report.auftragsreferenz)warnings.push(`Auftragsreferenz „${report.auftragsreferenz}“ passt möglicherweise nicht zur Gutachtennummer „${p.report}“.`);
  return [...new Set(warnings)];
 }
+// Ignore layout whitespace / Unicode hyphens, but retain ID punctuation and leading zeros.
+const labID=(s:string)=>tidy(s).replace(/[\u2010-\u2015\u2212]/g,'-').replace(/\s/g,'').toUpperCase();
 export function compareReports(xml:LabReport,pdf:LabReport){
- const warnings=[...pdf.warnings];if(xml.bericht!==pdf.bericht)warnings.push('Berichtsnummern von XML und PDF weichen ab oder wurden nicht erkannt.');
- for(const row of xml.rows){const others=pdf.rows.filter(r=>norm(r.ref)===norm(row.ref));if(!others.length)warnings.push(`XML-Probe fehlt in der PDF-Beschreibungstabelle: ${row.ref}.`);else if(others.length!==1||tidy(others[0].desc)!==tidy(row.desc))warnings.push(`Beschreibung weicht zwischen XML und PDF ab: ${row.ref}.`);}
+ const warnings=[...pdf.warnings];if(labID(xml.bericht)!==labID(pdf.bericht)||!xml.bericht||!pdf.bericht)warnings.push('Berichtsnummern von XML und PDF weichen ab oder wurden nicht erkannt.');
+ for(const row of xml.rows){
+  const others=pdf.rows.filter(r=>norm(r.ref)===norm(row.ref));
+  if(!others.length){warnings.push(`XML-Probe fehlt in der PDF-Beschreibungstabelle: ${row.ref}.`);continue;}
+  if(others.length!==1){warnings.push(`Probenreferenz zwischen XML und PDF nicht eindeutig: ${row.ref}.`);continue;}
+  const other=others[0];
+  if(tidy(other.desc)!==tidy(row.desc))warnings.push(`Beschreibung weicht zwischen XML und PDF ab: ${row.ref}.`);
+  for(const [key,label,normalize] of [['labNr','Labor-Nr.',labID],['datum','Probenahmedatum',(s:string)=>berlinDate(s)||tidy(s)],['art','Probenart',(s:string)=>tidy(s).toLocaleLowerCase('de')]] as const){
+   const a=row[key]||'',b=other[key]||'';
+   if(a||b){if(!a||!b)warnings.push(`${label} fehlt in ${a?'PDF':'XML'}: ${row.ref}.`);else if(normalize(a)!==normalize(b))warnings.push(`${label} weicht zwischen XML und PDF ab: ${row.ref}.`);}
+  }
+ }
  for(const row of pdf.rows)if(!xml.rows.some(r=>norm(r.ref)===norm(row.ref)))warnings.push(`PDF-Probe fehlt im XML: ${row.ref}.`);
  if(pdf.expected!==null&&xml.rows.length!==pdf.expected)warnings.push(`XML enthält ${xml.rows.length} Proben; PDF nennt ${pdf.expected}.`);return [...new Set(warnings)];
 }

@@ -2,7 +2,7 @@ import {bounds, floorName, markerSize, markerSVG, type Project} from './model';
 import {loadImage} from './import';
 import {planMatrix,preparation} from './preparation';
 import {areaAnchor,areaCategories,areaSVG,palette} from './areas';
-import {rangeText,shortParameter,UNRATED,type Rated} from './results';
+import {rangeText,shortParameter,UNRATED,qualifierGroups,type Rated} from './results';
 function wrap(ctx:CanvasRenderingContext2D,text:string,width:number){
   const lines:string[]=[];let line='';
   for(const word of text.split(/\s+/)){if(line&&ctx.measureText(`${line} ${word}`).width<=width){line+=` ${word}`;continue;}if(line){lines.push(line);line='';}for(const char of word){if(line&&ctx.measureText(line+char).width>width){lines.push(line);line='';}line+=char;}}
@@ -13,7 +13,8 @@ function legendBlocks(p:Project,rated?:Rated|null){
   const blocks:{name:string;variants:LegendVariant[]}[]=[];
   if(rated){
     for(const g of rated.groups)if(g.scale)blocks.push({name:`${shortParameter(rated.parameter)} in ${g.unit}${g.scale.name?` · ${g.scale.name}`:''}`,variants:g.cats.map((c,i)=>({color:c.color,opacity:1,outline:'#1d2a33',dash:[],round:true,text:`${c.name} (${rangeText(g.scale!,i,g.unit)})${c.labels.length?`: ${c.labels.join(', ')}`:''}`}))});
-    if(rated.unrated.length)blocks.push({name:'Ohne Bewertung',variants:[{color:UNRATED,opacity:1,outline:'#1d2a33',dash:[],round:true,text:`${rated.unrated.join(', ')} – kein Wert für ${shortParameter(rated.parameter)} oder keine Skala`}]});
+    for(const g of qualifierGroups(rated))blocks.push({name:g.name,variants:[{color:g.color,opacity:1,outline:'#1d2a33',dash:[],round:true,text:g.labels.join(', ')}]});
+    if(rated.unrated.length)blocks.push({name:'Ohne Bewertung',variants:[{color:UNRATED,opacity:1,outline:'#1d2a33',dash:[],round:true,text:`${rated.unrated.join(', ')} – kein Wert für ${shortParameter(rated.parameter)} oder keine anwendbare Skala / Zahl nicht eindeutig`}]});
   }
   for(const c of areaCategories(p.areas||[]))blocks.push({name:c.name,variants:c.variants.map(v=>{const pal=palette(v.color);return {color:v.color,opacity:v.opacity,outline:pal.outline,dash:pal.dash,round:false,text:`${v.labels.join(', ')} · ${Math.round(v.opacity*100)} %`};})});
   return blocks;
@@ -28,7 +29,7 @@ function legendLayout(p:Project,width:number,fs:number,rated?:Rated|null){
   return {entries,height:y,fs,title};
 }
 export function exportLayout(p:Project,longSide:number,rated?:Rated|null){
-  const hasLegend=!!(p.areas?.length||(rated&&(rated.groups.some(g=>g.scale)||rated.unrated.length)));
+  const hasLegend=!!(p.areas?.length||(rated&&(rated.groups.some(g=>g.scale)||rated.unrated.length||qualifierGroups(rated).length)));
   const b=bounds(p),unit=Math.max(b.width,b.height),pad=unit*.028;
   // Include area code plates close to the plan boundary in the exported bounds.
   for(const a of p.areas||[]){const c=areaAnchor(a.points),size=Math.max(p.plan.width,p.plan.height)/60,rx=size*Math.max(1,a.label.length*.32),right=b.x+b.width,bottom=b.y+b.height;b.x=Math.min(b.x,c.x-rx);b.y=Math.min(b.y,c.y-size*.72);b.width=Math.max(right,c.x+rx)-b.x;b.height=Math.max(bottom,c.y+size*.72)-b.y;}
