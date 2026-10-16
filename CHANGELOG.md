@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.9.0 – 16. Oktober 2026
+
+- Punktgröße je Plan: Bei sehr großen oder kleinen Plänen lassen sich die Probenpunkte jetzt anpassen. Regler „Punktgröße“ oben in der Liste (20–300 %) und die Tasten **<** (kleiner) und **>** (größer). Jeder Plan (Geschoss) behält seinen eigenen Wert; Export, Beschriftungen und Ergebniskarte folgen.
+- Der Wert wird in der Projektdatei gespeichert (nur wenn er von 100 % abweicht); ältere Dateien laden unverändert, ungültige Werte werden beim Import abgewiesen. Mehrere Änderungen hintereinander sind ein Rückgängig-Schritt.
+
 ## 1.8.3 – 16. Oktober 2026
 
 - Sicherungskopien „(vorher …)“ sammeln sich nicht mehr unbegrenzt im Ordner „Pläne“: PlanKit behält die neuesten 10 und je Tag die jeweils neueste der letzten 30 Tage. Wiederherstellungsdateien, manuelle Kopien und die Projektdatei werden nie gelöscht; ein Fehler beim Aufräumen lässt das Speichern nie scheitern.
