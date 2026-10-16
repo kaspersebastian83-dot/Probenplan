@@ -29,12 +29,16 @@ function darkRuns(pg,yMm){const k=pg.width/pg.mmW,y=Math.round(yMm*k),runs=[];fo
 function lineGap(pg){for(let y=pg.mmH*.3;y<pg.mmH*.75;y+=1.3){const runs=darkRuns(pg,y);for(let i=0;i+3<runs.length;i++){const [a,b,c,d]=runs.slice(i,i+4),u=(d-a)/3920;if(u>0&&Math.abs((b-a)-960*u)<.6&&Math.abs((c-b)-2000*u)<.6)return c-b;}}return null;}
 // PDF_DUMP=<Ordner> legt die erzeugten PDFs zur Sichtprüfung ab.
 let dumped=0;
-async function pdfExport(page){const [dl]=await Promise.all([page.waitForEvent('download'),page.locator('#export').click()]);if(process.env.PDF_DUMP)await dl.saveAs(`${process.env.PDF_DUMP}/${++dumped}-${dl.suggestedFilename()}`);return {name:dl.suggestedFilename(),pages:readPdf(await readFile(await dl.path()))};}
+// Bleibt der Download aus, nennt der Fehler, was die App angezeigt hat (Meldung, Schaltfläche, Browserfehler).
+async function pdfExport(page){
+ const started=Date.now(),pending=page.waitForEvent('download',{timeout:120000}).catch(e=>e);await page.locator('#export').click();const dl=await pending;
+ if(dl instanceof Error){const state=await page.evaluate(()=>({toast:document.getElementById('toast')?.textContent,toastError:document.getElementById('toast')?.className,button:document.getElementById('export')?.textContent,result:!document.getElementById('export-result')?.hidden})).catch(e=>({evaluate:String(e)}));throw Error(`Kein PDF-Download nach ${Math.round((Date.now()-started)/1000)} s: ${JSON.stringify(state)} · Konsole: ${JSON.stringify(page.__log||[])}`);}
+ if(Date.now()-started>25000)console.log(`Hinweis: PDF-Export dauerte ${Math.round((Date.now()-started)/1000)} s`);if(process.env.PDF_DUMP)await dl.saveAs(`${process.env.PDF_DUMP}/${++dumped}-${dl.suggestedFilename()}`);return {name:dl.suggestedFilename(),pages:readPdf(await readFile(await dl.path()))};}
 
 for(const engine of ['chromium','webkit']){
  const browser=await ({chromium,webkit}[engine]).launch();
  try{
-  const context=await browser.newContext({viewport:{width:1366,height:768},acceptDownloads:true}),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const context=await browser.newContext({viewport:{width:1366,height:768},acceptDownloads:true}),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));page.__log=[];page.on('console',m=>{if(['error','warning'].includes(m.type()))page.__log.push(`${m.type()}: ${m.text()}`.slice(0,300));});page.on('pageerror',e=>page.__log.push(`pageerror: ${e.message}`.slice(0,300)));
   await page.goto(base);
   await page.locator('#file').setInputFiles(plan(4000,3000,'EG'));await page.locator('#welcome').waitFor({state:'hidden'});
   await page.keyboard.press('p');await tap(page,.3,.4);await page.keyboard.press('v');
