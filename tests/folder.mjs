@@ -21,7 +21,7 @@ const fs=(page,action,...args)=>page.evaluate(async([action,args])=>{
  if(action==='read'){const d=await dir(args[0]);try{return await(await(await d.getFileHandle(args[1])).getFile()).text();}catch{return null;}}
  if(action==='write'){const d=await dir(args[0]);const w=await(await d.getFileHandle(args[1],{create:true})).createWritable();await w.write(args[2]);await w.close();return true;}
 },[action,args]);
-const saved=async page=>{await page.locator('#saved',{hasText:'gespeichert'}).waitFor({state:'attached'});for(let i=0;i<40;i++){const t=await fs(page,'read',[NAME,'Pläne'],FILE);if(t)return JSON.parse(t);await page.waitForTimeout(100);}throw Error('Projektdatei fehlt');};
+const saved=async page=>{await page.locator('#saved',{hasText:/^✓ In „Pläne“ gespeichert$/}).waitFor({state:'attached'});for(let i=0;i<40;i++){const t=await fs(page,'read',[NAME,'Pläne'],FILE);if(t)return JSON.parse(t);await page.waitForTimeout(100);}throw Error('Projektdatei fehlt');};
 const browser=await chromium.launch();
 try{
  const context=await browser.newContext({viewport:{width:1366,height:768},acceptDownloads:true}),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -84,7 +84,7 @@ try{
   await page.locator('[data-mode=sample]').click();await tap(page,.6,.6);await page.locator('#ask-dialog').waitFor();
   other.report='External B';await fs(page,'write',[NAME,'Pläne'],FILE,JSON.stringify(other));await page.locator('#ask-actions button',{hasText:'Meine Fassung übernehmen'}).click();
   await page.locator('#ask-dialog').waitFor({state:'visible'});assert.equal(JSON.parse(await fs(page,'read',[NAME,'Pläne'],FILE)).report,'External B');
-  await page.locator('#ask-actions button',{hasText:'Meine Fassung übernehmen'}).click();await page.locator('#saved',{hasText:'gespeichert'}).waitFor();assert.equal((await saved(page)).markers.length,2);
+  await page.locator('#ask-actions button',{hasText:'Meine Fassung übernehmen'}).click();await page.locator('#saved',{hasText:/^✓ In „Pläne“ gespeichert$/}).waitFor();assert.equal((await saved(page)).markers.length,2);
   const names=await fs(page,'list',[NAME,'Pläne']),backups=await Promise.all(names.filter(n=>n.includes('(vorher ')).map(n=>fs(page,'read',[NAME,'Pläne'],n)));assert.ok(backups.some(t=>JSON.parse(t).report==='External B'));
   assert.equal(JSON.parse(await fs(page,'read',[NAME],'_Projekt.json')).objekt,'Wohnhaus Musterstraße 1');
  });
