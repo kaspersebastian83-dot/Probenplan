@@ -1,7 +1,7 @@
 import {preview} from 'vite';
 import {spawn} from 'node:child_process';
 import {mkdir,writeFile,rm,access} from 'node:fs/promises';
-const suites=['browser','edge-cases','import-preparation','scoped-pdf','areas','keyboard','marker-pan','labreport','lab-provenance','layout','floors','results','folder','folder-safety','marker-size','sheet-pdf'];
+const suites=['browser','edge-cases','import-preparation','scoped-pdf','areas','keyboard','marker-pan','labreport','lab-provenance','layout','floors','results','folder','folder-safety','marker-size','sheet-pdf','anlage'];
 // Start a private production preview on a free port; never attach to a user's app.
 await rm('.test-output',{recursive:true,force:true});await mkdir('.test-output',{recursive:true});
 for(const file of ['dist/index.html','dist/sw.js'])await access(file).catch(()=>{throw new Error('Produktionsbuild fehlt. Vor pnpm test bitte pnpm build ausführen.');});

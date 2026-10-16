@@ -1,5 +1,16 @@
 # Änderungen
 
+## 1.11.0 – 16. Oktober 2026
+
+- Neu im Export: **„Word · Anlage Probenahme“** – Word-Datei zum Einfügen in den Bericht (Einfügen › Objekt › Text aus Datei): Arial, direkte Formatierung, keine Kopf-/Fußzeile, A4 mit den Rändern des Berichts.
+  - Lageplan je Geschoss als Ergebniskarte bzw. Probenplan im genormten Maßstab (Planseite 159 × 192 mm, in Originalgröße eingesetzt, mit Schriftfeld, Legende, Maßstabsleiste).
+  - Probenverzeichnis: Messwert in der Schreibweise des Prüfberichts, Einordnung in die Skala des Sachverständigen (Skala mit Bereichen angegeben), nicht platzierte Proben ausdrücklich genannt.
+  - Je Probe ein Probenblatt: Angaben, Lageausschnitt mit Markierung, Fotos aus FotoKit (Zuordnung über die Probe-Nr., verkleinerte Kopien, FotoKit-Drehung angewendet) mit Dateiname, Aufnahmezeit und Prüfsumme, alle Laborwerte.
+  - Prüfprotokoll: Vollständigkeit (Proben ohne Lage, Wert, Einordnung oder Foto; unbekannte Probe-Nr.; veränderte, fehlende oder ungeprüfte Fotos; Pläne ohne Maßstab; fehlende Laborberichtsdateien) und SHA-256 aller Quelldateien und Fotos.
+  - Im Projektordner: gespeicherter Stand wird belegt (vorher gespeichert), Ablage datiert und nie überschreibend in „Mitteilungen“, Zeile in „_Anlagen-Protokoll.txt“ (wie die Anlagen der Projektzentrale). Ohne Projektordner: Download ohne Fotos.
+- Word-Schreiber (`src/docx.ts`) als Kopie aus der Projektzentrale, ergänzt um Bilder in Tabellenzellen und einmalige Ablage mehrfach verwendeter Bilder.
+- Test `anlage.mjs`.
+
 ## 1.10.0 – 16. Oktober 2026
 
 - Maßstäbliches PDF für das Gutachten: Export als **PDF · A4** oder **PDF · A3** mit Rahmen, Schriftfeld (Firmenlogo, Dr. Schiffers & Partner, Planart und Geschoss, Objekt, Gutachten-Nr., Datum, Maßstab, Blatt), Legende, Maßstabsleiste und optionalem Nordpfeil. Der Plan wird im größten passenden genormten Maßstab (1:50, 1:100, 1:200 …) gedruckt; Hoch-/Querformat wählt PlanKit automatisch. „Alle Pläne“ ergibt ein PDF mit einem Blatt je Geschoss, jedes im eigenen Maßstab.

@@ -1,4 +1,4 @@
-# PlanKit 1.10.0 (früher Probenplan)
+# PlanKit 1.11.0 (früher Probenplan)
 
 PlanKit gehört zur Familie von LabelKit und FotoKit und sieht genauso aus. Webadresse, Repository, Startdatei und das Dateiformat `.probenplan` behalten den bisherigen Namen – bestehende Projekte, Lesezeichen und installierte Apps funktionieren unverändert weiter.
 
@@ -114,6 +114,19 @@ Am einfachsten den Plan unmittelbar nach dem Import vorbereiten, anschließend m
 PDF-Seiten werden zunächst als PNG gerendert: bis 4.600 Pixel an der längsten Seite und höchstens 16 Megapixel, auf Mobilgeräten oder bei wenig gemeldetem Gerätespeicher höchstens 9 Megapixel. Bei einem Renderfehler folgt ein Versuch mit bis zu 3.000 Pixeln / 6 Megapixeln. Die tatsächlichen Planabmessungen sind unter der Arbeitsfläche sichtbar. Ein späterer 4.600-px-Export kann eine begrenzte PDF-Rastervorlage hochskalieren. Für zusätzliche PDF-Seiten ein eigenes Projekt anlegen. PDFs mit Passwortschutz bitte als ungeschützte Kopie bereitstellen.
 
 Smartphone-JPGs werden einschließlich EXIF-Ausrichtung verarbeitet, Hoch-/Querformat und Originalauflösung erhalten. Geprüft wurden unter anderem JPG und PNG mit jeweils 24 Megapixeln. Die Grenze von 50 Megapixeln / 18.000 Pixeln pro Seite schützt vor sehr großen Speicherbelegungen; sie wird nach Möglichkeit bereits anhand der Bildheader geprüft. HEIC/HEIF ist nicht Bestandteil von 1.2: als JPG exportieren oder auf dem iPhone **Einstellungen → Kamera → Formate → Maximale Kompatibilität** wählen.
+
+## Anlage Probenahme (Word) ab 1.11
+
+Export → **„Word · Anlage Probenahme“** erstellt eine Word-Datei, die im Bericht mit *Einfügen › Objekt › Text aus Datei* eingefügt wird (Arial, direkte Formatierung, keine Kopf-/Fußzeile, A4 mit den Rändern des Berichts):
+
+1. **Lageplan je Geschoss** – Ergebniskarte (sobald Messwerte da sind) bzw. Probenplan im genormten Maßstab. Die Planseite (159 × 192 mm) wird in Originalgröße eingesetzt, der Maßstab bleibt beim Druck mit „Tatsächliche Größe“ erhalten.
+2. **Probenverzeichnis** – Messwert in der Schreibweise des Prüfberichts, Einordnung in die Skala des Sachverständigen (die Skala mit ihren Bereichen steht darunter). Keine Interpolation, keine Hochrechnung.
+3. **Probenblätter** – je Probe Angaben, Lageausschnitt, Fotos aus FotoKit (Zuordnung über „Probe-Nr.“, verkleinerte Kopien) mit Dateiname, Aufnahmezeit und Prüfsumme, alle Laborwerte.
+4. **Prüfprotokoll** – was fehlt oder abweicht (Proben ohne Lage, Wert, Einordnung oder Foto, unbekannte Probe-Nr., veränderte/fehlende Fotos, Pläne ohne Maßstab, fehlende Laborberichtsdateien) und SHA-256 aller Quelldateien und Fotos.
+
+Im Projektordner speichert PlanKit vorher den Plan (die Anlage belegt den gespeicherten Stand) und legt die Datei datiert in `Mitteilungen` ab, z. B. `26-0142_Anlage-3_Probenahme_2026-10-21.docx` – nie überschreibend, mit Zeile in `Mitteilungen/_Anlagen-Protokoll.txt`. Ohne Projektordner wird die Anlage ohne Fotos heruntergeladen.
+
+Der Word-Schreiber `src/docx.ts` ist eine Kopie aus der Projektzentrale; Änderungen bitte in beiden Apps gleich halten.
 
 ## Projekte speichern
 
