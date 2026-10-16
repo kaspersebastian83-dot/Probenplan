@@ -13,7 +13,7 @@ import {cropProject,planMatrix,preparation,rotateProject} from './preparation';
 import type {LocalPDF} from './pdf';
 import type {Plan,Rect} from './model';
 import type {Area,Point} from './model';
-import {hasValues,parameters,prepare,rangeText,rateMarkers,saveShared,fromShared,scaleKey,shortParameter,autoColors,units,valueOf,UNRATED,BELOW_LIMIT,vdsScale} from './results';
+import {hasValues,parameters,prepare,rangeText,rateMarkers,saveShared,fromShared,scaleKey,shortParameter,autoColors,units,valueOf,UNRATED,qualifierGroups,vdsScale} from './results';
 import type {Scale} from './model';
 import {addArea,areaSVG,cleanName,MAX_POINTS,PALETTE,palette,polygonError} from './areas';
 
@@ -364,7 +364,7 @@ document.querySelector('#help-dialog h3')!.insertAdjacentHTML('beforebegin','<h3
 // ---- Ergebniskarte ----
 // „Ergebnisse“ färbt Probenmarker nach Bewertungskategorie (Skalen wie in FotoKit, Farben im Projekt).
 // Einstellungen in der Liste rechts; Export wahlweise als Probenplan oder Ergebniskarte.
-document.querySelector('.panel-scroll')!.insertAdjacentHTML('afterbegin','<section class="results-section" id="results-section" hidden><div class="section-heading"><h2>Ergebniskarte</h2></div><label>Bewerteter Parameter<select id="result-param"></select></label><label>Nutzung / Referenz<select id="result-usage"><option value="">Eigene / FotoKit-Skala</option><option value="residential">VdS 2357 · Wohn-/Büroräume · 10 µg/m²</option><option value="industrial">VdS 2357 · Industrie · 100 µg/m²</option></select></label><div id="result-scales"></div><p class="tiny">Kategorien aufsteigend: Ein Wert gehört zur letzten Kategorie, deren „ab“-Wert er erreicht; Unter BG wird separat markiert, ohne gemessenen Zahlenwert. Mehrdeutige Zahlen (z. B. 1.234) bleiben ohne Bewertung. Die Skalen gelten auch für die Ergebnistabelle in FotoKit. Farben werden im Projekt gespeichert. VdS 2357: Hintergrundreferenzen nur für Σ16 EPA-PAK auf Oberflächen, keine pauschalen Freigabe- oder Sanierungsgrenzwerte. Originalwerte und Einheiten bleiben erhalten.</p></section>');
+document.querySelector('.panel-scroll')!.insertAdjacentHTML('afterbegin','<section class="results-section" id="results-section" hidden><div class="section-heading"><h2>Ergebniskarte</h2></div><label>Bewerteter Parameter<select id="result-param"></select></label><label>Nutzung / Referenz<select id="result-usage"><option value="">Eigene / FotoKit-Skala</option><option value="residential">VdS 2357 · Wohn-/Büroräume · 10 µg/m²</option><option value="industrial">VdS 2357 · Industrie · 100 µg/m²</option></select></label><div id="result-scales"></div><p class="tiny">Kategorien aufsteigend: Ein Wert gehört zur letzten Kategorie, deren „ab“-Wert er erreicht; Unter BG nur bei „unter BG“ oder „&lt;“ mit gültiger Zahl. n.n.: Nicht nachgewiesen. n.b.: Nicht bestimmt / Bedeutung prüfen. Diese Angaben sind keine gemessenen Nullwerte; fehlerhafte „&lt;“-Angaben bleiben ohne Bewertung. Mehrdeutige Zahlen (z. B. 1.234) bleiben ohne Bewertung. Die Skalen gelten auch für die Ergebnistabelle in FotoKit. Farben werden im Projekt gespeichert. VdS 2357: Hintergrundreferenzen nur für Σ16 EPA-PAK auf Oberflächen, keine pauschalen Freigabe- oder Sanierungsgrenzwerte. Originalwerte und Einheiten bleiben erhalten.</p></section>');
 document.querySelector('.canvas-footer')!.insertAdjacentHTML('beforeend','<span id="result-legend" hidden></span>');
 let resultSignature='';
 function renderResults(){
@@ -375,8 +375,8 @@ function renderResults(){
   const legend=$('result-legend');legend.hidden=!showResults;
   if(!p||!showResults){resultSignature='';return;}
   const settings=p.results,list=parameters(p),rated=rateMarkers(p);
-  legend.innerHTML=rated.groups.flatMap(g=>g.scale?g.scale.cats.map(c=>`<span><i style="background:${c.color}"></i>${escape(c.name)}</span>`):[]).join('')+(rated.below.length?`<span><i style="background:${BELOW_LIMIT}"></i>unter BG (kein Messwert)</span>`:'')+(rated.unrated.length?`<span><i style="background:${UNRATED}"></i>ohne Bewertung</span>`:'');
-  const signature=JSON.stringify([settings,list,rated.groups.map(g=>g.cats.map(c=>c.labels)),rated.unrated,rated.below]);if(signature===resultSignature)return;resultSignature=signature;
+  legend.innerHTML=rated.groups.flatMap(g=>g.scale?g.scale.cats.map(c=>`<span><i style="background:${c.color}"></i>${escape(c.name)}</span>`):[]).join('')+qualifierGroups(rated).map(g=>`<span><i style="background:${g.color}"></i>${escape(g.name)}</span>`).join('')+(rated.unrated.length?`<span><i style="background:${UNRATED}"></i>ohne Bewertung</span>`:'');
+  const signature=JSON.stringify([settings,list,rated.groups.map(g=>g.cats.map(c=>c.labels)),rated.unrated,rated.below,rated.notDetected,rated.notDetermined]);if(signature===resultSignature)return;resultSignature=signature;
   const select=input('result-param') as unknown as HTMLSelectElement;select.innerHTML=list.map(x=>`<option value="${escape(x)}">${escape(x)}</option>`).join('');select.value=settings?.parameter||'';
   (input('result-usage') as unknown as HTMLSelectElement).value=settings?.usage||'';
   const parameter=settings?.parameter||'';
@@ -387,7 +387,7 @@ function renderResults(){
     return `<div class="result-scale" data-key="${escape(key)}"><h3>${escape(shortParameter(parameter))} in ${escape(unit||'(ohne Einheit)')}</h3><label class="scale-name">Name der Skala <span class="optional">optional</span><input data-scale-name maxlength="160" value="${escape(scale.name)}" placeholder="z. B. PAK Wischproben, Stand 10/2026"></label>
       <table class="scale-table"><thead><tr><th></th><th>Kategorie</th><th>ab ${escape(unit)}</th><th></th></tr></thead><tbody>${scale.cats.map((c,i)=>`<tr data-cat="${i}"><td><input type="color" data-cat-color value="${c.color}" aria-label="Farbe ${escape(c.name)}"></td><td><input data-cat-name maxlength="60" value="${escape(c.name)}" aria-label="Kategorie ${i+1}"></td><td><input data-cat-from type="number" step="any" min="0" value="${c.from}" ${i===0?'disabled':''} aria-label="ab-Wert Kategorie ${i+1}"></td><td>${i?`<button data-cat-del title="Kategorie entfernen" aria-label="Kategorie entfernen">×</button>`:''}</td></tr><tr class="cat-samples"><td></td><td colspan="3">${escape(rangeText(scale,i,unit))}${group?.cats[i]?.labels.length?` · ${escape(group.cats[i].labels.join(', '))}`:''}</td></tr>`).join('')}</tbody></table>
       <div class="inspector-actions"><button data-cat-add ${scale.cats.length>=12?'disabled':''}>＋ Kategorie</button><button data-scale-auto title="Farben von grün (unterste) bis rot (oberste Kategorie)">Farben automatisch</button><button data-scale-del class="danger">Skala entfernen</button></div></div>`;
-  }).join('')+(rated.below.length?`<p class="tiny">Unter BG (kein Messwert): ${escape(rated.below.join(', '))}</p>`:'')+(rated.unrated.length?`<p class="tiny">Ohne Bewertung (grau): ${escape(rated.unrated.join(', '))}</p>`:'');
+  }).join('')+qualifierGroups(rated).map(g=>`<p class="tiny">${escape(g.name)}: ${escape(g.labels.join(', '))}</p>`).join('')+(rated.unrated.length?`<p class="tiny">Ohne Bewertung (grau): ${escape(rated.unrated.join(', '))}</p>`:'');
 }
 function setScale(key:string,scale:Scale|null){if(!project?.results)return;mutate(p=>{if(scale)p.results!.scales[key]=scale;else delete p.results!.scales[key];});saveShared(key,scale);}
 function currentScale(key:string){return project?.results?.scales[key];}

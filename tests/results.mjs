@@ -54,7 +54,7 @@ for(const engine of ['chromium','webkit']){
    await page.locator('#result-usage').selectOption('residential');
    assert.deepEqual(await fills(page),{P1:'#749bb5',P2:'#e0453a',P3:'#e0453a',P4:'#e0453a',P5:'#c3ccd5'});
    assert.match(await page.locator('#result-scales').textContent(),/Wohn-\/Büroräume/);assert.match(await page.locator('#result-scales').textContent(),/0,1/);
-   assert.match(await page.locator('#result-legend').textContent(),/unter BG/);
+   assert.match(await page.locator('#result-legend').textContent(),/Unter BG/);
    await page.locator('#result-usage').selectOption('industrial');assert.match(await page.locator('#result-scales').textContent(),/Industrie/);
    await page.locator('#undo').click();assert.equal(await page.locator('#result-usage').inputValue(),'residential');
    await page.locator('#redo').click();assert.equal(await page.locator('#result-usage').inputValue(),'industrial');
@@ -79,6 +79,19 @@ for(const engine of ['chromium','webkit']){
    await page.evaluate(()=>localStorage.removeItem('bu-scales'));
    await page.locator('#project-file').setInputFiles({name:'ok.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(file))});await page.locator('#replace-yes').click();await page.locator('#toast:not(.error)').waitFor();
    await page.keyboard.press('k');assert.equal((await fills(page)).P4,'#e0453a');
+  });
+  await check(`${engine}: qualifier legends, malformed limits, original strings and measured zero`,async()=>{
+   const file=await downloadedProject(page),values=['< 0,50','unter BG','n.n.','n.b.','< kaputt'];
+   file.markers.forEach((m,i)=>m.lab.werte=[{p:SUM,r:values[i],u:UNIT}]);file.results.usage='residential';
+   const load=async data=>{await page.locator('#project-file').setInputFiles({name:'qualifiers.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(data))});await page.locator('#replace-yes').click();await page.locator('#toast:not(.error)').waitFor();};
+   await load(file);
+   assert.deepEqual(await fills(page),{P1:'#749bb5',P2:'#749bb5',P3:'#8b83a8',P4:'#9d8975',P5:'#c3ccd5'});
+   const legend=await page.locator('#result-legend').textContent();assert.match(legend,/Unter BG/);assert.match(legend,/Nicht nachgewiesen/);assert.match(legend,/Nicht bestimmt \/ Bedeutung prüfen/);assert.match(legend,/ohne Bewertung/);
+   const text=await page.locator('#result-scales').textContent();assert.match(text,/Unter BG.*P1, P2/);assert.match(text,/Nicht nachgewiesen.*P3/);assert.match(text,/Nicht bestimmt.*P4/);assert.match(text,/Ohne Bewertung.*P5/);
+   assert.deepEqual((await downloadedProject(page)).markers.map(m=>m.lab.werte),file.markers.map(m=>m.lab.werte));
+   await openExport(page);await page.locator('#view').selectOption('results');const download=page.waitForEvent('download');await page.locator('#export').click();assert.match((await download).suggestedFilename(),/Ergebniskarte/);await closeExport(page);
+   file.markers[0].lab.werte[0].r='0';await load(file);assert.equal((await fills(page)).P1,'#4caf50');assert.equal((await fills(page)).P2,'#749bb5');
+   assert.equal((await savedProject(page)).results.usage,'residential');
   });
   assert.deepEqual(errors,[]);
  }finally{await browser.close();}

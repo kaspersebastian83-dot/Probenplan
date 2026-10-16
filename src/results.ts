@@ -16,7 +16,6 @@ export const scaleKey=(parameter:string,unit:string)=>`${parameter}|${unit}`;
  * (1.234 / 1,234) is ambiguous without a declared locale: leave it unrated. */
 export function labNumber(raw:string):number{
  const t=String(raw??'').trim().replace(/−/g,'-');
- if(belowLimit(t))return NaN;
  const match=t.match(/^([+-]?)([\d., \u00a0\u202f]+)([eE][+-]?\d+)?$/);if(!match)return NaN;
  let body=match[2].trim();const exponent=match[3]||'';
  if(/[ \u00a0\u202f]/.test(body)){
@@ -33,8 +32,20 @@ export function labNumber(raw:string):number{
  }
  const v=Number(match[1]+body+exponent);return Number.isFinite(v)?v:NaN;
 }
-export const belowLimit=(raw:string)=>/^\s*</.test(raw||'')||/^\s*\(?\s*(?:n\.\s*[bn]\.|(?:unter|<)\s*(?:BG|LOQ)|<\s*Bestimmungsgrenze)\s*\)?\s*$/i.test(raw||'');
+export type LabQualifier='measured'|'below'|'notDetected'|'notDetermined'|'unrated';
+/** Interpret qualifiers separately; never turn them into a measured number. */
+export function labQualifier(raw:string):LabQualifier{
+ let t=String(raw??'').trim();if(t.startsWith('(')&&t.endsWith(')'))t=t.slice(1,-1).trim();
+ if(/^unter\s+BG$/i.test(t))return 'below';
+ if(/^n\.\s*n\.$/i.test(t))return 'notDetected';
+ if(/^n\.\s*b\.$/i.test(t))return 'notDetermined';
+ if(t.startsWith('<')){const limit=labNumber(t.slice(1));return Number.isFinite(limit)&&limit>=0?'below':'unrated';}
+ return Number.isFinite(labNumber(raw))?'measured':'unrated';
+}
+export const belowLimit=(raw:string)=>labQualifier(raw)==='below';
 export const BELOW_LIMIT='#749bb5';
+export const NOT_DETECTED='#8b83a8';
+export const NOT_DETERMINED='#9d8975';
 /** VdS 2357 background references; only Σ16 EPA-PAK in surface units.
  * Source: LANUV, Bericht Steinhagen 15.02.2023, p. 7 (see README). */
 export function vdsScale(parameter:string,unit:string,usage:ResultSettings['usage']):Scale|undefined{
@@ -72,20 +83,29 @@ export function prepare(p:Project):boolean{
 }
 export function units(p:Project,parameter:string){const seen:string[]=[];for(const w of werte(p))if(w.p===parameter&&!seen.includes(w.u))seen.push(w.u);return seen;}
 
-export interface Rated {fill:Map<string,string>;groups:{key:string;unit:string;scale:Scale|undefined;cats:(Category&{labels:string[]})[]}[];unrated:string[];below:string[];parameter:string}
+export interface Rated {fill:Map<string,string>;groups:{key:string;unit:string;scale:Scale|undefined;cats:(Category&{labels:string[]})[]}[];unrated:string[];below:string[];notDetected:string[];notDetermined:string[];parameter:string}
 /** Farben je Marker und Legende für die Marker des übergebenen (Teil-)Projekts. */
 export function rateMarkers(p:Project,markers:Marker[]=p.markers,settings:ResultSettings|undefined=p.results):Rated{
-  const fill=new Map<string,string>(),unrated:string[]=[],below:string[]=[],parameter=settings?.parameter||'';const groups=new Map<string,Rated['groups'][number]>();
+  const fill=new Map<string,string>(),unrated:string[]=[],below:string[]=[],notDetected:string[]=[],notDetermined:string[]=[],parameter=settings?.parameter||'';const groups=new Map<string,Rated['groups'][number]>();
   for(const m of markers){if(m.kind!=='sample')continue;const w=valueOf(m,parameter);
     if(!w){unrated.push(m.label);fill.set(m.id,UNRATED);continue;}
     const key=scaleKey(parameter,w.u),scale=settings?.usage?vdsScale(parameter,w.u,settings.usage):settings?.scales[key];if(!groups.has(key))groups.set(key,{key,unit:w.u,scale,cats:(scale?.cats||[]).map(c=>({...c,labels:[]}))});
-    if(belowLimit(w.r)){below.push(m.label);fill.set(m.id,BELOW_LIMIT);continue;}
+    const qualifier=labQualifier(w.r);
+    if(qualifier==='below'){below.push(m.label);fill.set(m.id,BELOW_LIMIT);continue;}
+    if(qualifier==='notDetected'){notDetected.push(m.label);fill.set(m.id,NOT_DETECTED);continue;}
+    if(qualifier==='notDetermined'){notDetermined.push(m.label);fill.set(m.id,NOT_DETERMINED);continue;}
     const g=groups.get(key)!,i=rate(scale,labNumber(w.r));if(i<0){unrated.push(m.label);fill.set(m.id,UNRATED);continue;}
     g.cats[i].labels.push(m.label);fill.set(m.id,g.cats[i].color);}
   const order=(a:string,b:string)=>a.localeCompare(b,'de',{numeric:true});
   for(const g of groups.values())g.cats.forEach(c=>c.labels.sort(order));
-  return {fill,groups:[...groups.values()],unrated:unrated.sort(order),below:below.sort(order),parameter};
+  return {fill,groups:[...groups.values()],unrated:unrated.sort(order),below:below.sort(order),notDetected:notDetected.sort(order),notDetermined:notDetermined.sort(order),parameter};
 }
+/** Shared wording for screen and exported legends. None of these are measured zero. */
+export function qualifierGroups(rated:Rated){return [
+ {name:'Unter BG (kein gemessener Nullwert)',color:BELOW_LIMIT,labels:rated.below},
+ {name:'Nicht nachgewiesen (n.n.)',color:NOT_DETECTED,labels:rated.notDetected},
+ {name:'Nicht bestimmt / Bedeutung prüfen (n.b.)',color:NOT_DETERMINED,labels:rated.notDetermined}
+].filter(g=>g.labels.length);}
 export function rangeText(scale:Scale,i:number,unit:string){const c=scale.cats[i],next=scale.cats[i+1],n=(v:number)=>v.toLocaleString('de-DE');return next?(i===0?`< ${n(next.from)} ${unit}`:`${n(c.from)} – < ${n(next.from)} ${unit}`):(i===0?`alle Werte`:`≥ ${n(c.from)} ${unit}`);}
 /** Gut lesbare Schriftfarbe auf einer Füllfarbe. */
 export function ink(color:string){const n=parseInt(color.slice(1),16),r=n>>16,g=n>>8&255,b=n&255;return (r*299+g*587+b*114)/1000>150?'#1d2a33':'#ffffff';}

@@ -3,7 +3,7 @@
 ## 1.8.1 – 16. Oktober 2026
 
 - Sichere Zahleninterpretation für deutsche/internationale Formate; mehrdeutige und ungültige Angaben bleiben ohne Bewertung. Originalwerte und Einheiten bleiben erhalten.
-- Unter BG separat in Karte und Export, ohne gemessenen Nullwert.
+- Qualifikatoren separat in Karte und Export: Unter BG nur für „unter BG“ oder `<` mit gültiger Zahl; n.n. = Nicht nachgewiesen, n.b. = Nicht bestimmt / Bedeutung prüfen. Fehlerhafte `<`-Angaben bleiben ohne Bewertung; kein Qualifikator wird als gemessene Null behandelt.
 - Explizite VdS-2357-Nutzung: Wohn-/Büroräume 10 µg/m² oder Industrie 100 µg/m² für Σ16 EPA-PAK auf Oberflächen, mit passender Einheit und Referenz in der Legende. Eigene und FotoKit-Skalen bleiben erhalten.
 - XML/PDF-Abgleich prüft Labor-IDs, Probenahmedaten und Probenarten. Synthetische Regressionstests für Parsing, BG, Referenzgrenzen, Projektroundtrip und FotoKit-Kompatibilität.
 
