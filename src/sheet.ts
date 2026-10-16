@@ -4,7 +4,8 @@ import {floorName,metersPerUnit,northAngle,type Project} from './model';
 import {contentBounds,drawLegend,drawPlanContent,legendLayout,wrap} from './export';
 import {loadImage} from './import';
 import type {Rated} from './results';
-import logoUrl from './assets/firmenlogo.png';
+// Als data:-URL eingebettet: das Blatt lädt beim Export nichts nach (offline sicher, unabhängig vom Service Worker).
+import logoUrl from './assets/firmenlogo.png?inline';
 
 export const COMPANY={name:'Dr. Schiffers & Partner',address:'Gouleystr. 59 · 52146 Würselen'};
 export type Paper='a4'|'a3';
@@ -107,7 +108,7 @@ export async function renderSheet(p:Project,layout:SheetLayout,rated:Rated|null|
     }else{text('Ohne Maßstab',x,cy-1,fs*1.05,{bold:true});text('Plan nicht kalibriert – Strecke messen in der Liste',x,cy+3,fs*.8,{color:muted,max:room});}
   }
   // Schriftfeld.
-  {const T=L.title,logo=await loadImage(logoUrl),lh=11,lw=lh*logo.naturalWidth/logo.naturalHeight;
+  {const T=L.title,logo=await loadImage(logoUrl,'Firmenlogo'),lh=11,lw=lh*logo.naturalWidth/logo.naturalHeight;
     ctx.drawImage(logo,(T.x+PAD)*k,(T.y+2)*k,lw*k,lh*k);
     const tx=T.x+PAD+lw+3,tmax=T.x+T.w-PAD-tx;text(COMPANY.name,tx,T.y+7,3.4,{bold:true,max:tmax});text(COMPANY.address,tx,T.y+11.4,2.3,{color:muted,max:tmax});
     line(.25);let y=T.y+15;ctx.beginPath();ctx.moveTo(T.x*k,y*k);ctx.lineTo((T.x+T.w)*k,y*k);ctx.stroke();

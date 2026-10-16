@@ -34,7 +34,8 @@ export function sanitizeSVG(source:string):{data:string;width:number;height:numb
   svg.setAttribute('width',String(width));svg.setAttribute('height',String(height));svg.setAttribute('xmlns','http://www.w3.org/2000/svg');
   return {data:`data:image/svg+xml;base64,${btoa(new TextEncoder().encode(new XMLSerializer().serializeToString(svg)).reduce((s,b)=>s+String.fromCharCode(b),''))}`,width,height};
 }
-export function loadImage(src:string):Promise<HTMLImageElement>{return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(Error('Das Planbild konnte nicht geladen werden.'));img.src=src;});}
+/** Bild laden; bleibt der Browser die Antwort schuldig, wird nach 60 s ein Fehler gemeldet statt still zu warten. */
+export function loadImage(src:string,what='Das Planbild'):Promise<HTMLImageElement>{return new Promise((resolve,reject)=>{const img=new Image(),timer=setTimeout(()=>reject(Error(`${what} konnte nicht geladen werden (Zeitüberschreitung).`)),60_000);img.onload=()=>{clearTimeout(timer);resolve(img);};img.onerror=()=>{clearTimeout(timer);reject(Error(`${what} konnte nicht geladen werden.`));};img.src=src;});}
 function checkRasterSize(bytes:Uint8Array){
   let width=0,height=0;
   if(bytes.length>=24&&bytes[0]===137&&bytes[1]===80&&bytes[2]===78&&bytes[3]===71){const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);width=view.getUint32(16);height=view.getUint32(20);}

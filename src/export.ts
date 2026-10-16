@@ -39,12 +39,12 @@ export function contentBounds(p:Project){
 export async function drawPlanContent(ctx:CanvasRenderingContext2D,p:Project,b:{x:number;y:number;width:number;height:number},x0:number,y0:number,k:number,rated?:Rated|null){
   ctx.save();ctx.translate(x0,y0);ctx.scale(k,k);ctx.translate(-b.x,-b.y);
   ctx.beginPath();ctx.rect(0,0,p.plan.width,p.plan.height);ctx.clip();ctx.transform(...planMatrix(p.plan));
-  const source=preparation(p.plan),base=await loadImage(p.plan.data);ctx.drawImage(base,0,0,source.sourceWidth,source.sourceHeight);
+  const source=preparation(p.plan),base=await loadImage(p.plan.data,'Der Grundriss');ctx.drawImage(base,0,0,source.sourceWidth,source.sourceHeight);
   ctx.restore();
   const w=b.width*k,h=b.height*k;
   const overlay=`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(w)}" height="${Math.ceil(h)}" viewBox="${b.x} ${b.y} ${b.width} ${b.height}">${areaSVG(p.areas||[],p.plan)}${p.markers.map(m=>markerSVG(p,m,false,0,rated?.fill.get(m.id))).join('')}</svg>`;
   const url=URL.createObjectURL(new Blob([overlay],{type:'image/svg+xml'}));
-  try{ctx.drawImage(await loadImage(url),x0,y0,w,h);}finally{URL.revokeObjectURL(url);}
+  try{ctx.drawImage(await loadImage(url,'Die Markierungsebene'),x0,y0,w,h);}finally{URL.revokeObjectURL(url);}
 }
 export type LegendLayout=NonNullable<ReturnType<typeof legendLayout>>;
 /** Legendenblöcke (Flächen/Ergebnisse) ab (x,y) zeichnen; Maße wie bei legendLayout. */

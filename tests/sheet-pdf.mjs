@@ -32,7 +32,7 @@ let dumped=0;
 // Bleibt der Download aus, nennt der Fehler, was die App angezeigt hat (Meldung, Schaltfläche, Browserfehler).
 async function pdfExport(page){
  const started=Date.now(),pending=page.waitForEvent('download',{timeout:120000}).catch(e=>e);await page.locator('#export').click();const dl=await pending;
- if(dl instanceof Error){const state=await page.evaluate(()=>({toast:document.getElementById('toast')?.textContent,toastError:document.getElementById('toast')?.className,button:document.getElementById('export')?.textContent,result:!document.getElementById('export-result')?.hidden})).catch(e=>({evaluate:String(e)}));throw Error(`Kein PDF-Download nach ${Math.round((Date.now()-started)/1000)} s: ${JSON.stringify(state)} · Konsole: ${JSON.stringify(page.__log||[])}`);}
+ if(dl instanceof Error){const state=await page.evaluate(()=>({toast:document.getElementById('toast')?.textContent,toastError:document.getElementById('toast')?.className,button:document.getElementById('export')?.textContent,disabled:document.getElementById('export')?.disabled,ua:navigator.userAgent.slice(-40),result:!document.getElementById('export-result')?.hidden})).catch(e=>({evaluate:String(e)}));throw Error(`Kein PDF-Download nach ${Math.round((Date.now()-started)/1000)} s: ${JSON.stringify(state)} · Konsole: ${JSON.stringify(page.__log||[])}`);}
  if(Date.now()-started>25000)console.log(`Hinweis: PDF-Export dauerte ${Math.round((Date.now()-started)/1000)} s`);if(process.env.PDF_DUMP)await dl.saveAs(`${process.env.PDF_DUMP}/${++dumped}-${dl.suggestedFilename()}`);return {name:dl.suggestedFilename(),pages:readPdf(await readFile(await dl.path()))};}
 
 for(const engine of ['chromium','webkit']){
