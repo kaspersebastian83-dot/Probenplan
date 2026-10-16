@@ -1,4 +1,4 @@
-import {chromium,webkit,savedProject,downloadedProject} from './runtime.mjs';
+import {chromium,webkit,savedProject,downloadedProject,openExport,closeExport} from './runtime.mjs';
 import {labRows,labXML,labPDF} from './lab-fixtures.mjs';
 import assert from 'node:assert/strict';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
@@ -62,7 +62,7 @@ for(const engine of ['chromium','webkit']){
    try{
     const page=await context.newPage();await page.goto(base);const empty=await plan(page);
     const files=[file('noop.xml',labXML(labRows.slice(0,2)))];await review(page,files);const imported=await accept(page);
-    await page.locator('#report').fill('Synthetischer Redo-Schritt');await page.locator('#report').press('Tab');const edited=await savedProject(page);
+    await openExport(page);await page.locator('#report').fill('Synthetischer Redo-Schritt');await page.locator('#report').press('Tab');await closeExport(page);const edited=await savedProject(page);
     await page.locator('#undo').click();assert.deepEqual(await savedProject(page),imported);
     const skipAll=async()=>{
      const before=await savedProject(page),buttons={undo:await page.locator('#undo').isEnabled(),redo:await page.locator('#redo').isEnabled()};

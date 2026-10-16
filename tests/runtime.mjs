@@ -7,13 +7,20 @@ const suite=process.env.TEST_SUITE||'standalone',out=resolve('.test-output/diagn
 let sequence=0;
 function instrument(type){return new Proxy(type,{get(target,key){if(key!=='launch')return typeof target[key]==='function'?target[key].bind(target):target[key];return async options=>{
  const browser=await target.launch(options),newContext=browser.newContext.bind(browser),contexts=new Map();
- browser.newContext=async options=>{const context=await newContext(options),id=++sequence,logs=[];await context.tracing.start({screenshots:true,snapshots:true,sources:true});
+ browser.newContext=async options=>{const context=await newContext(options),id=++sequence,logs=[];
+  // Die Liste rechts ist standardmäßig eingeklappt. Die Funktionssuites arbeiten mit geöffneter Liste;
+  // layout.mjs prüft den Standard (Aufruf mit ?layout-default).
+  await context.addInitScript(()=>{try{if(!location.search.includes('layout-default')&&localStorage.getItem('plankit:panel')===null)localStorage.setItem('plankit:panel','open');}catch{}});await context.tracing.start({screenshots:true,snapshots:true,sources:true});
   context.on('page',page=>{page.on('pageerror',e=>logs.push({type:'pageerror',message:e.stack||e.message}));page.on('console',m=>{if(m.type()==='error')logs.push({type:'console',message:m.text()});});});
   let captured=false;const capture=async()=>{if(captured)return;captured=true;await mkdir(out,{recursive:true});for(const [i,page] of context.pages().entries()){await page.screenshot({path:resolve(out,`${type.name()}-${id}-page-${i}.png`),fullPage:true,timeout:5000}).catch(()=>{});}await context.tracing.stop({path:resolve(out,`${type.name()}-${id}-trace.zip`)}).catch(()=>{});await writeFile(resolve(out,`${type.name()}-${id}-console.json`),JSON.stringify(logs,null,2));};contexts.set(context,capture);
   const close=context.close.bind(context);context.close=async()=>{await capture();contexts.delete(context);await close();};return context;};
  const close=browser.close.bind(browser);browser.close=async()=>{await Promise.allSettled([...contexts.values()].map(capture=>capture()));await close();};return browser;
  };}});}
 export const chromium=instrument(chromiumType),webkit=instrument(webkitType);
+
+// Export ist eine schwebende Karte, die über „Exportieren …“ geöffnet wird.
+export async function openExport(page){if(!await page.locator('#export-dialog').evaluate(d=>d.open))await page.locator('#export-open').click();await page.locator('#export').waitFor();}
+export async function closeExport(page){if(await page.locator('#export-dialog').evaluate(d=>d.open))await page.locator('#export-dialog .close').click();}
 
 // Observe durable state for repeated assertions; project downloads are tested separately.
 export async function savedProject(page){

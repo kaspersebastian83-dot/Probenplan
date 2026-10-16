@@ -40,7 +40,7 @@ export class LabUI {
  }
  private apply(){
   if(this.confirm.disabled||this.hooks.blocked())return;
-  try{const project=this.hooks.project()!,next=applyLabImport(project,this.report,this.choices);if(next!==project)this.hooks.mutate(p=>Object.assign(p,next));this.selected=null;this.review.close();this.hooks.mode('navigate');this.render(this.hooks.project());}catch(e){this.hooks.error(e);}
+  try{const project=this.hooks.project()!,next=applyLabImport(project,this.report,this.choices);if(next!==project)this.hooks.mutate(p=>Object.assign(p,next));this.selected=null;this.review.close();this.hooks.mode('navigate');this.render(this.hooks.project());if(this.hooks.project()?.pending?.length)document.dispatchEvent(new CustomEvent('plankit:reveal',{detail:'lab-panel'}));}catch(e){this.hooks.error(e);}
  }
  placeAt(pt:Point){const p=this.hooks.project(),label=this.selected;if(!p||label===null||this.hooks.blocked())return;if(pt.x<0||pt.y<0||pt.x>p.plan.width||pt.y>p.plan.height){this.hooks.error(Error('Bitte innerhalb des Grundrisses platzieren.'));return;}const index=p.pending?.findIndex(r=>r.label===label)??-1,row=p.pending?.[index];if(!row)return;this.hooks.mutate(project=>{project.pending!.splice(index,1);const nextNumber=project.nextSample,m=addMarker(project,'sample',pt.x,pt.y);project.nextSample=nextNumber;m.label=row.label;m.note=row.desc;m.lab=copyLab(row);project.version=4;this.hooks.selected(m.id);});this.selected=null;this.hooks.mode('navigate');this.render(this.hooks.project());}
  reset(){this.selected=null;this.cancelDrag();}

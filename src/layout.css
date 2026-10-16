@@ -1,0 +1,124 @@
+/* PlanKit-Layout „Karte zuerst“ (1.5): eine schlanke Kopfzeile, Werkzeugleiste links, der Plan füllt den Rest.
+   Die Liste rechts ist einklappbar (L), der Export eine schwebende Karte. Nur für den PC optimiert. */
+html,body{height:100%}
+body{height:100dvh;overflow:hidden}
+#app{height:100%;display:flex;flex-direction:column}
+
+/* Kopfzeile */
+.topbar{height:48px;flex:0 0 auto;gap:8px;padding:0 12px;min-width:0}
+.topbar .brand{font-size:15px;flex:0 0 auto}
+.tb-group,.topbar .history{display:flex;gap:4px;align-items:center;flex:0 0 auto}
+.topbar .tb{min-height:30px;height:30px;padding:0 10px;font-size:12px;font-weight:600;border-radius:6px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);color:#fff;white-space:nowrap}
+.topbar .tb:hover:not(:disabled){background:rgba(255,255,255,.26);border-color:rgba(255,255,255,.5);color:#fff}
+.topbar .tb:disabled{opacity:.45}
+.topbar .history .tb{width:32px;padding:0;font-size:17px}
+.topbar .export-btn{background:#fff;color:var(--kit-accent);border-color:#fff}
+.topbar .export-btn:hover:not(:disabled){background:#eef4fb;color:var(--kit-accent-2)}
+#panel-toggle[aria-pressed=true]{background:rgba(255,255,255,.3)}
+#lab-import{min-height:30px;height:30px;padding:0 10px;font-size:12px;border-radius:6px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);color:#fff;white-space:nowrap;width:auto;margin:0}
+#lab-import:hover:not(:disabled){background:rgba(255,255,255,.26);color:#fff}
+.tb-doc{display:flex;align-items:center;gap:8px;min-width:0;flex:0 1 auto;color:#fff;margin-left:6px;padding-left:12px;border-left:1px solid rgba(255,255,255,.25)}
+#canvas-name{font:12px var(--kit-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;max-width:280px}
+.tb-doc .tag{background:rgba(255,255,255,.18);color:#fff;font-size:9px;flex:0 0 auto}
+.tb-spacer{flex:1 1 0;min-width:4px}
+#saved{font-size:11px;color:rgba(255,255,255,.8);white-space:nowrap}
+.topbar .status{flex:0 0 auto}
+#saved{max-width:170px;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:1500px){#saved{max-width:110px}}
+@media(max-width:1366px){#canvas-name{max-width:150px}.topbar .status{max-width:135px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}}
+
+/* Arbeitsbereich */
+.kit-workspace{flex:1;display:flex;min-height:0}
+.rail{width:66px;flex:0 0 auto;background:#fff;border-right:1px solid var(--kit-line);display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;overflow-y:auto}
+.rail .modes{display:flex;flex-direction:column;gap:4px;margin:0}
+.rail .mode{width:56px;min-height:52px;height:auto;padding:5px 2px;flex-direction:column;justify-content:center;align-items:center;gap:3px;text-align:center;font-size:10px;line-height:1.15;border:1px solid transparent;border-radius:8px;background:transparent}
+.rail .mode span small{display:none}
+.rail .mode .tool-icon{width:26px;height:26px;font-size:18px;margin:0}
+.rail .mode .sample-icon{width:22px;height:22px;font-size:12px}
+.rail .mode .fire-icon{font-size:24px}
+.rail .mode.active{background:var(--kit-focus);border-color:var(--kit-accent);color:var(--kit-accent-2)}
+.rail .mode:hover:not(:disabled){background:var(--kit-panel2);border-color:var(--kit-line2)}
+#preparation{border-top:1px solid var(--kit-line);margin-top:6px;padding-top:6px;display:flex;flex-direction:column;align-items:center}
+#preparation>.eyebrow,#preparation>.tiny{display:none}
+#preparation .preparation-buttons{display:flex;flex-direction:column;gap:4px;margin:0}
+#preparation .preparation-buttons button{font-size:10px;min-height:52px}
+.kit-canvas{flex:1;min-width:0;display:flex;background:var(--kit-bg)}
+#stage{flex:1;height:auto;min-height:0;max-height:none;border:0;border-radius:0;box-shadow:none}
+#welcome h2{font-size:30px}
+
+/* Schwebende Elemente auf der Karte */
+#toolbar{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--kit-line2);border-radius:8px;box-shadow:0 2px 8px rgba(40,72,116,.12);padding:4px 6px 4px 12px;max-width:calc(100% - 24px);z-index:2}
+#welcome:not([hidden])~#toolbar{display:none}
+#toolbar #mode-hint{position:static;transform:none;border:0;background:none;padding:0;font-size:11px;color:var(--kit-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#toolbar #mode-hint[hidden]~#next-field{display:none!important}
+#next-field{margin:0!important;gap:6px;font-size:11px!important;font-weight:600;color:var(--kit-text);white-space:nowrap;border-left:1px solid var(--kit-line);padding-left:10px}
+#stage[data-mode^=area] #next-field,#stage[data-mode=crop] #next-field,#stage[data-mode=fire] #next-field{display:none!important}
+#next-field input{width:72px;min-height:28px;height:28px;padding:2px 6px;margin:0;font-family:var(--kit-mono)}
+#toolbar #area-draft{margin:0;padding:0 0 0 10px;border:0;border-left:1px solid var(--kit-line);border-radius:0;background:none;display:flex;align-items:center;gap:8px;white-space:nowrap}
+#toolbar #area-draft[hidden]{display:none!important}
+#toolbar #area-draft label{margin:0;display:flex;align-items:center;gap:6px;font-size:11px}
+#toolbar #area-draft select{width:170px;min-height:28px;height:28px;padding:2px 6px;margin:0;font-size:11px}
+#toolbar #area-draft input[type=range]{width:80px;margin:0;min-height:0}
+#toolbar #area-draft output{float:none}
+#toolbar #area-draft #draft-status{margin:0;font-size:10px}
+#toolbar #area-draft .inspector-actions{margin:0;flex-wrap:nowrap}
+#toolbar #area-draft .inspector-actions button{min-height:28px;height:28px;padding:0 8px;font-size:10px;flex:0 0 auto}
+#crop-actions{position:absolute;top:56px;left:50%;transform:translateX(-50%);margin:0;z-index:3;background:#fff;border:1px solid var(--kit-line2);box-shadow:0 2px 8px rgba(40,72,116,.15);display:flex;flex-wrap:wrap;gap:6px;align-items:center;max-width:520px}
+#crop-actions[hidden]{display:none!important}
+#crop-actions p{width:100%;margin:0 0 4px}
+#crop-actions button{width:auto;margin:0;flex:1}
+#import-status{position:absolute;top:56px;left:50%;transform:translateX(-50%);margin:0;z-index:3;box-shadow:0 2px 8px rgba(40,72,116,.15)}
+.zoom-controls{left:auto;right:12px;transform:none;bottom:12px}
+.canvas-footer{position:absolute;left:12px;bottom:12px;padding:6px 10px;background:#ffffffe8;border:1px solid var(--kit-line);border-radius:8px;font-size:10px;z-index:1}
+.canvas-footer #source-info{margin-left:6px;padding-left:10px;border-left:1px solid var(--kit-line)}
+
+/* Liste rechts – standardmäßig eingeklappt */
+.kit-panel{display:none;width:300px;flex:0 0 auto;background:#fff;border-left:1px solid var(--kit-line);flex-direction:column;min-height:0}
+body.panel-open .kit-panel{display:flex}
+.panel-head{display:flex;align-items:center;justify-content:space-between;padding:6px 8px 6px 16px;border-bottom:1px solid var(--kit-line);flex:0 0 auto}
+.panel-head .tb{min-height:28px;height:28px;width:32px;padding:0;font-size:16px}
+.panel-scroll{overflow-y:auto;flex:1;min-height:0}
+.panel-scroll>section{padding:14px 16px;border-bottom:1px solid var(--kit-line)}
+.panel-scroll h2{font-size:14px;margin:0}
+.panel-scroll .section-heading{margin-bottom:4px}
+#marker-list{max-height:none}
+.lab-section h3{font-size:12px;margin-top:12px}
+.lab-section>button{font-size:11px}
+#pending-list{max-height:none}
+#area-list{max-height:none}
+
+/* Export als schwebende Karte unter der Kopfzeile */
+dialog.export-card{position:fixed;inset:56px 12px auto auto;margin:0;width:320px;max-width:calc(100vw - 24px);max-height:calc(100dvh - 70px);overflow:auto;padding:18px 20px;z-index:10}
+dialog.export-card h2{font-size:16px;margin:6px 0 4px}
+dialog.export-card .muted{font-size:12px;margin:0}
+dialog.export-card label{margin-top:12px}
+dialog.export-card .export-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+dialog.export-card .export-dim{margin:14px 0}
+dialog.export-card #export{min-height:44px}
+
+/* Schmalere Fenster (z. B. halbe Bildschirmbreite, Tablet): Kopfzeile bricht um, nichts wird abgeschnitten. */
+@media(max-width:1279px){
+  .topbar{height:auto;min-height:48px;flex-wrap:wrap;row-gap:6px;padding:8px 10px}
+  .tb-doc{border-left:0;padding-left:0;margin-left:0}
+  #canvas-name{max-width:180px}
+}
+/* Telefon (nur Notbetrieb, ausgelegt ist PlanKit für den PC): Werkzeuge oben als Zeile,
+   Plan mit fester Höhe, Liste darunter – die Seite scrollt, nichts verdeckt den Plan. */
+@media(max-width:700px){
+  body{height:auto;overflow:auto}
+  #app{height:auto}
+  .kit-workspace{flex-direction:column;flex:0 0 auto}
+  .rail{width:100%;flex-direction:row;flex-wrap:wrap;justify-content:center;border-right:0;border-bottom:1px solid var(--kit-line);padding:6px;overflow:visible}
+  .rail .modes{flex-direction:row;flex-wrap:wrap;justify-content:center}
+  #preparation{flex-direction:row;border-top:0;border-left:1px solid var(--kit-line);margin:0 0 0 4px;padding:0 0 0 4px}
+  #preparation .preparation-buttons{flex-direction:row}
+  .kit-canvas{height:62dvh;min-height:400px;flex:0 0 auto}
+  .kit-panel{width:100%;border-left:0;border-top:1px solid var(--kit-line)}
+  .panel-scroll{overflow:visible}
+  #toolbar #mode-hint{max-width:46vw}
+  /* Kopfzeile einzeilig und waagerecht scrollbar: feste Höhe, damit der Plan beim Speichern nicht springt */
+  .topbar{height:48px;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;padding:0 10px;scrollbar-width:none}
+  .topbar>*{flex-shrink:0}
+  .tb-spacer{display:none}
+}
+@media(min-width:701px) and (max-width:1000px){.kit-panel{width:260px}}

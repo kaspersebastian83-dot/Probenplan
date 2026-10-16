@@ -1,4 +1,4 @@
-import {chromium,webkit,devices,savedProject,downloadedProject} from './runtime.mjs';
+import {chromium,webkit,devices,savedProject,downloadedProject,openExport,closeExport} from './runtime.mjs';
 import assert from 'node:assert/strict';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -34,7 +34,7 @@ async function tap(page,p,touch=false){const q=await coord(page,p);if(touch)awai
 async function draw(page,pts,name='Brandbereich',color=PALETTE[0].color,touch=false){await page.locator('[data-mode="area-draw"]').click();await page.locator('#draft-color').selectOption(color);for(const p of pts)await tap(page,p,touch);await page.locator('#area-finish').click();await page.locator('#new-area-name').fill(name);await page.locator('#area-dialog-save').click();await page.locator('#area-dialog').waitFor({state:'hidden'});}
 async function change(page,id,value){await page.locator(`#${id}`).fill(value);await page.locator(`#${id}`).dispatchEvent('change');}
 async function replace(page,p){await page.locator('#project-file').setInputFiles({name:'test.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))});await page.locator('#replace-yes').click();await page.locator('#replace-dialog').waitFor({state:'hidden'});await page.locator('#import-status').waitFor({state:'hidden'});}
-async function exportFile(page,name,format='png',quality=3500){await page.locator('#format').selectOption(format);await page.locator('#quality').selectOption(String(quality));const d=page.waitForEvent('download');await page.locator('#export').click();const path=resolve(out,name);await (await d).saveAs(path);return path;}
+async function exportFile(page,name,format='png',quality=3500){await openExport(page);await page.locator('#format').selectOption(format);await page.locator('#quality').selectOption(String(quality));const d=page.waitForEvent('download');await page.locator('#export').click();const path=resolve(out,name);await (await d).saveAs(path);await closeExport(page);return path;}
 async function drag(page,a,b){a=await coord(page,a);b=await coord(page,b);await page.mouse.move(a.x,a.y);await page.mouse.down();await page.mouse.move(b.x,b.y,{steps:10});await page.mouse.up();}
 for(const engine of (process.env.AREA_ENGINE?[process.env.AREA_ENGINE]:['chromium','webkit'])){
  const browser=await (engine==='webkit'?webkit.launch():chromium.launch());
@@ -76,7 +76,7 @@ for(const engine of (process.env.AREA_ENGINE?[process.env.AREA_ENGINE]:['chromiu
  });
  await check(`${engine}: Alte Schema-1/2-Projekte und ungültige Schema-3-Dateien`,async()=>{
   const before=await state(page);for(const modify of [p=>p.areas[0].points[0].x=-1,p=>p.areas[0].opacity=2,p=>p.areas[0].color='red',p=>p.areas[0].name='',p=>p.nextArea=-1,p=>p.areas.push(clone(p.areas[0])),p=>p.areas[0].points=[{x:1,y:1},{x:2,y:2},{x:3,y:3}]]){const p=clone(before);modify(p);await page.locator('#project-file').setInputFiles({name:'bad.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))});await page.locator('#import-status').waitFor({state:'hidden'});assert.deepEqual(await state(page),before);}
-  const excessive=clone(before);for(let i=0;i<65;i++)addArea(excessive,square,PALETTE[i%6].color,.3,`Kategorie ${i} mit einer sehr ausführlichen unterscheidbaren Beschreibung zur Dokumentation`);await replace(page,excessive);await page.locator('#export').click();await page.locator('#toast').filter({hasText:'DIN A4 zu klein'}).waitFor();await replace(page,before);
+  const excessive=clone(before);for(let i=0;i<65;i++)addArea(excessive,square,PALETTE[i%6].color,.3,`Kategorie ${i} mit einer sehr ausführlichen unterscheidbaren Beschreibung zur Dokumentation`);await replace(page,excessive);await openExport(page);await page.locator('#export').click();await page.locator('#toast').filter({hasText:'DIN A4 zu klein'}).waitFor();await closeExport(page);await replace(page,before);
   const v2=clone(before);delete v2.areas;delete v2.nextArea;v2.version=2;await replace(page,v2);assert.deepEqual(await state(page),v2);const v1=clone(v2);delete v1.plan.pdf;delete v1.plan.preparation;v1.version=1;await replace(page,v1);assert.deepEqual(await state(page),v1);
  });assert.deepEqual(errors,[]);assert.deepEqual(external,[]);await context.close();
  }finally{await browser.close();}
