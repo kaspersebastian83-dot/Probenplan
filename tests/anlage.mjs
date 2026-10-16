@@ -100,7 +100,7 @@ try{
   const dims=media.filter(n=>n.endsWith('.jpeg')).map(n=>{const b=files[n];let i=2;while(i<b.length){const m=b[i+1],len=b.readUInt16BE(i+2);if(m===0xC0||m===0xC2)return [b.readUInt16BE(i+7),b.readUInt16BE(i+5)];i+=2+len;}return null;});
   assert.ok(dims.some(d=>d&&d[1]>d[0]),'mindestens ein Foto hochkant (FotoKit-Drehung angewendet)');
   const log=await fs(page,'text',[NAME,'Mitteilungen'],'_Anlagen-Protokoll.txt'),docSha=await fs(page,'sha',[NAME,'Mitteilungen'],docName);
-  assert.ok(log.includes(`| ${docName} | ${docSha} | Pläne/Probenplan ${NAME}.probenplan | ${planSha} | PlanKit 1.11.0`),'Protokollzeile');
+  assert.ok(log.includes(`| ${docName} | ${docSha} | Pläne/Probenplan ${NAME}.probenplan | ${planSha} | PlanKit 1.12.0`),'Protokollzeile');
  });
  await check('Zweites Erstellen überschreibt nichts',async()=>{
   await page.locator('#export').click();await page.locator('#toast',{hasText:'_2.docx'}).waitFor({timeout:90000});
@@ -120,6 +120,11 @@ try{
   assert.match(t,/1\. Lageplan der Probenahmestellen – EG \(1\/2\)/);assert.match(t,/1\. Lageplan der Probenahmestellen – 1\. OG \(2\/2\)/);
   assert.match(t,/Probe\nGeschoss\nProbenahmestelle/);assert.match(t,/P5\n1\. OG/);assert.match(t,/P1\nEG/);assert.match(t,/P4\nnicht im Plan/);
   assert.match(t,/Probenblatt P5\n[\s\S]*?Lage im Plan \(1\. OG\)/);
+ });
+ await check('Aus der Projektzentrale (?aktion=anlage) ist der Export mit der Anlage gleich offen',async()=>{
+  await page.locator('#saved',{hasText:/gespeichert/}).waitFor();await page.waitForTimeout(1500);
+  await page.goto(`${base}/?projekt=${encodeURIComponent(NAME)}&aktion=anlage`);await page.locator('button',{hasText:'Datei verwenden'}).click({timeout:4000}).catch(()=>{});
+  await page.locator('#export-dialog[open]').waitFor();assert.equal(await page.locator('#format').inputValue(),'anlage');assert.ok(await page.locator('#annex-fields').isVisible());
  });
  assert.deepEqual(errors,[]);
 }finally{await browser.close();}

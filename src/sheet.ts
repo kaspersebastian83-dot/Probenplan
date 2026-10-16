@@ -8,10 +8,11 @@ import type {Rated} from './results';
 import logoUrl from './assets/firmenlogo.png?inline';
 
 export const COMPANY={name:'Dr. Schiffers & Partner',address:'Gouleystr. 59 · 52146 Würselen'};
-export type Paper='a4'|'a3'|'anlage';
+export type Paper='a4'|'a3'|'anlage'|'bild';
 /** „anlage“: Planseite für die Word-Anlage – passt hochkant in den Textbereich des Berichts (A4, 25 mm Ränder,
  *  Briefkopf oben), ohne eigenen Heftrand. Das Bild wird in Word in genau dieser Größe eingesetzt, der Maßstab bleibt. */
-export const PAPERS:Record<Paper,{long:number;short:number;label:string}>={a4:{long:297,short:210,label:'A4'},a3:{long:420,short:297,label:'A3'},anlage:{long:192,short:159,label:'Anlage'}};
+export const PAPERS:Record<Paper,{long:number;short:number;label:string}>={a4:{long:297,short:210,label:'A4'},a3:{long:420,short:297,label:'A3'},anlage:{long:192,short:159,label:'Anlage'},bild:{long:297,short:210,label:'Bild'}};
+/** „bild“: PNG/JPG fürs Gutachten im Seitenverhältnis A4, ohne Heftrand – mit Schriftfeld, Firmenlogo, Legende und Maßstabsleiste wie das PDF. */
 /** Genormte Maßstäbe 1:N, aufsteigend. */
 export const SCALES=[10,20,25,50,100,200,250,500,1000,2000,2500,5000];
 const MARGIN={left:20,top:10,right:10,bottom:10},NO_MARGIN={left:.3,top:.3,right:.3,bottom:.3},PAD=3,TITLE_H=46,NS_H=24;
@@ -38,7 +39,7 @@ export function sheetLayout(p:Project,paper:Paper,rated?:Rated|null):SheetLayout
   const b=contentBounds(p),mpu=metersPerUnit(p.plan),fs=font(paper),tw=title(paper).width;
   const candidates:SheetLayout[]=[];
   // Reihenfolge = Vorrang bei gleichem Maßstab: quer mit Seitenleiste, hoch mit Fußleiste.
-  const M=paper==='anlage'?NO_MARGIN:MARGIN;
+  const M=paper==='anlage'||paper==='bild'?NO_MARGIN:MARGIN;
   for(const landscape of (paper==='anlage'?[false]:[true,false]))for(const style of (landscape?['side','band']:['band','side']) as ('side'|'band')[]){
     const width=landscape?PAPERS[paper].long:PAPERS[paper].short,height=landscape?PAPERS[paper].short:PAPERS[paper].long;
     const frame={x:M.left,y:M.top,w:width-M.left-M.right,h:height-M.top-M.bottom};
@@ -59,7 +60,7 @@ export function sheetLayout(p:Project,paper:Paper,rated?:Rated|null):SheetLayout
     else mm=Math.min(iw/b.width,ih/b.height);
     candidates.push({paper,landscape,width,height,style,frame,plan,legend,ns,title:titleBox,ratio,mmPerUnit:mm,bounds:b});
   }
-  if(!candidates.length)throw Error(paper==='anlage'?'Die Legende passt nicht auf die Planseite der Anlage. Bitte Bezeichnungen kürzen bzw. Kategorien zusammenfassen.':`Die Legende passt nicht auf ${PAPERS[paper].label}. Bitte ${paper==='a4'?'A3 wählen oder ':''}Bezeichnungen kürzen bzw. Kategorien zusammenfassen.`);
+  if(!candidates.length)throw Error(paper==='bild'?'Die Legende passt nicht neben das Schriftfeld. Bitte Bezeichnungen kürzen, Kategorien zusammenfassen oder „Mit Schriftfeld“ abwählen.':paper==='anlage'?'Die Legende passt nicht auf die Planseite der Anlage. Bitte Bezeichnungen kürzen bzw. Kategorien zusammenfassen.':`Die Legende passt nicht auf ${PAPERS[paper].label}. Bitte ${paper==='a4'?'A3 wählen oder ':''}Bezeichnungen kürzen bzw. Kategorien zusammenfassen.`);
   // Größter Maßstab (kleinstes N) gewinnt; bei Gleichstand die größere Darstellung, sonst die Reihenfolge oben.
   return candidates.reduce((best,c)=>{const nb=best.ratio??Infinity,nc=c.ratio??Infinity;if(nc!==nb)return nc<nb?c:best;return c.mmPerUnit>best.mmPerUnit*1.0001?c:best;});
 }
@@ -107,7 +108,7 @@ export async function renderSheet(p:Project,layout:SheetLayout,rated:Rated|null|
       line(.25);ctx.strokeRect(x*k,top*k,bar.mm*k,hgt*k);
       const labelEvery=seg>=7?1:seg*2>=7?2:bar.segments;
       for(let i=0;i<=bar.segments;i++)if(i%labelEvery===0||i===bar.segments)text(i===bar.segments?`${de(bar.meters)} m`:de(bar.meters/bar.segments*i),x+i*seg,top+hgt+3.2,fs*.85,{align:i===0?'left':'center'});
-      text('Drucken mit „Tatsächliche Größe“ (100 %)',x,top+hgt+7.2,fs*.72,{color:muted,max:room});
+      text(L.paper==='bild'?'1:N gilt bei Wiedergabe in A4-Größe; die Leiste gilt immer':'Drucken mit „Tatsächliche Größe“ (100 %)',x,top+hgt+7.2,fs*.72,{color:muted,max:room});
     }else{text('Ohne Maßstab',x,cy-1,fs*1.05,{bold:true});text('Plan nicht kalibriert – Strecke messen in der Liste',x,cy+3,fs*.8,{color:muted,max:room});}
   }
   // Schriftfeld.
@@ -121,8 +122,8 @@ export async function renderSheet(p:Project,layout:SheetLayout,rated:Rated|null|
     const half=T.w/2,rowH=7;
     field('Objekt',info.objekt,T.x,y,T.w);y+=rowH;ctx.beginPath();ctx.moveTo(T.x*k,y*k);ctx.lineTo((T.x+T.w)*k,y*k);ctx.moveTo((T.x+half)*k,y*k);ctx.lineTo((T.x+half)*k,(T.y+T.h)*k);ctx.stroke();
     field('Gutachten-Nr.',p.report,T.x,y,half);field('Datum',p.date?p.date.split('-').reverse().join('.'):'',T.x+half,y,half);y+=rowH;ctx.beginPath();ctx.moveTo(T.x*k,y*k);ctx.lineTo((T.x+T.w)*k,y*k);ctx.stroke();
-    field('Maßstab',L.ratio?`M 1:${L.ratio.toLocaleString('de-DE')}`:'ohne (nicht kalibriert)',T.x,y,half);
-    field('Blatt',L.paper==='anlage'?`Anlage${info.pages>1?` · Plan ${info.page}/${info.pages}`:''}`:`${PAPERS[L.paper].label} ${L.landscape?'quer':'hoch'}${info.pages>1?` · ${info.page}/${info.pages}`:''}`,T.x+half,y,half);
+    field('Maßstab',L.ratio?`M 1:${L.ratio.toLocaleString('de-DE')}${L.paper==='bild'?' (bei A4)':''}`:'ohne (nicht kalibriert)',T.x,y,half);
+    field('Blatt',L.paper==='anlage'?`Anlage${info.pages>1?` · Plan ${info.page}/${info.pages}`:''}`:L.paper==='bild'?`Bild${info.pages>1?` · Plan ${info.page}/${info.pages}`:''}`:`${PAPERS[L.paper].label} ${L.landscape?'quer':'hoch'}${info.pages>1?` · ${info.page}/${info.pages}`:''}`,T.x+half,y,half);
   }
   return canvas;
 }
