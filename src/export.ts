@@ -1,4 +1,4 @@
-import {bounds, markerSize, markerSVG, type Project} from './model';
+import {bounds, floorName, markerSize, markerSVG, type Project} from './model';
 import {loadImage} from './import';
 import {planMatrix,preparation} from './preparation';
 import {areaAnchor,areaCategories,areaSVG,palette} from './areas';
@@ -43,7 +43,7 @@ export async function exportImage(p:Project,longSide:number,format:'png'|'jpeg')
     try{ctx.drawImage(await loadImage(url),0,0,l.width,l.height);}finally{URL.revokeObjectURL(url);}
     const fs=Math.max(l.b.width,l.b.height)*(l.legend ? .019 : .0145);const y=l.pad+l.b.height+l.pad;
     ctx.strokeStyle='#a8b1ac';ctx.lineWidth=fs*.05;ctx.beginPath();ctx.moveTo(l.pad,y);ctx.lineTo(l.planWidth-l.pad,y);ctx.stroke();
-    ctx.fillStyle='#263b35';ctx.font=`bold ${fs*1.2}px Arial`;ctx.fillText('PROBENPLAN',l.pad,y+fs*1.9);
+    ctx.fillStyle='#263b35';ctx.font=`bold ${fs*1.2}px Arial`;const floor=floorName(p);ctx.fillText(floor?`PROBENPLAN · ${floor}`:'PROBENPLAN',l.pad,y+fs*1.9,l.planWidth-2*l.pad);
     ctx.font=`${fs}px Arial`;
     const meta=[p.report?`Gutachten ${p.report}`:'',p.date?`Datum ${p.date.split('-').reverse().join('.')}`:''].filter(Boolean).join('  ·  ');
     ctx.fillText(meta,l.pad,y+fs*3.5,l.planWidth-2*l.pad);

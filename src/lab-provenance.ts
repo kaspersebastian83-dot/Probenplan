@@ -1,4 +1,4 @@
-import {clone,type LabOrigin,type LabSample,type LabSources,type Project} from './model';
+import {allAreas,allMarkers,clone,type LabOrigin,type LabSample,type LabSources,type Project} from './model';
 import type {LabReport} from './labreport';
 
 const idPattern=/^[\w-]{1,80}$/;
@@ -19,10 +19,10 @@ export function originFromReport(report:LabReport,id=crypto.randomUUID()):LabOri
 // Each accepted import gets its own immutable origin, even for equal report numbers.
 export function applyLabImport(project:Project,report:LabReport,choices:ReadonlyMap<LabSample,string>):Project{
  const next=clone(project),origin=originFromReport(report);next.pending||=[];
- const occupied=new Set([...next.markers,...(next.areas||[]),...next.pending,...report.rows].map(r=>r.label.toUpperCase()));
+ const occupied=new Set([...allMarkers(next),...allAreas(next),...next.pending,...report.rows].map(r=>r.label.toUpperCase()));
  let number=Math.max(next.nextSample,...report.rows.map(r=>Number(r.label.slice(1))+1)),accepted=0;
  for(const input of report.rows){
-  const choice=choices.get(input),hit=[...next.markers,...(next.areas||[]),...next.pending].find(r=>r.label.toUpperCase()===input.label.toUpperCase());
+  const choice=choices.get(input),hit=[...allMarkers(next),...allAreas(next),...next.pending].find(r=>r.label.toUpperCase()===input.label.toUpperCase());
   if(choice==='skip')continue;
   if(hit&&choice!=='update'&&choice!=='next')throw Error(`${input.label}: Herkunftskonflikt bitte ausdrücklich auflösen.`);
   const row:LabSample={label:input.label,ref:input.ref,desc:input.desc,...(input.art!==undefined?{art:input.art}:{}),...(input.labNr!==undefined?{labNr:input.labNr}:{}),...(input.datum!==undefined?{datum:input.datum}:{}),bericht:origin.bericht,reportId:origin.id};
@@ -37,10 +37,10 @@ export function applyLabImport(project:Project,report:LabReport,choices:Readonly
  }
  // Preserve identity for a no-op so callers can skip history and persistence.
  if(!accepted)return project;
- if(next.pending.length>1000||next.markers.length+next.pending.length>3000)throw Error('Zu viele Proben im Projekt (maximal 1000 offen, 3000 insgesamt).');
+ if(next.pending.length>1000||allMarkers(next).length+next.pending.length>3000)throw Error('Zu viele Proben im Projekt (maximal 1000 offen, 3000 insgesamt).');
  if(number>=1e9)throw Error('Probenzähler ausgeschöpft.');
  if((next.labReports?.length||0)>=3000)throw Error('Zu viele gespeicherte Laborberichte (maximal 3000).');
- next.nextSample=number;next.version=4;next.labReports=[...(next.labReports||[]),origin];return next;
+ next.nextSample=number;next.version=Math.max(next.version,4) as Project['version'];next.labReports=[...(next.labReports||[]),origin];return next;
 }
 
-export function projectLabRows(p:Project):LabSample[]{return [...(p.pending||[]),...p.markers.filter(m=>m.lab).map(m=>({label:m.label,...m.lab!}))];}
+export function projectLabRows(p:Project):LabSample[]{return [...(p.pending||[]),...allMarkers(p).filter(m=>m.lab).map(m=>({label:m.label,...m.lab!}))];}

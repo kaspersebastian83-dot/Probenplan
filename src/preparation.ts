@@ -12,7 +12,7 @@ export function rotateProject(project:Project,direction:1|-1){
   const turn=(x:number,y:number)=>direction===1?{x:h-y,y:x}:{x:y,y:w-x};
   for(const m of project.markers){const pt=turn(m.x,m.y),label=turn(m.lx,m.ly);m.x=pt.x;m.y=pt.y;m.lx=label.x;m.ly=label.y;}
   for(const area of project.areas||[])area.points=area.points.map(pt=>turn(pt.x,pt.y));
-  plan.preparation=p;plan.width=h;plan.height=w;project.version=project.version===4?4:project.areas?3:2;
+  plan.preparation=p;plan.width=h;plan.height=w;project.version=Math.max(project.version,project.areas?3:2) as Project['version'];
 }
 export function cropProject(project:Project,rect:Rect){
   const plan=project.plan;
@@ -23,5 +23,5 @@ export function cropProject(project:Project,rect:Rect){
   const p=preparation(plan);p.crop={x:p.crop.x+rect.x,y:p.crop.y+rect.y,width:rect.width,height:rect.height};
   for(const m of project.markers){m.x-=rect.x;m.y-=rect.y;m.lx-=rect.x;m.ly-=rect.y;}
   for(const area of project.areas||[])area.points=area.points.map(pt=>({x:Math.max(0,Math.min(rect.width,pt.x-rect.x)),y:Math.max(0,Math.min(rect.height,pt.y-rect.y))}));
-  plan.preparation=p;plan.width=rect.width;plan.height=rect.height;project.version=project.version===4?4:project.areas?3:2;
+  plan.preparation=p;plan.width=rect.width;plan.height=rect.height;project.version=Math.max(project.version,project.areas?3:2) as Project['version'];
 }
