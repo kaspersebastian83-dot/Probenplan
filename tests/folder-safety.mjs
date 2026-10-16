@@ -66,5 +66,22 @@ try{
   assert.equal(got.count,10);assert.equal(got.main,'v14');assert.ok(got.copy);assert.equal(got.recovery,0);
   assert.ok(got.texts.includes('v13'),'newest backup kept');assert.ok(!got.texts.includes('v0'),'oldest backup pruned');
  });
+ await check('Office safety: backup names use local time; old UTC names are sorted by their real time',async()=>{
+  const got=await page.evaluate(async()=>{const m=await import('/folder.mjs'),f=await make();let rev=null;
+   rev=(await m.saveFolderProject(f,'a',rev)).revision;rev=(await m.saveFolderProject(f,'b',rev)).revision;
+   const now=new Date(),z=n=>String(n).padStart(2,'0'),backups=(await names(f)).filter(n=>n.includes('(vorher '));
+   // 12 alte Sicherungen im UTC-Format von gestern: dürfen die neuen (Ortszeit) nicht verdrängen
+   const y=new Date(Date.now()-86400000);for(let i=0;i<12;i++){const d=new Date(y.getTime()+i*1000);await m.writeFile(f.plaene,`Probenplan ${f.name} (vorher ${d.toISOString().replace(/[:.]/g,'-')}-0000000${i%10}-uuid).probenplan`,'alt'+i);}
+   rev=(await m.saveFolderProject(f,'c',rev)).revision;
+   const after=(await names(f)).filter(n=>n.includes('(vorher '));
+   return {first:backups[0],today:`${now.getFullYear()}-${z(now.getMonth()+1)}-${z(now.getDate())}`,hour:z(now.getHours()),texts:await Promise.all(after.map(n=>read(f,n))),
+    utc:m.stampTime('2026-10-16T19-37-16-853Z-x'),local:m.stampTime('2026-10-16 21-37-16-853 abcd1234)')};
+  });
+  assert.match(got.first,new RegExp(`\\(vorher ${got.today} \\d{2}-\\d{2}-\\d{2}-\\d{3} [0-9a-f]{8}\\)\\.probenplan$`),got.first);
+  assert.ok(got.first.includes(`${got.today} ${got.hour}-`)||got.first.includes(`${got.today} `),'Ortszeit im Namen');
+  assert.equal(got.utc,Date.UTC(2026,9,16,19,37,16,853));assert.equal(got.local,new Date(2026,9,16,21,37,16,853).getTime());
+  assert.ok(got.texts.includes('a')&&got.texts.includes('b'),'neue Sicherungen bleiben, auch neben 12 älteren im UTC-Format');
+  assert.ok(!got.texts.includes('alt0'),'älteste UTC-Sicherung wird aufgeräumt');
+ });
  await context.close();
 }finally{await browser.close();await new Promise(r=>server.close(r));}

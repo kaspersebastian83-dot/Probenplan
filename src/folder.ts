@@ -55,7 +55,15 @@ export async function fileRevision(file:File|null):Promise<string|null>{
 export class FolderConflict extends Error{
  constructor(public current:File|null,public revision:string|null){super('Die Projektdatei wurde an anderer Stelle gespeichert, ersetzt oder gelöscht.');}
 }
-const uniqueName=(f:ProjectFolder,kind:string)=>`Probenplan ${f.name} (${kind} ${new Date().toISOString().replace(/[:.]/g,'-')}-${crypto.randomUUID()}).probenplan`;
+/** Zeitstempel in Ortszeit („2026-10-16 21-37-16-853“), wie die Uhr im Büro – UTC („19-37“) verwirrte beim Wiederherstellen. */
+export function localStamp(d=new Date()){const z=(n:number,l=2)=>String(n).padStart(l,'0');return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())} ${z(d.getHours())}-${z(d.getMinutes())}-${z(d.getSeconds())}-${z(d.getMilliseconds(),3)}`;}
+/** Zeitpunkt aus dem Namen einer Sicherung: neue Namen in Ortszeit, ältere (bis 1.12.0) in UTC mit „T…Z“. */
+export function stampTime(rest:string):number|null{
+ let m=rest.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z/);if(m)return Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6],+m[7]);
+ m=rest.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2})-(\d{2})-(\d{2})-(\d{3})(?=[ )])/);if(m)return new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6],+m[7]).getTime();
+ return null;
+}
+const uniqueName=(f:ProjectFolder,kind:string)=>`Probenplan ${f.name} (${kind} ${localStamp()} ${crypto.randomUUID().slice(0,8)}).probenplan`;
 /** Always use a fresh filename: backups/recovery files are never recycled. */
 export async function writeProjectCopy(f:ProjectFolder,kind:string,text:string){const name=uniqueName(f,kind);await writeFile(f.plaene,name,text);if(await (await fileInfo(f.plaene,name))?.text()!==text)throw Error('Sicherungsdatei konnte nicht bestätigt werden.');return name;}
 /** Serialize cooperating tabs; detect external changes again immediately before replacement.
@@ -92,10 +100,13 @@ export async function pruneBackups(f:ProjectFolder){
  try{
   const prefix=`Probenplan ${f.name} (vorher `,names:string[]=[];
   for await(const h of f.plaene.values())if(h.kind==='file'&&h.name.startsWith(prefix)&&h.name.endsWith(').probenplan'))names.push(h.name);
-  names.sort().reverse();
+  // Nach Zeitpunkt sortieren (alte UTC- und neue Ortszeit-Namen gemischt), Tag in Ortszeit
+  const time=new Map(names.map(n=>[n,stampTime(n.slice(prefix.length))]));
+  names.sort((a,b)=>(time.get(b)??-1)-(time.get(a)??-1)||b.localeCompare(a));
   const keep=new Set(names.slice(0,KEEP_RECENT)),days=new Set<string>();
-  for(const n of names){const day=n.slice(prefix.length,prefix.length+10);
-   if(!/^\d{4}-\d{2}-\d{2}$/.test(day)){keep.add(n);continue;}
+  for(const n of names){const t=time.get(n);
+   if(t==null){keep.add(n);continue;}
+   const d=new Date(t),day=`${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
    if(!days.has(day)&&days.size<KEEP_DAYS){days.add(day);keep.add(n);}}
   for(const n of names)if(!keep.has(n))await f.plaene.removeEntry(n).catch(()=>{});
  }catch{/* pruning is best effort */}
