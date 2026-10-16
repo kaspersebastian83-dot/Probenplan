@@ -68,11 +68,11 @@ try{
  await check('Interrupted close preserves the main file, browser draft and recovery candidate',async()=>{
   const before=await fs(page,'read',[NAME,'Pläne'],FILE);
   await page.evaluate(file=>{const original=FileSystemFileHandle.prototype.createWritable;window.failMainClose=true;
-   FileSystemFileHandle.prototype.createWritable=async function(...args){const stream=await original.apply(this,args),main=this.name===file;return new Proxy(stream,{get(target,key){if(key==='close')return async()=>{if(main&&window.failMainClose)throw Error('Synthetic interrupted close');return target.close();};return typeof target[key]==='function'?target[key].bind(target):target[key];}});};
+   FileSystemFileHandle.prototype.createWritable=async function(...args){const stream=await original.apply(this,args);if(this.name!==file)return stream;return new Proxy(stream,{get(target,key){if(key==='close')return async()=>{if(window.failMainClose)throw Error('Synthetic interrupted close');return target.close();};return typeof target[key]==='function'?target[key].bind(target):target[key];}});};
   },FILE);
   await page.locator('[data-mode=sample]').click();await tap(page,.4,.4);await page.locator('#saved',{hasText:'Nicht im Projektordner gespeichert'}).waitFor();
   assert.equal(await fs(page,'read',[NAME,'Pläne'],FILE),before);
-  const names=await fs(page,'list',[NAME,'Pläne']),recovery=names.find(n=>n.includes('(Wiederherstellung '));assert.ok(recovery);assert.equal(JSON.parse(await fs(page,'read',[NAME,'Pläne'],recovery)).markers.length,1);
+  const names=await fs(page,'list',[NAME,'Pläne']),recovery=names.find(n=>n.includes('(Wiederherstellung '));assert.ok(recovery,JSON.stringify({names,toast:await page.locator('#toast').textContent()}));assert.equal(JSON.parse(await fs(page,'read',[NAME,'Pläne'],recovery)).markers.length,1);
   const local=await page.evaluate(name=>new Promise((res,rej)=>{const r=indexedDB.open('probenplan',1);r.onsuccess=()=>{const q=r.result.transaction('projects').objectStore('projects').get(`projekt:${name}`);q.onsuccess=()=>{r.result.close();res(q.result);};q.onerror=()=>rej(q.error);};}),NAME);assert.equal(local.dirty,true);assert.equal(local.project.markers.length,1);
   const d=page.waitForEvent('download');await page.locator('#emergency-copy').click();assert.match((await d).suggestedFilename(),/Notfallkopie/);
   page.once('dialog',dialog=>dialog.accept());await page.reload();await page.locator('#ask-title',{hasText:'Ungespeicherte Browser-Fassung'}).waitFor();await page.locator('#ask-actions button',{hasText:'Browser-Fassung verwenden'}).click();

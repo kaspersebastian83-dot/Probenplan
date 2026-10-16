@@ -19,7 +19,7 @@ try{
  });
  async function check(name,fn){await fn();console.log(`OK ${name}`);}
  await check('Office safety: verified saves, unique backups and same-content timestamps',async()=>{
-  const got=await page.evaluate(async()=>{const m=await import('/folder.mjs'),f=await make(),a='{"synthetic":1}',b='{"synthetic":2}',c='{"synthetic":3}';let rev=(await m.saveFolderProject(f,a,null)).revision;rev=(await m.saveFolderProject(f,b,rev)).revision;rev=(await m.saveFolderProject(f,c,rev)).revision;const files=await names(f),copies=await Promise.all(files.filter(n=>n.includes('(vorher ')).map(n=>read(f,n)));return {text:await read(f),files,copies,revision:rev,actual:await m.fileRevision(await m.fileInfo(f.plaene,m.projectFileName(f)))};});
+  const got=await page.evaluate(async()=>{const m=await import('/folder.mjs'),f=await make(),a='{"synthetic":1}',b='{"synthetic":2}',c='{"synthetic":3}';let rev=(await m.saveFolderProject(f,a,null)).revision;await m.writeProjectCopy(f,'Wiederherstellung',b);rev=(await m.saveFolderProject(f,b,rev)).revision;rev=(await m.saveFolderProject(f,c,rev)).revision;const files=await names(f),copies=await Promise.all(files.filter(n=>n.includes('(vorher ')).map(n=>read(f,n)));return {text:await read(f),files,copies,revision:rev,actual:await m.fileRevision(await m.fileInfo(f.plaene,m.projectFileName(f)))};});
   assert.equal(got.text,'{"synthetic":3}');assert.deepEqual(got.copies.sort(),['{"synthetic":1}','{"synthetic":2}']);assert.equal(got.files.filter(n=>n.includes('Wiederherstellung')).length,0);assert.equal(new Set(got.files).size,3);assert.equal(got.revision,got.actual);
  });
  await check('Office safety: changed bytes, replacement, deletion and unexpected creation conflict',async()=>{

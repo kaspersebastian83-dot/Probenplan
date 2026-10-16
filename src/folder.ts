@@ -76,6 +76,9 @@ export async function saveFolderProject(f:ProjectFolder,text:string,expected:str
   if(await fileRevision(committed)!==wanted)throw Error('Die geschriebene Datei konnte nicht bestätigt werden. Wiederherstellungsdatei bleibt erhalten.');
   // Cleanup failure does not invalidate a verified save; the candidate remains available.
   await f.plaene.removeEntry(recovery).catch(()=>{});
+  // Older interrupted attempts with the exact committed bytes are resolved too.
+  // Different candidates and all previous-file backups remain untouched.
+  try{for(const candidate of await listFiles(f.plaene,/\.probenplan$/i))if(candidate.name.startsWith(`Probenplan ${f.name} (Wiederherstellung `)&&await fileRevision(await candidate.handle.getFile())===wanted)await f.plaene.removeEntry(candidate.name);}catch{/* Keep candidates if cleanup is unavailable. */}
   return {revision:wanted,backup};
  });
 }
