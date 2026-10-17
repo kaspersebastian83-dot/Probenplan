@@ -5,6 +5,7 @@ import DOMPurify from 'dompurify';
 import { unzipSync } from 'fflate';
 import { MARKER_SCALE, type Plan, type Project, type Preparation, type Sheet, type ResultSettings, type Scale, validLabel, MAX_SHEETS, cleanSheetName, allMarkers, allAreas } from './model';
 import {MAX_AREAS,MAX_POINTS,PALETTE,cleanName,polygonError} from './areas';
+import {MAX_ANGLE,wholeSize} from './preparation';
 const MAX=60*1024*1024;
 const safeData=(s:string)=>/^data:(?:image\/(?:png|jpeg|webp|gif)|font\/(?:woff2?|ttf|otf)|application\/(?:font-woff|x-font-ttf|vnd.ms-fontobject|octet-stream))(?:;charset=[\w-]+)?;base64,[a-z0-9+/=\s]+$/i.test(s);
 function safeCSS(css:string){
@@ -69,8 +70,17 @@ export async function candidates(file:File):Promise<Candidate[]>{
   if(!result.length)throw Error('Kein SVG-, PNG- oder JPG-Plan im ZIP gefunden. PDF bitte direkt auswählen; DXF und CSV werden noch nicht unterstützt.');return result;
 }
 export async function validateProject(value:unknown):Promise<Project>{
-  const p=value as Project;
-  if(!p||p.format!=='probenplan'||p.version!==5)return validateSingle(p);
+  const raw=value as Project;
+  if(raw&&raw.format==='probenplan'&&typeof raw.version==='number'&&raw.version>6)throw Error('Diese Projektdatei stammt von einer neueren PlanKit-Version. Bitte PlanKit aktualisieren (Seite neu laden).');
+  // Format 6 = Format 5 bzw. Einzelplan plus Feinausrichtung: wie diese prüfen, Feinwinkel erlauben, Format 6 behalten.
+  const fine=!!raw&&raw.format==='probenplan'&&raw.version===6;
+  const p=(fine?{...raw,version:raw.sheets!==undefined?5:4}:raw) as Project;
+  const result=await validateFormat(p,fine);
+  if(fine)result.version=6;
+  return result;
+}
+async function validateFormat(p:Project,fine:boolean):Promise<Project>{
+  if(!p||p.format!=='probenplan'||p.version!==5)return validateSingle(p,fine);
   // Format 5: mehrere Pläne. Jeder Plan wird wie ein Projekt des Formats 4 geprüft,
   // danach Kennungen und IDs über alle Pläne hinweg auf Eindeutigkeit.
   const sheets=p.sheets,active=p.active;
@@ -78,11 +88,11 @@ export async function validateProject(value:unknown):Promise<Project>{
   const sheetIds=new Set<string>();
   for(const [i,sh] of sheets.entries()){if(!sh||typeof sh.id!=='string'||!/^[\w-]{1,80}$/.test(sh.id)||sheetIds.has(sh.id)||typeof sh.name!=='string'||!cleanSheetName(sh.name)||sh.name.length>40||(i===active)!==(sh.plan===undefined))throw Error('Ungültiger oder doppelter Plan in der Projektdatei.');sheetIds.add(sh.id);}
   const base={format:'probenplan' as const,version:4 as const,nextSample:p.nextSample,nextFire:p.nextFire,report:p.report,date:p.date,...(p.labReports!==undefined?{labReports:p.labReports}:{})};
-  const own=await validateSingle({...base,plan:p.plan,markers:p.markers,...(p.areas!==undefined||p.nextArea!==undefined?{areas:p.areas??[],nextArea:p.nextArea}:{}),...(p.pending!==undefined?{pending:p.pending}:{}),...(p.results!==undefined?{results:p.results}:{})} as Project);
+  const own=await validateSingle({...base,plan:p.plan,markers:p.markers,...(p.areas!==undefined||p.nextArea!==undefined?{areas:p.areas??[],nextArea:p.nextArea}:{}),...(p.pending!==undefined?{pending:p.pending}:{}),...(p.results!==undefined?{results:p.results}:{})} as Project,fine);
   const out:Sheet[]=[];
   for(const [i,sh] of sheets.entries()){
     if(i===active){out.push({id:sh.id,name:cleanSheetName(sh.name)});continue;}
-    const v=await validateSingle({...base,plan:sh.plan,markers:sh.markers,...(sh.areas!==undefined||p.nextArea!==undefined?{areas:sh.areas??[],nextArea:p.nextArea}:{})} as Project);
+    const v=await validateSingle({...base,plan:sh.plan,markers:sh.markers,...(sh.areas!==undefined||p.nextArea!==undefined?{areas:sh.areas??[],nextArea:p.nextArea}:{})} as Project,fine);
     out.push({id:sh.id,name:cleanSheetName(sh.name),plan:v.plan,markers:v.markers,...(v.areas?{areas:v.areas}:{})});
   }
   const result:Project={...own,version:5,sheets:out,active};
@@ -92,7 +102,7 @@ export async function validateProject(value:unknown):Promise<Project>{
   if(allMarkers(result).length>3000)throw Error('Zu viele Markierungen in der Projektdatei.');
   return result;
 }
-async function validateSingle(p:Project):Promise<Project>{
+async function validateSingle(p:Project,fine=false):Promise<Project>{
   if(!p||p.format!=='probenplan'||![1,2,3,4].includes(p.version)||!p.plan||typeof p.plan.data!=='string'||!Array.isArray(p.markers)||p.markers.length>3000)throw Error('Ungültige oder nicht unterstützte Projektdatei.');
   if(typeof p.plan.name!=='string'||typeof p.report!=='string'||p.report.length>100||typeof p.date!=='string'||(p.date!==''&&!/^\d{4}-\d{2}-\d{2}$/.test(p.date)))throw Error('Ungültige Projektdaten.');
   if(p.plan.data.length>MAX*1.5)throw Error('Die Projektdatei enthält einen zu großen Plan.');
@@ -109,9 +119,10 @@ async function validateSingle(p:Project):Promise<Project>{
   if(p.plan.preparation){
     const edit=p.plan.preparation,c=edit.crop;
     if(!edit||![0,90,180,270].includes(edit.rotation)||edit.sourceWidth!==plan.width||edit.sourceHeight!==plan.height||!c||![c.x,c.y,c.width,c.height].every(Number.isFinite)||c.x<0||c.y<0||c.width<=0||c.height<=0)throw Error('Ungültige Bildbearbeitung in der Projektdatei.');
-    const w=edit.rotation%180?plan.height:plan.width,h=edit.rotation%180?plan.width:plan.height;
+    if(edit.angle!==undefined&&(!fine||typeof edit.angle!=='number'||!Number.isFinite(edit.angle)||edit.angle===0||Math.abs(edit.angle)>MAX_ANGLE))throw Error(fine?'Ungültige Feinausrichtung in der Projektdatei.':'Feinausrichtung benötigt Projektformat 6.');
+    const whole=wholeSize({sourceWidth:edit.sourceWidth,sourceHeight:edit.sourceHeight,rotation:edit.rotation as Preparation['rotation'],crop:c,...(edit.angle!==undefined?{angle:edit.angle}:{})}),w=whole.width,h=whole.height;
     if(c.x+c.width>w+.01||c.y+c.height>h+.01||Math.abs(p.plan.width-c.width)>.01||Math.abs(p.plan.height-c.height)>.01)throw Error('Der gespeicherte Zuschnitt liegt außerhalb des Originalplans.');
-    plan.preparation={sourceWidth:edit.sourceWidth,sourceHeight:edit.sourceHeight,rotation:edit.rotation as Preparation['rotation'],crop:{x:c.x,y:c.y,width:c.width,height:c.height}};plan.width=c.width;plan.height=c.height;
+    plan.preparation={sourceWidth:edit.sourceWidth,sourceHeight:edit.sourceHeight,rotation:edit.rotation as Preparation['rotation'],crop:{x:c.x,y:c.y,width:c.width,height:c.height},...(edit.angle!==undefined?{angle:edit.angle}:{})};plan.width=c.width;plan.height=c.height;
   }
   if(p.plan.markerScale!==undefined){const s=p.plan.markerScale;if(typeof s!=='number'||!Number.isFinite(s)||s<MARKER_SCALE.min||s>MARKER_SCALE.max)throw Error('Ungültige Punktgröße in der Projektdatei.');if(s!==1)plan.markerScale=s;}
   if(p.plan.calibration!==undefined){const c=p.plan.calibration;if(!c||typeof c!=='object'||![c.units,c.meters].every(n=>typeof n==='number'&&Number.isFinite(n)&&n>0)||c.meters>100_000||c.units>10_000_000||c.meters/c.units>1000||c.meters/c.units<1e-7)throw Error('Ungültiger Maßstab in der Projektdatei.');plan.calibration={units:c.units,meters:c.meters};}

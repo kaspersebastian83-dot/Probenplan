@@ -1,5 +1,11 @@
 # Änderungen
 
+## 1.14.0 – 17. Oktober 2026
+
+- **Ausrichten für fotografierte Pläne:** neues Werkzeug „Ausrichten“ (A) neben „Zuschnitt“. Ein Raster liegt fest über der Karte, der Plan dreht sich darunter: im Plan ziehen (Umschalt = zehnmal feiner), Regler, Zahlenfeld, ±0,1° oder Pfeiltasten. „An Kante ausrichten“ legt zwei angeklickte Punkte entlang einer Wand waagerecht oder senkrecht. Bis ±45°, ein Rückgängig-Schritt.
+- Gespeichert wird nur der Winkel; das Original bleibt unverändert. Ecken außerhalb des Fotos werden weiß (Bildschirm, PNG/JPG, PDF, Anlage). Probenpunkte, Beschriftungen, Flächen und Nordpfeil drehen mit und bleiben auf ihrer Stelle im Bild; Maßstab und Punktgröße bleiben.
+- **Projektformat 6** für Projekte mit Feinausrichtung. Ältere PlanKit-Versionen lehnen diese Dateien ab, statt den Winkel zu übergehen; Dateien aus neueren Versionen meldet PlanKit jetzt verständlich („neuere PlanKit-Version“).
+
 ## 1.13.0 – 17. Oktober 2026
 
 - **Leiste mit Projekt und Arbeitsschritten:** Neue schmale Leiste oben, in allen vier Apps gleich: Projekt mit Wechsel zu den zuletzt geöffneten, die vier Arbeitsschritte (LabelKit, FotoKit, PlanKit, BelegKit) mit Haken bei erledigten Schritten, und ein Knopf „Weiter: …“ zum nächsten offenen Schritt – öffnet die App mit demselben Projekt. Ohne geöffnetes Projekt bietet die Leiste „Weiter mit <zuletzt geöffnetes Projekt>“ an. Die Leiste liest den Projektordner nur und schreibt nie hinein; ohne Ordnerrecht fehlen nur die Haken. In PlanKit ist sie besonders schmal und die Kopfzeile etwas niedriger, damit der Plan seine Fläche behält.

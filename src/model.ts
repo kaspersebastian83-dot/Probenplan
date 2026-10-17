@@ -13,14 +13,16 @@ export interface Marker { id: string; kind: Kind; label: string; note: string; x
 export interface Rect { x:number; y:number; width:number; height:number }
 export interface Point { x:number; y:number }
 export interface Area { id:string; label:string; name:string; color:string; opacity:number; points:Point[] }
-export interface Preparation { sourceWidth:number; sourceHeight:number; rotation:0|90|180|270; crop:Rect }
+/** Bildvorbereitung: angle = Feinausrichtung in Grad (±45, im Uhrzeigersinn), vor der 90°-Drehung und dem Zuschnitt angewandt. */
+export interface Preparation { sourceWidth:number; sourceHeight:number; rotation:0|90|180|270; crop:Rect; angle?:number }
 /** Maßstab je Plan: eine gemessene Strecke in Planeinheiten und ihre wahre Länge in Metern. Drehen/Zuschneiden ändern die Einheit nicht. */
 export interface Calibration { units:number; meters:number }
 export interface Plan { name: string; width: number; height: number; data: string; vector: boolean; markerScale?:number; calibration?:Calibration; north?:number; preparation?:Preparation; pdf?:{page:number; totalPages:number; renderLongSide:number} }
 // Mehrere Pläne (Geschosse) ab Format 5: Der aktive Plan steht wie bisher in plan/markers/areas,
 // in sheets[active] nur Kennung und Name. Alle anderen Pläne liegen vollständig in sheets.
 export interface Sheet { id:string; name:string; plan?:Plan; markers?:Marker[]; areas?:Area[] }
-export type Version = 1|2|3|4|5;
+// Format 6: wie 5, zusätzlich Feinausrichtung (Preparation.angle). Ältere PlanKit-Versionen lehnen es ab, statt den Winkel still zu übergehen.
+export type Version = 1|2|3|4|5|6;
 export interface Project { format: 'probenplan'; version: Version; plan: Plan; markers: Marker[]; nextSample: number; nextFire: number; report: string; date: string; areas?:Area[]; nextArea?:number; pending?:LabSample[]; labReports?:LabOrigin[]; sheets?:Sheet[]; active?:number; results?:ResultSettings }
 const clonePlan=(plan:Plan):Plan=>({...plan,...(plan.calibration?{calibration:{...plan.calibration}}:{}),...(plan.preparation?{preparation:structuredClone(plan.preparation)}:{}),...(plan.pdf?{pdf:{...plan.pdf}}:{})});
 const cloneMarkers=(markers:Marker[])=>markers.map(m=>({...m,...(m.lab?{lab:{...m.lab}}:{})}));
@@ -91,7 +93,7 @@ export function sheetCount(p:Project){return p.sheets?.length||1;}
 /** Name des Plans; bei nur einem Plan ohne ausdrückliche Benennung leer. */
 export function floorName(p:Project,index=p.active??0){return p.sheets&&p.sheets.length>1?p.sheets[index]?.name||'':'';}
 export function suggestFloorName(n:number){return n===0?'EG':`${n}. OG`;}
-function ensureSheets(p:Project){if(!p.sheets){p.sheets=[{id:crypto.randomUUID(),name:suggestFloorName(0)}];p.active=0;}p.version=5;return p.sheets;}
+function ensureSheets(p:Project){if(!p.sheets){p.sheets=[{id:crypto.randomUUID(),name:suggestFloorName(0)}];p.active=0;}p.version=Math.max(p.version,5) as Project['version'];return p.sheets;}
 /** Projektansicht eines einzelnen Plans (für Export und Vorschau). */
 export function sheetProject(p:Project,index:number):Project{
   if(!p.sheets||index===(p.active??0))return p;
