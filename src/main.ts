@@ -3,6 +3,7 @@ import {LabUI} from './labui';
 import './style.css';
 import './theme.css';
 import './layout.css';
+import './suite-bar';
 import {addMarker,addSheet,bounds,clone,createProject,escape,floorName,History,markerScale,markerSize,markerSVG,MARKER_SCALE,metersPerUnit,northAngle,stepMarkerScale,moveSheet,removeSheet,renameSheet,sheetCount,sheetProject,switchSheet,validLabel,MAX_SHEETS,type Project,type Marker} from './model';
 import {candidates,loadImage,readPlan,validateProject,type Candidate} from './import';
 import {download,restoreLocal,saveLocal} from './storage';
@@ -54,7 +55,7 @@ document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Ma
 document.querySelector('#help-dialog')!.insertAdjacentHTML('beforeend','<h3>Laborberichte und offene Proben</h3><p>Zuerst einen Grundriss laden. Unter „Laborbericht importieren …“ XML, PDF oder beide gemeinsam auswählen oder Dateien auf die App ziehen. Die Prüftabelle vor Übernahme korrigieren, ergänzen und sortieren. Bei belegten P-Nummern das gewünschte Vorgehen ausdrücklich wählen. Offene Laborproben auf den Plan ziehen oder auswählen und in den Plan tippen. Übernahme und Platzierung unterstützen Undo/Redo; Projektdatei und Autosicherung erhalten die offene Liste.</p><p>„Probenliste speichern“ erzeugt eine JSON-Datei für andere Apps. Im Speicherdialog den Projektordner und „Laborergebnisse“ wählen; Browser ohne nativen Dialog laden die Datei herunter. Gespeicherte Herkunft bleibt nach erneutem Öffnen erhalten; bei mehreren Berichten den gewünschten Eintrag wählen. Nur bei älteren Projekten fehlende Herkunftsangaben ergänzen. PDF-Scans oder unbekannte Tabellenlayouts benötigen XML oder manuelle Eingabe. Alle Laborwerte bleiben lokal; die Ergebniskarte nutzt Ihre Skala oder die ausdrücklich gewählte VdS-Hintergrundreferenz.</p>');
 input('file').accept='.zip,.svg,.png,.jpg,.jpeg,.pdf,.heic,.heif,application/pdf,image/png,image/jpeg';
 $('plan-name').textContent='PDF, Polycam-ZIP, SVG, PNG oder JPG';
-document.getElementById('app-version')!.textContent='v1.12.2';
+document.getElementById('app-version')!.textContent='v1.13.0';
 const colorOptions=PALETTE.map(c=>`<option value="${c.color}">${c.title} · ${c.suggestion}</option>`).join('');
 document.querySelector('.modes')!.insertAdjacentHTML('beforeend','<button data-mode="area-draw" class="mode" disabled><span class="tool-icon">⬡</span><span>Fläche zeichnen<small>Eckpunkte setzen & abschließen</small></span></button><button data-mode="area-edit" class="mode" disabled><span class="tool-icon">◇</span><span>Fläche bearbeiten<small>Ecken oder ganze Fläche ziehen</small></span></button>');
 document.querySelector('.markers-section')!.insertAdjacentHTML('afterend',`<section class="areas-section"><div class="section-heading"><h2>Schadensflächen</h2><span id="area-count" class="count">0</span></div><div id="area-draft" hidden><label>Farbe<select id="draft-color">${colorOptions}</select></label><label>Deckkraft <output id="draft-opacity-value">30 %</output><input id="draft-opacity" type="range" min="5" max="70" value="30"></label><p id="draft-status" class="tiny"></p><div class="inspector-actions"><button id="area-last">Letzten Eckpunkt entfernen</button><button id="area-cancel">Abbrechen</button><button id="area-finish" class="primary">Fläche abschließen</button></div></div><div id="area-list"></div><div id="area-inspector" hidden><label>Kennung<input id="area-label" maxlength="16"></label><label>Bezeichnung<textarea id="area-name" maxlength="160" rows="3"></textarea></label><label>Farbe<select id="area-color">${colorOptions}</select></label><label>Deckkraft <output id="area-opacity-value"></output><input id="area-opacity" type="range" min="5" max="70"></label><p class="tiny">Eckpunkte oder die ganze Fläche im Plan ziehen. Die Bezeichnung bestimmt die gemeinsame Legendenkategorie.</p><button id="area-delete" class="danger wide">Fläche löschen</button></div><p class="tiny">Farben und Bezeichnungen dokumentieren Ihre Eingabe. Sie stellen keine chemische Bewertung oder Freigabe fest.</p></section>`);
@@ -678,6 +679,7 @@ async function enterFolder(dir:Parameters<typeof openFolder>[0]){
   else{await preserveUnsavedProject();transition();labUI?.reset();project=null;history.clear();render();$('saved').textContent=`Projekt ${target.name}`;}
   showFolder();$('folder-prompt').hidden=true;await renderFolderPlans();
   window.history.replaceState(null,'',`?projekt=${encodeURIComponent(target.name)}`);
+  (window as any).MosaikLeiste?.aktualisieren();
   toast(next?`Projekt ${target.name}: Probenplan aus „${PLAENE}“ geöffnet.`:`Projekt ${target.name}: noch kein Probenplan – Grundriss wählen.`);
 }
 async function openFromZentrale(name:string){
