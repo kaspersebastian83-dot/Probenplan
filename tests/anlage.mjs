@@ -5,6 +5,8 @@ import {chromium,openExport} from './runtime.mjs';
 import {labXML,labRows} from './lab-fixtures.mjs';
 import assert from 'node:assert/strict';
 import {writeFile} from 'node:fs/promises';
+import {readFileSync} from 'node:fs';
+const VERSION=JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8')).version;   // Protokollzeile nennt die laufende Version
 const base=process.env.TEST_URL||'http://localhost:4173';
 const NAME='26.0142 Teststadt',PARAM='Summe 16 EPA-PAK exkl. BG',UNIT='µg/100 cm²';
 const svg='<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000"><rect width="1600" height="1000" fill="white"/><path d="M30 30H1570V970H30Z M800 30V970" fill="none" stroke="black" stroke-width="10"/><text x="300" y="500" font-size="60">Küche</text><text x="1100" y="500" font-size="60">Wohnzimmer</text></svg>';
@@ -101,7 +103,7 @@ try{
   const dims=media.filter(n=>n.endsWith('.jpeg')).map(n=>{const b=files[n];let i=2;while(i<b.length){const m=b[i+1],len=b.readUInt16BE(i+2);if(m===0xC0||m===0xC2)return [b.readUInt16BE(i+7),b.readUInt16BE(i+5)];i+=2+len;}return null;});
   assert.ok(dims.some(d=>d&&d[1]>d[0]),'mindestens ein Foto hochkant (FotoKit-Drehung angewendet)');
   const log=await fs(page,'text',[NAME,'Mitteilungen'],'_Anlagen-Protokoll.txt'),docSha=await fs(page,'sha',[NAME,'Mitteilungen'],docName);
-  assert.ok(log.includes(`| ${docName} | ${docSha} | Pläne/Probenplan ${NAME}.probenplan | ${planSha} | PlanKit 1.14.0`),'Protokollzeile');
+  assert.ok(log.includes(`| ${docName} | ${docSha} | Pläne/Probenplan ${NAME}.probenplan | ${planSha} | PlanKit ${VERSION}`),'Protokollzeile');
  });
  await check('Zweites Erstellen überschreibt nichts',async()=>{
   await page.locator('#export').click();await page.locator('#toast',{hasText:'_2.docx'}).waitFor({timeout:90000});
