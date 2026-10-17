@@ -185,6 +185,7 @@
     }
   }
   async function aktualisieren(){
+    if (pop) return;   // Menü offen: nicht neu zeichnen (würde es schließen); der nächste Durchlauf holt das nach
     var mein = ++lauf, n = urlName();
     if (n !== name){ name = n; stand = null; }
     try{ zuletzt = (await kvGet('zuletzt')) || []; if (!Array.isArray(zuletzt)) zuletzt = []; }catch(e){ zuletzt = []; }

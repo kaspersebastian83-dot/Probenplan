@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.14.1 – 17. Oktober 2026
+
+- Behoben: Das Projektmenü der Leiste oben („Anderes Projekt“) schloss sich von selbst, wenn die Leiste sich im Hintergrund aktualisierte (alle 20 Sekunden und beim Zurückkehren ins Fenster).
+
 ## 1.14.0 – 17. Oktober 2026
 
 - **Ausrichten für fotografierte Pläne:** neues Werkzeug „Ausrichten“ (A) neben „Zuschnitt“. Ein Raster liegt fest über der Karte, der Plan dreht sich darunter: im Plan ziehen (Umschalt = zehnmal feiner), Regler, Zahlenfeld, ±0,1° oder Pfeiltasten. „An Kante ausrichten“ legt zwei angeklickte Punkte entlang einer Wand waagerecht oder senkrecht. Bis ±45°, ein Rückgängig-Schritt.
