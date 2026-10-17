@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.12.1 – 17. Oktober 2026
+
+- **Sicherungskopien in Ortszeit:** „(vorher …)“- und „(Wiederherstellung …)“-Dateien heißen jetzt z. B. „Probenplan 26.0142 Teststadt (vorher 2026-10-16 21-37-16-853 a1b2c3d4).probenplan“. Bisher stand dort die UTC-Zeit („19-37“ für eine Speicherung um 21:37), was beim Wiederherstellen verwirrte. Das Aufräumen alter Sicherungen ordnet alte (UTC) und neue Namen nach ihrem tatsächlichen Zeitpunkt.
+
 ## 1.12.0 – 16. Oktober 2026
 
 - **PNG/JPG mit Schriftfeld (Standard):** Bilder fürs Gutachten sehen jetzt aus wie das PDF – Seitenleiste mit Legende, Maßstabsleiste/Nordpfeil und Schriftfeld mit Firmenlogo, Objekt, Gutachten-Nr., Datum und „PROBENPLAN“ bzw. „ERGEBNISKARTE“; Seitenverhältnis A4 ohne Heftrand. „Mit Schriftfeld …“ abwählen ergibt das bisherige Bild (nur Plan mit Legende).
