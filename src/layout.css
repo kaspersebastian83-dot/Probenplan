@@ -1,11 +1,11 @@
 /* PlanKit-Layout „Karte zuerst“ (1.5): eine schlanke Kopfzeile, Werkzeugleiste links, der Plan füllt den Rest.
    Die Liste rechts ist einklappbar (L), der Export eine schwebende Karte. Nur für den PC optimiert. */
 html,body{height:100%}
-body{height:100dvh;overflow:hidden}
-#app{height:100%;display:flex;flex-direction:column}
+body{height:100dvh;overflow:hidden;display:flex;flex-direction:column}
+#app{flex:1;min-height:0;display:flex;flex-direction:column}
 
 /* Kopfzeile */
-.topbar{height:48px;flex:0 0 auto;gap:8px;padding:0 12px;min-width:0}
+.topbar{height:40px;flex:0 0 auto;gap:8px;padding:0 12px;min-width:0}
 .topbar .brand{font-size:15px;flex:0 0 auto}
 .tb-group,.topbar .history{display:flex;gap:4px;align-items:center;flex:0 0 auto}
 .topbar .tb{min-height:30px;height:30px;padding:0 10px;font-size:12px;font-weight:600;border-radius:6px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);color:#fff;white-space:nowrap}

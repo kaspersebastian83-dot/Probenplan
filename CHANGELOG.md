@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.13.0 – 17. Oktober 2026
+
+- **Leiste mit Projekt und Arbeitsschritten:** Neue schmale Leiste oben, in allen vier Apps gleich: Projekt mit Wechsel zu den zuletzt geöffneten, die vier Arbeitsschritte (LabelKit, FotoKit, PlanKit, BelegKit) mit Haken bei erledigten Schritten, und ein Knopf „Weiter: …“ zum nächsten offenen Schritt – öffnet die App mit demselben Projekt. Ohne geöffnetes Projekt bietet die Leiste „Weiter mit <zuletzt geöffnetes Projekt>“ an. Die Leiste liest den Projektordner nur und schreibt nie hinein; ohne Ordnerrecht fehlen nur die Haken. In PlanKit ist sie besonders schmal und die Kopfzeile etwas niedriger, damit der Plan seine Fläche behält.
+
 ## 1.12.2 – 17. Oktober 2026
 
 - **Projektdaten aktuell:** Ändert sich „_Projekt.json“ (Objekt, Schadendatum …) in der Projektzentrale oder bei einem Kollegen, liest PlanKit sie beim Zurückkehren ins Fenster neu. Bisher blieb das Objekt vom Öffnen des Projekts stehen und kam so in Schriftfeld, Fußzeile und Anlage.
