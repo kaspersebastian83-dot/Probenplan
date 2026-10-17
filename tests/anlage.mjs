@@ -36,6 +36,7 @@ const fs=(page,action,...args)=>page.evaluate(async([action,args])=>{
   await new Promise((res,rej)=>{const r=indexedDB.open('mosaik-suite',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>{const tx=r.result.transaction('kv','readwrite');tx.objectStore('kv').put(archiv,'archiv');tx.oncomplete=()=>{r.result.close();res();};tx.onerror=()=>rej(tx.error);};r.onerror=()=>rej(r.error);});return true;}
  if(action==='list'){const d=await dir(args[0]);const out=[];for await(const h of d.values())out.push(h.name);return out.sort();}
  if(action==='bytes'){const d=await dir(args[0]);const b=new Uint8Array(await(await(await d.getFileHandle(args[1])).getFile()).arrayBuffer());let s='';for(let i=0;i<b.length;i+=32768)s+=String.fromCharCode(...b.subarray(i,i+32768));return btoa(s);}
+ if(action==='put'){const d=await dir(args[0]);const w=await(await d.getFileHandle(args[1],{create:true})).createWritable();await w.write(args[2]);await w.close();return true;}
  if(action==='text'){const d=await dir(args[0]);return await(await(await d.getFileHandle(args[1])).getFile()).text();}
  if(action==='sha'){const d=await dir(args[0]);return hex(await(await(await d.getFileHandle(args[1])).getFile()).arrayBuffer());}
 },[action,args]);
@@ -100,7 +101,7 @@ try{
   const dims=media.filter(n=>n.endsWith('.jpeg')).map(n=>{const b=files[n];let i=2;while(i<b.length){const m=b[i+1],len=b.readUInt16BE(i+2);if(m===0xC0||m===0xC2)return [b.readUInt16BE(i+7),b.readUInt16BE(i+5)];i+=2+len;}return null;});
   assert.ok(dims.some(d=>d&&d[1]>d[0]),'mindestens ein Foto hochkant (FotoKit-Drehung angewendet)');
   const log=await fs(page,'text',[NAME,'Mitteilungen'],'_Anlagen-Protokoll.txt'),docSha=await fs(page,'sha',[NAME,'Mitteilungen'],docName);
-  assert.ok(log.includes(`| ${docName} | ${docSha} | Pläne/Probenplan ${NAME}.probenplan | ${planSha} | PlanKit 1.12.1`),'Protokollzeile');
+  assert.ok(log.includes(`| ${docName} | ${docSha} | Pläne/Probenplan ${NAME}.probenplan | ${planSha} | PlanKit 1.12.2`),'Protokollzeile');
  });
  await check('Zweites Erstellen überschreibt nichts',async()=>{
   await page.locator('#export').click();await page.locator('#toast',{hasText:'_2.docx'}).waitFor({timeout:90000});
@@ -120,6 +121,15 @@ try{
   assert.match(t,/1\. Lageplan der Probenahmestellen – EG \(1\/2\)/);assert.match(t,/1\. Lageplan der Probenahmestellen – 1\. OG \(2\/2\)/);
   assert.match(t,/Probe\nGeschoss\nProbenahmestelle/);assert.match(t,/P5\n1\. OG/);assert.match(t,/P1\nEG/);assert.match(t,/P4\nnicht im Plan/);
   assert.match(t,/Probenblatt P5\n[\s\S]*?Lage im Plan \(1\. OG\)/);
+ });
+ await check('Projektdaten aktuell: Objekt aus der Projektzentrale wird beim Zurückkehren ins Fenster neu gelesen',async()=>{
+  const pj=JSON.parse(await fs(page,'text',[NAME],'_Projekt.json'));
+  await fs(page,'put',[NAME],'_Projekt.json',JSON.stringify({...pj,objekt:'EFH, Neuweg 9'}));
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.waitForTimeout(500);
+  await page.locator('#export').click();await page.locator('#toast',{hasText:'_4.docx'}).waitFor({timeout:90000});
+  const name=(await fs(page,'list',[NAME,'Mitteilungen'])).find(n=>n.endsWith('_4.docx'));
+  const t=text(unzip(Buffer.from(await fs(page,'bytes',[NAME,'Mitteilungen'],name),'base64'))['word/document.xml'].toString('utf8'));
+  assert.match(t,/Objekt\nEFH, Neuweg 9/);assert.doesNotMatch(t,/Musterweg 7/);
  });
  await check('Aus der Projektzentrale (?aktion=anlage) ist der Export mit der Anlage gleich offen',async()=>{
   await page.locator('#saved',{hasText:/gespeichert/}).waitFor();await page.waitForTimeout(1500);

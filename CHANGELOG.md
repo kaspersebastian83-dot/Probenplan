@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.12.2 – 17. Oktober 2026
+
+- **Projektdaten aktuell:** Ändert sich „_Projekt.json“ (Objekt, Schadendatum …) in der Projektzentrale oder bei einem Kollegen, liest PlanKit sie beim Zurückkehren ins Fenster neu. Bisher blieb das Objekt vom Öffnen des Projekts stehen und kam so in Schriftfeld, Fußzeile und Anlage.
+
 ## 1.12.1 – 17. Oktober 2026
 
 - **Sicherungskopien in Ortszeit:** „(vorher …)“- und „(Wiederherstellung …)“-Dateien heißen jetzt z. B. „Probenplan 26.0142 Teststadt (vorher 2026-10-16 21-37-16-853 a1b2c3d4).probenplan“. Bisher stand dort die UTC-Zeit („19-37“ für eine Speicherung um 21:37), was beim Wiederherstellen verwirrte. Das Aufräumen alter Sicherungen ordnet alte (UTC) und neue Namen nach ihrem tatsächlichen Zeitpunkt.
