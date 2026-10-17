@@ -13,7 +13,7 @@ import {exportImage,exportLayout} from './export';
 import {annexFileName,createAnnex,saveAnnex,ANNEX_DIR} from './annex-run';
 import {COMPANY,PAPERS,renderSheet,sheetLayout,type Paper} from './sheet';
 import {buildPdf,canvasRGB,type PdfPage} from './pdfwrite';
-import {cropProject,planMatrix,preparation,rotateProject} from './preparation';
+import {alignProject,cropProject,fineAngle,MAX_ANGLE,planMatrix,preparation,rotateProject} from './preparation';
 import type {LocalPDF} from './pdf';
 import type {Plan,Rect} from './model';
 import type {Area,Point} from './model';
@@ -51,26 +51,33 @@ const marks=$('marks') as unknown as SVGGElement;
 document.querySelector('#welcome p')!.innerHTML='Öffnen Sie eine PDF, einen Polycam-Export oder ein Planbild.<br>Ihre Gebäudedaten bleiben im Browser.';
 document.querySelector('#help-dialog ol li')!.innerHTML='<b>Plan laden:</b> PDF, Polycam-ZIP, SVG, PNG oder JPG auswählen. Bei mehrseitigen PDFs eine Seite in der Vorschau wählen. Bei Polycam möglichst SVG verwenden.';
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Anlage Probenahme (Word)</h3><p>Export → „Word · Anlage Probenahme“: eine Word-Datei zum Einfügen in den Bericht (Einfügen › Objekt › Text aus Datei) mit Lageplan je Geschoss im genormten Maßstab, Probenverzeichnis mit den Messwerten in der Schreibweise des Prüfberichts und der Einordnung in Ihre Skala, je Probe ein Probenblatt mit Lage, Fotos aus FotoKit (Probe-Nr.) und allen Laborwerten sowie einem Prüfprotokoll mit SHA-256 aller Quelldateien. Im Projektordner landet sie datiert in „Mitteilungen“, ohne etwas zu überschreiben; Lücken (Proben ohne Lage, Wert oder Foto, veränderte Fotos) stehen im Prüfprotokoll.</p>');
+document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Ausrichten (fotografierte Pläne)</h3><p>„Ausrichten“ (A) legt ein Raster über die Karte; der Plan dreht sich darunter um seine Mitte. Im Plan ziehen dreht frei (Umschalt = zehnmal feiner), Regler, Zahlenfeld, ±0,1° oder Pfeiltasten (Umschalt = 1°) stellen genau ein. „An Kante ausrichten“: zwei Punkte entlang einer geraden Wand anklicken – der Plan wird so gedreht, dass sie waagerecht oder senkrecht liegt. „Übernehmen“ oder Enter speichert, Escape bricht ab. Bis ±45°, gespeichert wird nur der Winkel; das Original bleibt unverändert. Ecken außerhalb des Fotos werden weiß, danach bei Bedarf zuschneiden. Probenpunkte, Flächen und Nordpfeil drehen mit und bleiben auf ihrer Stelle im Plan.</p>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Maßstäbliches PDF</h3><p>Liste → „Maßstab &amp; Norden“ → „Strecke messen“: zwei Punkte einer bekannten Strecke anklicken und die Länge in Metern eingeben. Im Export „PDF · A4“ oder „PDF · A3“ wählen – PlanKit nimmt den größten genormten Maßstab, der aufs Blatt passt, mit Schriftfeld, Legende, Maßstabsleiste und optionalem Nordpfeil. Beim Drucken „Tatsächliche Größe“ (100 %) wählen.</p><h3>Plan vorbereiten</h3><p>Unter „Plan vorbereiten“ jeweils 90° links/rechts drehen oder einen Bildausschnitt mit Maus/Finger aufziehen. Zuschnitt übernehmen oder abbrechen. Alle gesetzten Probenpunkte und Brandherde müssen im Ausschnitt liegen; ihre Positionen und versetzten Beschriftungen werden korrekt umgerechnet. Drehen und Zuschneiden sind rückgängig machbar. Die Originaldaten bleiben erhalten; eine perspektivische Entzerrung ist nicht enthalten.</p><p>PDF-Seiten werden lokal in hoher Auflösung gerendert (bis 4.600 px, auf Mobilgeräten/speicherarmen Geräten sinnvoll begrenzt). Bei Speicherproblemen wird eine kleinere Stufe versucht. JPG-/PNG-Originale werden beim Drehen und Zuschneiden nicht neu komprimiert. HEIC/HEIF bitte zuvor als JPG exportieren.</p>');
 document.querySelector('#help-dialog')!.insertAdjacentHTML('beforeend','<h3>Laborberichte und offene Proben</h3><p>Zuerst einen Grundriss laden. Unter „Laborbericht importieren …“ XML, PDF oder beide gemeinsam auswählen oder Dateien auf die App ziehen. Die Prüftabelle vor Übernahme korrigieren, ergänzen und sortieren. Bei belegten P-Nummern das gewünschte Vorgehen ausdrücklich wählen. Offene Laborproben auf den Plan ziehen oder auswählen und in den Plan tippen. Übernahme und Platzierung unterstützen Undo/Redo; Projektdatei und Autosicherung erhalten die offene Liste.</p><p>„Probenliste speichern“ erzeugt eine JSON-Datei für andere Apps. Im Speicherdialog den Projektordner und „Laborergebnisse“ wählen; Browser ohne nativen Dialog laden die Datei herunter. Gespeicherte Herkunft bleibt nach erneutem Öffnen erhalten; bei mehreren Berichten den gewünschten Eintrag wählen. Nur bei älteren Projekten fehlende Herkunftsangaben ergänzen. PDF-Scans oder unbekannte Tabellenlayouts benötigen XML oder manuelle Eingabe. Alle Laborwerte bleiben lokal; die Ergebniskarte nutzt Ihre Skala oder die ausdrücklich gewählte VdS-Hintergrundreferenz.</p>');
 input('file').accept='.zip,.svg,.png,.jpg,.jpeg,.pdf,.heic,.heif,application/pdf,image/png,image/jpeg';
 $('plan-name').textContent='PDF, Polycam-ZIP, SVG, PNG oder JPG';
-document.getElementById('app-version')!.textContent='v1.13.0';
+document.getElementById('app-version')!.textContent='v1.14.0';
 const colorOptions=PALETTE.map(c=>`<option value="${c.color}">${c.title} · ${c.suggestion}</option>`).join('');
 document.querySelector('.modes')!.insertAdjacentHTML('beforeend','<button data-mode="area-draw" class="mode" disabled><span class="tool-icon">⬡</span><span>Fläche zeichnen<small>Eckpunkte setzen & abschließen</small></span></button><button data-mode="area-edit" class="mode" disabled><span class="tool-icon">◇</span><span>Fläche bearbeiten<small>Ecken oder ganze Fläche ziehen</small></span></button>');
 document.querySelector('.markers-section')!.insertAdjacentHTML('afterend',`<section class="areas-section"><div class="section-heading"><h2>Schadensflächen</h2><span id="area-count" class="count">0</span></div><div id="area-draft" hidden><label>Farbe<select id="draft-color">${colorOptions}</select></label><label>Deckkraft <output id="draft-opacity-value">30 %</output><input id="draft-opacity" type="range" min="5" max="70" value="30"></label><p id="draft-status" class="tiny"></p><div class="inspector-actions"><button id="area-last">Letzten Eckpunkt entfernen</button><button id="area-cancel">Abbrechen</button><button id="area-finish" class="primary">Fläche abschließen</button></div></div><div id="area-list"></div><div id="area-inspector" hidden><label>Kennung<input id="area-label" maxlength="16"></label><label>Bezeichnung<textarea id="area-name" maxlength="160" rows="3"></textarea></label><label>Farbe<select id="area-color">${colorOptions}</select></label><label>Deckkraft <output id="area-opacity-value"></output><input id="area-opacity" type="range" min="5" max="70"></label><p class="tiny">Eckpunkte oder die ganze Fläche im Plan ziehen. Die Bezeichnung bestimmt die gemeinsame Legendenkategorie.</p><button id="area-delete" class="danger wide">Fläche löschen</button></div><p class="tiny">Farben und Bezeichnungen dokumentieren Ihre Eingabe. Sie stellen keine chemische Bewertung oder Freigabe fest.</p></section>`);
 document.body.insertAdjacentHTML('beforeend','<dialog id="area-dialog"><h2>Fläche benennen</h2><p>Vorschlag frei anpassen. Gleich bezeichnete Flächen werden in der Legende gemeinsam aufgeführt.</p><label>Bezeichnung<input id="new-area-name" maxlength="160"></label><div class="dialog-actions"><button id="area-dialog-cancel">Weiterzeichnen</button><button id="area-dialog-save" class="primary">Fläche speichern</button></div></dialog>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Schadensflächen & Legende</h3><p>„Fläche zeichnen“ wählen, Farbe und Deckkraft einstellen (Standard 30 %) und mindestens drei Eckpunkte in den Plan tippen. „Fläche abschließen“ öffnet die frei bearbeitbare Bezeichnung. „Letzten Eckpunkt entfernen“ korrigiert die Kontur; „Abbrechen“ verwirft den Entwurf. Zum Verschieben der Ansicht können Sie zwischendurch „Ansicht bewegen“ wählen. Zwei Finger und das Mausrad zoomen, ohne Eckpunkte zu setzen.</p><p>Unter „Fläche bearbeiten“ oder über die Flächenliste auswählen. Die sichtbaren Eckpunkte oder die ganze Fläche ziehen. Kennung, Bezeichnung, Farbe und Deckkraft sind nachträglich bearbeitbar. Kreuzende Konturen werden abgewiesen. Rückgängig/Wiederherstellen gilt auch für Flächen. Ein Zuschnitt muss sämtliche Eckpunkte und Probenpunkte enthalten. Unfertige Entwürfe vor Vorbereitung, Sicherung oder Export abschließen oder abbrechen.</p><p>Der Export ordnet nur verwendete Flächenbezeichnungen automatisch in einem weißen Legendenbereich an. Gleiche Bezeichnungen (unabhängig von Groß-/Kleinschreibung) erscheinen einmal; unterschiedliche Farben oder Deckkräfte werden dort mit den zugehörigen Kennungen gezeigt. Konturmuster und Kennungen helfen bei geringer Farbsättigung. Farben und Vorschlagstexte sind ausschließlich manuelle Dokumentation, keine automatische Schadstoffbewertung oder Freigabe.</p>');
-input('project-file').insertAdjacentHTML('afterend',`<div id="preparation" hidden><span class="eyebrow">PLAN VORBEREITEN</span><div class="preparation-buttons"><button id="rotate-left" title="90° nach links drehen">↶ Links drehen</button><button id="rotate-right" title="90° nach rechts drehen">↷ Rechts drehen</button><button id="crop-start">⌗ Zuschneiden</button></div><p class="tiny">Bei Bedarf ausrichten und Bildränder entfernen.</p><div id="crop-actions" hidden><p>Ziehen Sie im Plan einen neuen Bildausschnitt auf. Alle Probenpunkte müssen darin liegen.</p><button id="crop-confirm" class="primary" disabled>Zuschnitt übernehmen</button><button id="crop-cancel">Abbrechen</button></div></div><div id="import-status" role="status" hidden>Plan wird geladen …</div>`);
+input('project-file').insertAdjacentHTML('afterend',`<div id="preparation" hidden><span class="eyebrow">PLAN VORBEREITEN</span><div class="preparation-buttons"><button id="rotate-left" title="90° nach links drehen">↶ Links drehen</button><button id="rotate-right" title="90° nach rechts drehen">↷ Rechts drehen</button><button id="crop-start">⌗ Zuschneiden</button><button id="align-start">∡ Ausrichten</button></div><p class="tiny">Bei Bedarf ausrichten und Bildränder entfernen.</p><div id="crop-actions" hidden><p>Ziehen Sie im Plan einen neuen Bildausschnitt auf. Alle Probenpunkte müssen darin liegen.</p><button id="crop-confirm" class="primary" disabled>Zuschnitt übernehmen</button><button id="crop-cancel">Abbrechen</button></div><div id="align-actions" hidden><p>Plan drehen, bis Wände am Raster liegen: im Plan ziehen (Umschalt = fein), Regler, ±0,1° oder Pfeiltasten. Oder „An Kante ausrichten“ und zwei Punkte entlang einer Wand anklicken.</p><div class="align-row"><button id="align-minus" title="0,1° gegen den Uhrzeigersinn (←, Umschalt = 1°)">−0,1°</button><input id="align-range" type="range" min="-${45}" max="${45}" step="0.1" value="0" aria-label="Drehwinkel in Grad"><button id="align-plus" title="0,1° im Uhrzeigersinn (→, Umschalt = 1°)">+0,1°</button><label class="align-num"><input id="align-angle" type="number" min="-45" max="45" step="0.1" value="0" aria-label="Drehwinkel in Grad">°</label></div><div class="align-row"><button id="align-edge" title="Zwei Punkte entlang einer Wand anklicken: der Plan wird so gedreht, dass sie waagerecht oder senkrecht liegt">⟋ An Kante ausrichten</button><button id="align-reset" title="Feinausrichtung auf 0° zurücksetzen">0°</button></div><div class="align-row"><button id="align-cancel">Abbrechen</button><button id="align-confirm" class="primary">Ausrichtung übernehmen</button></div></div></div><div id="import-status" role="status" hidden>Plan wird geladen …</div>`);
 document.body.insertAdjacentHTML('beforeend',`<dialog id="pdf-dialog"><form method="dialog"><button class="close" aria-label="PDF-Auswahl abbrechen">×</button></form><span class="eyebrow">PDF · SEITENAUSWAHL</span><h2>Welchen Grundriss übernehmen?</h2><p id="pdf-name"></p><div class="pdf-navigation"><button id="pdf-prev" aria-label="Vorherige PDF-Seite">←</button><label>Seite <input id="pdf-page" type="number" min="1" value="1"></label><span id="pdf-count"></span><button id="pdf-next" aria-label="Nächste PDF-Seite">→</button></div><div class="pdf-preview"><img id="pdf-preview" alt="Vorschau der ausgewählten PDF-Seite"><p id="pdf-status" role="status">Vorschau wird geladen …</p></div><div class="dialog-actions"><button id="pdf-cancel">Abbrechen</button><button id="pdf-all">Alle Seiten als einzelne Pläne</button><button id="pdf-use" class="primary" disabled>Diese Seite übernehmen</button></div><p class="tiny">Die gewählte Seite wird in hoher Auflösung übernommen. „Alle Seiten“ legt je Seite einen eigenen Plan an (z. B. ein Geschoss pro Seite).</p></dialog>`);
 const ns='http://www.w3.org/2000/svg',planGroup=document.createElementNS(ns,'g'),clip=document.createElementNS(ns,'clipPath'),clipRect=document.createElementNS(ns,'rect');
 clip.id='plan-clip';clip.append(clipRect);svg.prepend(clip);image.before(planGroup);planGroup.append(image);planGroup.setAttribute('clip-path','url(#plan-clip)');
+// Weißer Grund hinter fein gedrehten Plänen: die Ecken außerhalb des Originals erscheinen weiß wie im Export.
+const planBack=document.createElementNS(ns,'rect');planBack.id='plan-back';planBack.setAttribute('fill','#fff');planGroup.prepend(planBack);
 const cropLayer=document.createElementNS(ns,'g');cropLayer.id='crop-overlay';cropLayer.setAttribute('pointer-events','none');svg.append(cropLayer);
+const alignLayer=document.createElementNS(ns,'g');alignLayer.id='align-overlay';alignLayer.setAttribute('pointer-events','none');svg.append(alignLayer);
 const areaLayer=document.createElementNS(ns,'g');areaLayer.id='areas';marks.before(areaLayer);
 let selectedArea:string|null=null,draftPoints:Point[]=[],measurePoints:Point[]=[];
 let labUI:LabUI|null=null;
 let project:Project|null=null,selected:string|null=null,mode='navigate',history=new History(),busy=false;
 let cropping=false,cropRect:Rect|null=null,cropDrag:{id:number;start:{x:number;y:number}}|null=null;
+// Ausrichten: Vorschau dreht nur die Darstellung um delta Grad; erst „Übernehmen“ ändert das Projekt (ein Rückgängig-Schritt).
+// Während des Ausrichtens ist cropping ebenfalls gesetzt: alles, was beim Zuschneiden gesperrt ist, ist auch hier gesperrt.
+let aligning:{start:number;delta:number;drag:{id:number;prev:number}|null;edge:Point[]|null}|null=null;
 let camera={x:0,y:0,width:1000,height:1000},fitWidth=1000,saveRevision=0,exportURL='';
 let saveQueue:Promise<void>=Promise.resolve();
 let toastTimer=0,savedToastRevision:number|null=null;
@@ -88,7 +95,7 @@ function persist(toFolder=true){
 function changed(){render();persist();}
 function mutate(fn:(p:Project)=>void){if(!project)return;history.push(project);fn(project);changed();}
 function selectedMarker(){return project?.markers.find(m=>m.id===selected);}
-function updateCamera(){svg.setAttribute('viewBox',`${camera.x} ${camera.y} ${camera.width} ${camera.height}`);$('zoom-value').textContent=`${Math.round(fitWidth/camera.width*100)} %`;renderMarkers();renderCrop();}
+function updateCamera(){svg.setAttribute('viewBox',`${camera.x} ${camera.y} ${camera.width} ${camera.height}`);$('zoom-value').textContent=`${Math.round(fitWidth/camera.width*100)} %`;renderMarkers();renderCrop();if(aligning)renderAlign();}
 function fit(){if(!project)return;const b=bounds(project),rect=svg.getBoundingClientRect(),ratio=rect.width/rect.height||1;let w=b.width*1.14,h=b.height*1.14;if(w/h<ratio)w=h*ratio;else h=w/ratio;camera={x:b.x+(b.width-w)/2,y:b.y+(b.height-h)/2,width:w,height:h};fitWidth=w;updateCamera();}
 function point(e:{clientX:number;clientY:number}){const matrix=svg.getScreenCTM();if(!matrix)return{x:0,y:0};const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(matrix.inverse());return{x:p.x,y:p.y};}
 function zoom(factor:number,anchor?:{x:number;y:number}){if(!project)return;const ratio=Math.min(20,Math.max(.25,fitWidth/(camera.width*factor)));factor=fitWidth/(ratio*camera.width);const c=anchor||{x:camera.x+camera.width/2,y:camera.y+camera.height/2};camera={x:c.x-(c.x-camera.x)*factor,y:c.y-(c.y-camera.y)*factor,width:camera.width*factor,height:camera.height*factor};updateCamera();}
@@ -133,7 +140,7 @@ function dimensions(){if(!project)return;const format=exportFormat(),pdf=format.
   catch(e){$('dimensions').textContent='—';$('dimensions-note').textContent=e instanceof Error?e.message:'';}
 }
 function renderCrop(){
-  if(!cropping||!project){cropLayer.replaceChildren();return;}
+  if(!cropping||aligning||!project){cropLayer.replaceChildren();return;}
   const w=project.plan.width,h=project.plan.height,c=cropRect||{x:0,y:0,width:0,height:0},stroke=camera.width/Math.max(1,svg.clientWidth)*2;
   cropLayer.innerHTML=`<path d="M0 0H${w}V${h}H0Z M${c.x} ${c.y}V${c.y+c.height}H${c.x+c.width}V${c.y}Z" fill="#17392c" fill-opacity=".48" fill-rule="evenodd"/><rect x="${c.x}" y="${c.y}" width="${c.width}" height="${c.height}" fill="none" stroke="white" stroke-width="${stroke*2}"/><rect x="${c.x}" y="${c.y}" width="${c.width}" height="${c.height}" fill="none" stroke="#1c7457" stroke-width="${stroke}" stroke-dasharray="${stroke*4} ${stroke*3}"/>`;
 }
@@ -153,27 +160,87 @@ for(const id of ['crop-confirm','crop-cancel']){
   button.onpointercancel=()=>{tap=null;};
   button.onpointerup=e=>{const start=tap;tap=null;if(start?.id!==e.pointerId||Math.hypot(e.clientX-start.x,e.clientY-start.y)>=10)return;const rect=cropRect,seen=clicks;setTimeout(()=>{if(cropping&&cropRect===rect&&clicks===seen&&!button.disabled)button.click();},80);};
 }
-svg.addEventListener('pointerdown',e=>{if(!cropping||!project)return;if(cropDrag||e.button>0)return;svg.setPointerCapture(e.pointerId);const start=cropPoint(e);cropDrag={id:e.pointerId,start};cropRect={...start,width:0,height:0};$<HTMLButtonElement>('crop-confirm').disabled=true;renderCrop();},{capture:true});
+svg.addEventListener('pointerdown',e=>{if(!cropping||aligning||!project)return;if(cropDrag||e.button>0)return;svg.setPointerCapture(e.pointerId);const start=cropPoint(e);cropDrag={id:e.pointerId,start};cropRect={...start,width:0,height:0};$<HTMLButtonElement>('crop-confirm').disabled=true;renderCrop();},{capture:true});
 svg.addEventListener('pointermove',e=>{if(!cropping||!project||cropDrag?.id!==e.pointerId)return;const pt=cropPoint(e),start=cropDrag.start;cropRect={x:Math.min(start.x,pt.x),y:Math.min(start.y,pt.y),width:Math.abs(pt.x-start.x),height:Math.abs(pt.y-start.y)};$<HTMLButtonElement>('crop-confirm').disabled=cropRect.width<1||cropRect.height<1;renderCrop();},{capture:true});
 svg.addEventListener('pointerup',e=>{if(cropping&&cropDrag?.id===e.pointerId)cropDrag=null;},{capture:true});
 svg.addEventListener('pointercancel',e=>{if(cropping&&cropDrag?.id===e.pointerId){cropDrag=null;cropRect=null;$<HTMLButtonElement>('crop-confirm').disabled=true;renderCrop();}},{capture:true});
-window.addEventListener('keydown',e=>{if(e.key==='Escape'&&cropping)endCrop();});
+window.addEventListener('keydown',e=>{if(e.key==='Escape'&&cropping&&!aligning)endCrop();});
+/* ---------- Ausrichten (Feinausrichtung) ----------
+   Raster fest über der Karte, der Plan dreht sich darunter um seine Mitte. Ziehen dreht (Umschalt = zehnmal feiner),
+   Regler/Zahl/±0,1°/Pfeiltasten stellen genau ein, „An Kante ausrichten“ legt zwei angeklickte Punkte waagerecht oder senkrecht.
+   Gespeichert wird nur der Winkel (alignProject); das Original bleibt unverändert. */
+$('stage').insertAdjacentHTML('beforeend','<div id="align-grid" hidden aria-hidden="true"></div>');
+const deg=(n:number)=>`${n.toLocaleString('de-DE',{minimumFractionDigits:1,maximumFractionDigits:2})}°`;
+function alignTotal(){return aligning?Math.round((aligning.start+aligning.delta)*100)/100:0;}
+function setAlignTotal(total:number){if(!aligning||!Number.isFinite(total))return;const t=Math.max(-MAX_ANGLE,Math.min(MAX_ANGLE,Math.round(total*100)/100));aligning.delta=Math.round((t-aligning.start)*100)/100;renderAlign();}
+function renderAlign(){
+  const on=!!aligning&&!!project;$('align-grid').hidden=!on;$('align-actions').hidden=!on;$('stage').classList.toggle('aligning',on);
+  for(const layer of [planGroup,areaLayer,marks])if(on&&aligning!.delta)layer.setAttribute('transform',`rotate(${aligning!.delta} ${project!.plan.width/2} ${project!.plan.height/2})`);else layer.removeAttribute('transform');
+  if(!on){alignLayer.replaceChildren();return;}
+  const a=aligning!,total=alignTotal();input('align-range').value=String(total);if(document.activeElement!==input('align-angle'))input('align-angle').value=String(total);
+  $<HTMLButtonElement>('align-confirm').textContent=a.delta?`Ausrichtung übernehmen (${deg(total)})`:'Ausrichtung übernehmen';
+  $('align-edge').classList.toggle('active',!!a.edge);
+  $('mode-hint').textContent=a.edge?(a.edge.length?'Zweiten Punkt auf derselben Wand anklicken':'Ersten Punkt auf einer geraden Wand oder Kante anklicken'):`Ausrichten · ${deg(total)} · Plan am Raster ausrichten`;
+  const k=camera.width/Math.max(1,svg.clientWidth),pts=a.edge||[];
+  alignLayer.innerHTML=pts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="${k*6}" fill="#c0392b" stroke="white" stroke-width="${k*2}"/>`).join('')+(pts.length===2?`<line x1="${pts[0].x}" y1="${pts[0].y}" x2="${pts[1].x}" y2="${pts[1].y}" stroke="#c0392b" stroke-width="${k*2}"/>`:'');
+}
+function endAlign(){aligning=null;cropping=false;setMode('navigate');renderAlign();render();fit();}
+$('align-start').onclick=()=>{if(!project||busy||cropping||!requireFinished())return;aligning={start:fineAngle(preparation(project.plan)),delta:0,drag:null,edge:null};cropping=true;selected=null;selectedArea=null;setMode('navigate');$('stage').dataset.mode='align';render();fit();renderAlign();};
+$('align-cancel').onclick=endAlign;
+$('align-confirm').onclick=()=>{if(!project||!aligning)return;const {delta}=aligning,total=alignTotal();if(!delta){endAlign();return;}
+  try{const next=clone(project);alignProject(next,delta);history.push(project);project=next;endAlign();persist();toast(`Plan um ${deg(delta)} gedreht (Ausrichtung jetzt ${deg(total)}). Rückgängig stellt die vorherige Lage wieder her.`);}catch(e){fail(e);}};
+$('align-minus').onclick=()=>setAlignTotal(alignTotal()-.1);
+$('align-plus').onclick=()=>setAlignTotal(alignTotal()+.1);
+$('align-reset').onclick=()=>setAlignTotal(0);
+input('align-range').oninput=()=>setAlignTotal(Number(input('align-range').value));
+input('align-angle').onchange=()=>{const v=Number(input('align-angle').value.replace(',','.'));if(Number.isFinite(v))setAlignTotal(v);else renderAlign();};
+$('align-edge').onclick=()=>{if(!aligning)return;aligning.edge=aligning.edge?null:[];renderAlign();};
+/** Mitte des Plans auf dem Bildschirm (Drehpunkt der Vorschau). */
+function alignCenter(){const m=svg.getScreenCTM();if(!m||!project)return {x:0,y:0};const p=new DOMPoint(project.plan.width/2,project.plan.height/2).matrixTransform(m);return {x:p.x,y:p.y};}
+svg.addEventListener('pointerdown',e=>{
+  if(!aligning||!project||e.button>0)return;e.preventDefault();
+  if(aligning.edge){
+    const pt=point(e);aligning.edge.push(pt);
+    if(aligning.edge.length===2){
+      const [a,b]=aligning.edge,len=Math.hypot(b.x-a.x,b.y-a.y)/(camera.width/Math.max(1,svg.clientWidth));
+      if(len<20){aligning.edge=[a];toast('Die beiden Punkte liegen zu nah beieinander. Bitte weiter auseinander anklicken.',true);renderAlign();return;}
+      const theta=Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI,target=Math.round(theta/90)*90;renderAlign();
+      const edge=aligning;setTimeout(()=>{if(aligning===edge){edge.edge=null;setAlignTotal(alignTotal()+target-theta);}},350);
+    }else renderAlign();
+    return;
+  }
+  if(aligning.drag)return;svg.setPointerCapture(e.pointerId);const c=alignCenter();aligning.drag={id:e.pointerId,prev:Math.atan2(e.clientY-c.y,e.clientX-c.x)};
+},{capture:true});
+svg.addEventListener('pointermove',e=>{
+  if(!aligning?.drag||aligning.drag.id!==e.pointerId)return;const c=alignCenter();if(Math.hypot(e.clientX-c.x,e.clientY-c.y)<16)return;
+  const now=Math.atan2(e.clientY-c.y,e.clientX-c.x);let step=(now-aligning.drag.prev)*180/Math.PI;aligning.drag.prev=now;step=((step+540)%360)-180;
+  aligning.delta+=step*(e.shiftKey?.1:1);const t=Math.max(-MAX_ANGLE,Math.min(MAX_ANGLE,aligning.start+aligning.delta));aligning.delta=t-aligning.start;renderAlign();
+},{capture:true});
+const alignDrop=(e:PointerEvent)=>{if(aligning?.drag?.id===e.pointerId){aligning.drag=null;setAlignTotal(alignTotal());}};
+svg.addEventListener('pointerup',alignDrop,{capture:true});svg.addEventListener('pointercancel',alignDrop,{capture:true});
+window.addEventListener('keydown',e=>{
+  if(!aligning||e.ctrlKey||e.metaKey||e.altKey)return;
+  if(e.key==='Escape'){e.preventDefault();if(aligning.edge){aligning.edge=null;renderAlign();}else endAlign();return;}
+  const t=e.target;if(t instanceof Element&&t.closest('input,textarea,select'))return;
+  if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();setAlignTotal(alignTotal()+(e.key==='ArrowRight'?1:-1)*(e.shiftKey?1:.1));}
+  else if(e.key==='Enter'&&!(t instanceof HTMLButtonElement)){e.preventDefault();$('align-confirm').click();}
+});
 function render(){
   const p=project;labUI?.render(p); $('welcome').hidden=!!p;$('mode-hint').hidden=!p;if(!p){renderSheets();renderResults();updateSizeUI();updateScaleUI();}
   ['save-project','export','export-open','next','report','date'].forEach(id=>($<HTMLButtonElement>(id).disabled=!p));
   document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(b=>b.disabled=!p&&b.dataset.mode!=='navigate');
   $<HTMLButtonElement>('undo').disabled=!history.past.length;$<HTMLButtonElement>('redo').disabled=!history.future.length;
   $('preparation').hidden=!p;
-  ['rotate-left','rotate-right','crop-start'].forEach(id=>$<HTMLButtonElement>(id).disabled=busy||cropping||!p);
+  ['rotate-left','rotate-right','crop-start','align-start'].forEach(id=>$<HTMLButtonElement>(id).disabled=busy||cropping||!p);
   ['load','open-project','save-project'].forEach(id=>$<HTMLButtonElement>(id).disabled=busy||cropping||(id==='save-project'&&!p));
   document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(b=>b.disabled=cropping||(!p&&b.dataset.mode!=='navigate'));
   $<HTMLButtonElement>('undo').disabled=cropping||!!draftPoints.length||!history.past.length;$<HTMLButtonElement>('redo').disabled=cropping||!!draftPoints.length||!history.future.length;
   $<HTMLButtonElement>('export').disabled=$<HTMLButtonElement>('export-open').disabled=busy||cropping||!p;
   if(!p)return;
-  ['rotate-left','rotate-right','crop-start','save-project','export','export-open','open-project','load'].forEach(id=>{if(draftPoints.length)$<HTMLButtonElement>(id).disabled=true;});
+  ['rotate-left','rotate-right','crop-start','align-start','save-project','export','export-open','open-project','load'].forEach(id=>{if(draftPoints.length)$<HTMLButtonElement>(id).disabled=true;});
   $('area-list').innerHTML=(p.areas||[]).map(a=>`<button class="area-row ${a.id===selectedArea?'selected':''}" data-area-select="${a.id}"><span style="background:${a.color}">${escape(a.label)}</span><span>${escape(a.name)}</span></button>`).join('')||'<p class="tiny">Noch keine Flächen gesetzt.</p>';
   const a=selectedPolygon();$('area-inspector').hidden=!a;if(a){input('area-label').value=a.label;input('area-name').value=a.name;input('area-color').value=a.color;input('area-opacity').value=String(Math.round(a.opacity*100));$('area-opacity-value').textContent=`${Math.round(a.opacity*100)} %`;}
-  const source=preparation(p.plan);image.setAttribute('href',p.plan.data);image.setAttribute('width',String(source.sourceWidth));image.setAttribute('height',String(source.sourceHeight));image.setAttribute('transform',`matrix(${planMatrix(p.plan).join(' ')})`);clipRect.setAttribute('width',String(p.plan.width));clipRect.setAttribute('height',String(p.plan.height));
+  const source=preparation(p.plan);image.setAttribute('href',p.plan.data);image.setAttribute('width',String(source.sourceWidth));image.setAttribute('height',String(source.sourceHeight));image.setAttribute('transform',`matrix(${planMatrix(p.plan).join(' ')})`);clipRect.setAttribute('width',String(p.plan.width));clipRect.setAttribute('height',String(p.plan.height));planBack.setAttribute('width',String(p.plan.width));planBack.setAttribute('height',String(p.plan.height));planBack.style.display=fineAngle(source)||aligning?'':'none';
   $('file-type').textContent=p.plan.vector?'SVG · VEKTOR':'RASTERBILD';$('plan-name').textContent=p.plan.name;$('canvas-name').textContent=p.plan.name.replace(/\.[^.]+$/,'');$('source-info').textContent=`${Math.round(p.plan.width)} × ${Math.round(p.plan.height)} · ${p.plan.vector?'Vektorgrundlage':'Rastergrundlage'}`;
   if(p.plan.pdf){$('file-type').textContent=`PDF · SEITE ${p.plan.pdf.page}`;$('source-info').textContent=`${Math.round(p.plan.width)} × ${Math.round(p.plan.height)} · PDF-Seite ${p.plan.pdf.page}/${p.plan.pdf.totalPages}`;}
   input('next').value=String(p.nextSample);input('report').value=p.report;input('date').value=p.date;
@@ -182,7 +249,7 @@ function render(){
   const m=selectedMarker();$('inspector').hidden=!m;if(m){input('label').value=m.label;input('note').value=m.note;}let labFields=document.getElementById('marker-lab');if(!labFields){labFields=document.createElement('p');labFields.id='marker-lab';labFields.className='lab-fields';$('inspector').append(labFields);}labFields.textContent=m?.lab?['Referenz: '+m.lab.ref,'Probenart: '+(m.lab.art||'—'),'Labor-Nr.: '+(m.lab.labNr||'—'),'Probenahme: '+(m.lab.datum||'—'),'Bericht: '+(m.lab.bericht||'—')].join(' · '):'';
   renderMarkers();dimensions();renderSheets();renderResults();updateSizeUI();updateScaleUI();
 }
-async function install(p:Project,fromFolder=false,transition?:()=>void){await preserveUnsavedProject();transition?.();if(folder&&!fromFolder){folderDirty=true;if(!p.report)p.report=folder.name;}labUI?.reset();project=p;selected=null;selectedArea=null;draftPoints=[];history.clear();cropping=false;cropRect=null;setMode('navigate');render();fit();persist(!fromFolder);$('export-result').hidden=true;}
+async function install(p:Project,fromFolder=false,transition?:()=>void){await preserveUnsavedProject();transition?.();if(folder&&!fromFolder){folderDirty=true;if(!p.report)p.report=folder.name;}labUI?.reset();project=p;selected=null;selectedArea=null;draftPoints=[];history.clear();cropping=false;cropRect=null;aligning=null;renderAlign();setMode('navigate');render();fit();persist(!fromFolder);$('export-result').hidden=true;}
 function saveProject(){if(project&&requireFinished()&&folder){void saveToFolder(true);return;}if(project&&requireFinished())void download(new Blob([JSON.stringify(project)],{type:'application/json'}),`${project.report||'Probenplan'}.probenplan`);}
 async function allowReplace(){if(!project)return true;return new Promise<boolean>(resolve=>{const d=$<HTMLDialogElement>('replace-dialog');const text=d.querySelector('p')!;text.dataset.plain??=text.textContent||'';text.textContent=folder?`Der neue Plan ersetzt den Probenplan dieses Projekts. Die bisherige Datei bleibt in „${PLAENE}“ als „(vorher …)“-Kopie erhalten.`:text.dataset.plain;$('replace-save').hidden=!!folder;const finish=(ok:boolean)=>{d.close();resolve(ok);};$('replace-cancel').onclick=()=>finish(false);$('replace-yes').onclick=()=>finish(true);$('replace-save').onclick=()=>{saveProject();finish(true);};d.oncancel=()=>resolve(false);d.showModal();});}
 async function choose(items:Candidate[]):Promise<Candidate|null>{if(items.length===1)return items[0];return new Promise(resolve=>{const d=$<HTMLDialogElement>('choose-dialog');$('choices').replaceChildren();items.forEach((item,i)=>{const b=document.createElement('button');b.className='choice';b.textContent=`${/\.svg$/i.test(item.name)?'◇ SVG · empfohlen':'▧ Bild'} — ${item.name}`;b.onclick=()=>{d.close();resolve(item);};$('choices').append(b);if(i===0)b.autofocus=true;});d.onclose=()=>resolve(null);d.showModal();});}
@@ -371,7 +438,7 @@ setMode('navigate');
 function moveTo(target:Element,...ids:string[]){for(const id of ids){const e=document.getElementById(id);if(e)target.append(e);}}
 const stageEl=$('stage'),panelScroll=document.querySelector('.panel-scroll')!;
 moveTo(document.querySelector('.rail')!,'preparation');
-moveTo(stageEl,'crop-actions','import-status');
+moveTo(stageEl,'crop-actions','align-actions','import-status');
 moveTo($('toolbar'),'area-draft');
 moveTo($('file-actions'),'lab-import','lab-files');
 document.querySelector('.markers-section')!.before($('lab-panel'));
@@ -380,8 +447,9 @@ const railLabel=(id:string,icon:string,text:string,title:string,key?:string)=>{c
 railLabel('rotate-left','↶','Links','90° nach links drehen (Umschalt+R)');
 railLabel('rotate-right','↷','Rechts','90° nach rechts drehen (R)','r');
 railLabel('crop-start','⌗','Zuschnitt','Bildausschnitt zuschneiden (C)','c');
+railLabel('align-start','∡','Ausrichten','Plan fein drehen und am Raster ausrichten (A)','a');
 for(const [mode,key,text,title] of [['area-draw','f','Fläche +','Schadensfläche zeichnen (F)'],['area-edit','g','Fläche ✎','Schadensfläche bearbeiten (G)']] as const){const b=document.querySelector<HTMLButtonElement>(`[data-mode="${mode}"]`);if(!b)continue;b.dataset.key=key;b.title=title;const label=b.querySelector('span:last-child');if(label)label.firstChild!.textContent=text;}
-document.querySelector('#help-dialog h2')!.insertAdjacentHTML('afterend','<h3>Tastenkürzel</h3><p><b>V</b> Ansicht · <b>P</b> Probe · <b>B</b> Brandherd · <b>E</b> Bearbeiten · <b>F</b> Fläche zeichnen · <b>G</b> Fläche bearbeiten · <b>R</b>/<b>Umschalt+R</b> drehen · <b>C</b> zuschneiden · <b>L</b> Liste ein/aus · <b>+</b>/<b>−</b> Zoom · <b>0</b> Einpassen · <b>&lt;</b>/<b>&gt;</b> Punktgröße · <b>Bild↑</b>/<b>Bild↓</b> Plan wechseln · <b>Strg+Z</b> rückgängig · <b>Entf</b> löschen · <b>Esc</b> abwählen</p>');
+document.querySelector('#help-dialog h2')!.insertAdjacentHTML('afterend','<h3>Tastenkürzel</h3><p><b>V</b> Ansicht · <b>P</b> Probe · <b>B</b> Brandherd · <b>E</b> Bearbeiten · <b>F</b> Fläche zeichnen · <b>G</b> Fläche bearbeiten · <b>R</b>/<b>Umschalt+R</b> drehen · <b>C</b> zuschneiden · <b>A</b> ausrichten · <b>L</b> Liste ein/aus · <b>+</b>/<b>−</b> Zoom · <b>0</b> Einpassen · <b>&lt;</b>/<b>&gt;</b> Punktgröße · <b>Bild↑</b>/<b>Bild↓</b> Plan wechseln · <b>Strg+Z</b> rückgängig · <b>Entf</b> löschen · <b>Esc</b> abwählen</p>');
 const PANEL_KEY='plankit:panel';
 function setPanel(open:boolean,remember=true){document.body.classList.toggle('panel-open',open);$('panel-toggle').setAttribute('aria-pressed',String(open));if(remember){try{localStorage.setItem(PANEL_KEY,open?'open':'closed');}catch{/* privates Fenster */}}}
 function reveal(id:string){const wasOpen=document.body.classList.contains('panel-open');setPanel(true);if(!wasOpen||matchMedia('(min-width:701px)').matches){const target=document.getElementById(id);const box=target?.getBoundingClientRect(),view=panelScroll.getBoundingClientRect();if(target&&box&&(box.top<view.top||box.top>view.bottom-40))target.scrollIntoView({block:'nearest'});}}

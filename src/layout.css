@@ -200,3 +200,23 @@ dialog.export-card #export{min-height:44px}
 dialog.export-card label.export-check{display:flex;flex-direction:row;align-items:center;gap:8px;font-weight:400}
 dialog.export-card label.export-check input{width:auto;margin:0}
 #view-note{display:block;margin-top:4px;color:#9a5b00;font-weight:400;line-height:1.35}
+
+/* Ausrichten: Raster fest über der Karte, Plan dreht sich darunter */
+#align-grid{position:absolute;inset:0;pointer-events:none;z-index:1;background-image:linear-gradient(to right,rgba(40,90,150,.22) 1px,transparent 1px),linear-gradient(to bottom,rgba(40,90,150,.22) 1px,transparent 1px);background-size:40px 40px;background-position:calc(50% + 20px) calc(50% + 20px)}
+#align-grid::before,#align-grid::after{content:'';position:absolute;background:rgba(192,57,43,.6)}
+#align-grid::before{left:50%;top:0;bottom:0;width:1px}
+#align-grid::after{top:50%;left:0;right:0;height:1px}
+#align-grid[hidden]{display:none}
+#stage.aligning #drawing{cursor:grab}
+#stage.aligning #drawing:active{cursor:grabbing}
+#stage[data-mode=align] #next-field{display:none!important}
+#align-actions{position:absolute;bottom:62px;left:50%;transform:translateX(-50%);margin:0;z-index:3;background:#fff;border:1px solid var(--kit-line2);border-radius:8px;box-shadow:0 2px 8px rgba(40,72,116,.15);padding:10px 12px;display:flex;flex-direction:column;gap:7px;width:min(560px,calc(100% - 24px))}
+#align-actions[hidden]{display:none!important}
+#align-actions p{margin:0;font-size:11px;line-height:1.45;color:var(--kit-muted)}
+#align-actions .align-row{display:flex;gap:6px;align-items:center}
+#align-actions button{min-height:30px;height:30px;padding:0 10px;font-size:11px;margin:0;flex:0 0 auto;width:auto}
+#align-actions .align-row:last-child button{flex:1}
+#align-actions input[type=range]{flex:1;min-width:0;min-height:0;margin:0}
+#align-actions .align-num{display:flex;align-items:center;gap:3px;margin:0;font-size:12px;font-weight:600}
+#align-actions .align-num input{width:72px;min-height:30px;height:30px;padding:2px 6px;margin:0;font-family:var(--kit-mono)}
+#align-edge.active{background:var(--kit-focus);border-color:var(--kit-accent);color:var(--kit-accent-2)}
