@@ -1,5 +1,6 @@
 // @ts-nocheck
 /* ===== MOSAIK-LEISTE v1 – in allen Apps der Familie identisch halten (LabelKit, FotoKit, PlanKit, BelegKit) =====
+   Links steht der Name der App-Suite „Spektron“ (Arbeitsname war „Mosaik“; interne Kennungen bleiben).
    Schmale Leiste oben: Projekt (mit Wechsel zu den zuletzt benutzten), die vier Arbeitsschritte mit Haken und nächstem Schritt,
    „Weiter“-Knopf. Ohne geöffnetes Projekt: „Mit <letztes Projekt> weitermachen“.
    Teilt sich mit den anderen Apps nur den Browser-Speicher: IndexedDB „mosaik-suite“ / „kv“, Schlüssel „archiv“ (Ordner-Handle)
@@ -102,6 +103,7 @@
       '#mosaikLeiste a,#mosaikLeiste button{font:inherit;color:inherit;text-decoration:none;border:0;background:none;cursor:pointer;padding:0;margin:0;min-height:0;border-radius:6px;box-shadow:none}' +
       '#mosaikLeiste .ml-home,#mosaikLeiste .ml-proj{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;color:#c9d6df}' +
       '#mosaikLeiste .ml-home:hover,#mosaikLeiste .ml-proj:hover,#mosaikLeiste .ml-proj[aria-expanded=true]{background:rgba(255,255,255,.1);color:#fff}' +
+      '#mosaikLeiste .ml-marke{flex:none;padding:0 6px 0 2px;color:#8fb3d1;font-weight:700;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}' +
       '#mosaikLeiste .ml-proj b{color:#fff;font-weight:650}#mosaikLeiste .ml-obj{color:#9fb1be;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto;max-width:34ch}' +
       '#mosaikLeiste .ml-sp{flex:1 1 0;min-width:4px}' +
       '#mosaikLeiste .ml-steps{display:flex;align-items:center;gap:2px}' +
@@ -119,7 +121,7 @@
       '#mosaikLeistePop a{display:block;padding:8px 10px;border-radius:7px;color:inherit;text-decoration:none}#mosaikLeistePop a:hover,#mosaikLeistePop a:focus-visible{background:#eaf1f6;outline:0}' +
       '#mosaikLeistePop a.aktuell{font-weight:650;background:#f2f6f9}#mosaikLeistePop hr{border:0;border-top:1px solid #e2e9ee;margin:5px 4px}' +
       '#mosaikLeiste.ml-kompakt{height:24px;font-size:12px;padding:0 8px}#mosaikLeiste.ml-kompakt .ml-home,#mosaikLeiste.ml-kompakt .ml-proj,#mosaikLeiste.ml-kompakt .ml-step,#mosaikLeiste.ml-kompakt .ml-weiter{height:20px;padding:0 7px}#mosaikLeiste.ml-kompakt .ml-step i{width:14px;height:14px;font-size:9px}#mosaikLeistePop{top:30px}' +
-      '@media (max-width:860px){#mosaikLeiste .ml-obj,#mosaikLeiste .ml-step span{display:none}#mosaikLeiste .ml-step.hier span{display:inline}}' +
+      '@media (max-width:860px){#mosaikLeiste .ml-marke,#mosaikLeiste .ml-obj,#mosaikLeiste .ml-step span{display:none}#mosaikLeiste .ml-step.hier span{display:inline}}' +
       '@media (max-width:560px){#mosaikLeiste .ml-home span,#mosaikLeiste .ml-weiter span{display:none}#mosaikLeiste .ml-step.hier span{display:none}}' +
       '@media print{#mosaikLeiste,#mosaikLeistePop{display:none!important}}';
     document.head.appendChild(st);
@@ -149,6 +151,7 @@
     bar.textContent = '';
     var app = APPS.filter(function(a){ return a[0] === ich; })[0] || APPS[0];
     bar.style.setProperty('--ac', app[4]);
+    bar.appendChild(h('span', { class: 'ml-marke', title: 'Spektron – die Büro-Apps', text: 'Spektron' }));
     bar.appendChild(h('a', { class: 'ml-home', href: ZENTRALE, target: 'projektzentrale', title: 'Alle Projekte (Projektzentrale)' }, h('b', { text: '⌂', 'aria-hidden': 'true' }), h('span', { text: 'Projektzentrale' })));
     if (name){
       var pb = h('button', { class: 'ml-proj', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', title: 'Anderes Projekt öffnen' }, h('b', { text: name }), h('span', { text: '▾', 'aria-hidden': 'true' }));
