@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.14.2 – 18. Oktober 2026
+
+- Die Leiste oben zeigt links den Namen der App-Suite „Spektron“ (die Büro-Apps Projektzentrale, LabelKit, FotoKit, PlanKit, BelegKit und SpesenKit). Sonst unverändert.
+
 ## 1.14.1 – 17. Oktober 2026
 
 - Behoben: Das Projektmenü der Leiste oben („Anderes Projekt“) schloss sich von selbst, wenn die Leiste sich im Hintergrund aktualisierte (alle 20 Sekunden und beim Zurückkehren ins Fenster).
