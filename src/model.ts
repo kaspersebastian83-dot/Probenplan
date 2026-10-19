@@ -9,7 +9,7 @@ export interface Category {name:string;from:number;color:string}
 export interface Scale {name:string;cats:Category[]}
 export interface ResultSettings {usage?:'residential'|'industrial';parameter:string;scales:Record<string,Scale>}
 /** typ: Probenart aus LabelKit (PAK, Chlorid, Asbest, Sonstige) – bleibt erhalten, wenn der Laborbericht die Probe ergänzt. */
-export interface LabSample extends LabData {label:string;typ?:string}
+export interface LabSample extends LabData {label:string;typ?:string;shape?:Shape}
 /** Form der Probenahmestelle (Kreis ist Standard und wird nicht gespeichert); typ = Probenart aus LabelKit für die Legende. */
 export type Shape = 'circle' | 'square' | 'diamond';
 export const SHAPES:readonly Shape[]=['circle','square','diamond'];
@@ -19,6 +19,9 @@ export interface Marker { id: string; kind: Kind; label: string; note: string; x
 const TYPES:[RegExp,string,Shape][]=[[/^pak\b/i,'PAK','circle'],[/^chlorid\b/i,'Chlorid','square'],[/^asbest\b/i,'Asbest','diamond'],[/^sonstige\b/i,'Sonstige','circle']];
 export function typeFromArt(art?:string):{typ:string;shape:Shape}|null{const a=(art||'').trim();for(const [re,typ,shape] of TYPES)if(re.test(a))return {typ,shape};return null;}
 export function shapeForType(typ?:string):Shape{return TYPES.find(t=>t[1]===typ)?.[2]||'circle';}
+/** Form einer Laborprobe vor dem Platzieren: im Prüfdialog gewählt, sonst aus der Probenart. */
+export function pendingShape(r:{shape?:Shape;typ?:string;art?:string}):Shape{return r.shape||shapeForType(r.typ||typeFromArt(r.art)?.typ);}
+export const SHAPE_SYMBOL:Record<Shape,string>={circle:'○',square:'□',diamond:'◇'};
 export const TYPE_ORDER=TYPES.map(t=>t[1]);
 export function shapeOf(m:Marker):Shape{return m.shape||typeFromArt(m.lab?.art)?.shape||'circle';}
 export function typeOf(m:Marker):string{return m.typ||typeFromArt(m.lab?.art)?.typ||'';}

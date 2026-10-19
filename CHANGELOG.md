@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.16.0 – 19. Oktober 2026
+
+- **Form schon beim Übernehmen festlegen:** Im Dialog „Laborproben prüfen“ hat jede Zeile eine Spalte „Form“ (Kreis, Quadrat, Raute), oben „Form der Probenpunkte für alle Zeilen“. LabelKit-Proben sind nach Probenart vorbelegt. Beim Platzieren bekommt der Punkt genau diese Form; in „Noch zu platzieren“ ist sie schon zu sehen.
+- **Löschen direkt in den Listen:** ✕ neben jeder Probe in „Noch zu platzieren“ entfernt sie aus der Liste, „Liste leeren“ entfernt alle noch nicht platzierten Proben (mit Rückfrage). ✕ neben einer Markierung löscht den Probenpunkt samt Punkt im Plan. Alles rückgängig mit Strg+Z.
+
 ## 1.15.1 – 19. Oktober 2026
 
 - Behoben: Die Leiste oben zeigt jetzt das Objekt aus der Projektzentrale neben dem Projekt. Sie suchte es bisher an einer Stelle in „_Projekt.json“, an der die Projektzentrale es nicht ablegt.

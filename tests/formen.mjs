@@ -82,5 +82,37 @@ for(const engine of ['chromium','webkit']){
    await page.locator('#project-file').setInputFiles({name:'bad.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(bad))});await page.locator('#toast',{hasText:/Ungültige/}).waitFor();
   });
   assert.deepEqual(errors,[]);
+  // 1.16: Form schon im Prüfdialog, offene Proben einzeln/alle entfernen, platzierte Punkte direkt in der Liste löschen
+  const page2=await (await browser.newContext({viewport:{width:1366,height:768},acceptDownloads:true})).newPage();page2.on('pageerror',e=>errors.push(e.message));await page2.goto(base);
+  await page2.locator('#file').setInputFiles(plan);await page2.locator('#welcome').waitFor({state:'hidden'});
+  if(await page2.locator('#panel-toggle').getAttribute('aria-pressed')!=='true')await page2.locator('#panel-toggle').click();
+  await check(`${engine}: Form im Prüfdialog wählen – für alle und je Zeile`,async()=>{
+   await page2.locator('#lab-files').setInputFiles({name:'AR-999.xml',mimeType:'application/xml',buffer:Buffer.from(labXML())});await page2.locator('#lab-review').waitFor();
+   const forms=page2.locator('#lab-review [data-field=shape]');const n=await forms.count();assert.ok(n>=3,`Formspalte für alle Zeilen (${n})`);assert.equal(await forms.first().inputValue(),'circle');
+   await page2.locator('#lab-shape-all').selectOption('diamond');assert.deepEqual(new Set(await forms.evaluateAll(s=>s.map(x=>x.value))),new Set(['diamond']));
+   await forms.nth(0).selectOption('circle');await forms.nth(1).selectOption('square');
+   await page2.locator('#lab-confirm:enabled').click();await page2.locator('#lab-review').waitFor({state:'hidden'});
+   const p=await savedProject(page2);assert.deepEqual(p.pending.slice(0,3).map(r=>r.shape),['circle','square','diamond']);
+   assert.equal(await page2.locator('.pending-row').nth(1).evaluate(e=>e.classList.contains('square')),true);
+  });
+  await check(`${engine}: platzierte Laborproben bekommen die gewählte Form`,async()=>{
+   for(const [fx,fy] of [[.2,.3],[.4,.3],[.6,.3]])await placeFirstPending(page2,fx,fy);
+   const p=await savedProject(page2),ms=p.markers.filter(m=>m.kind==='sample');assert.deepEqual(ms.map(m=>m.shape),[undefined,'square','diamond']);
+  });
+  await check(`${engine}: offene Probe mit ✕ entfernen (rückgängig) und „Liste leeren“`,async()=>{
+   let p=await savedProject(page2);const n=p.pending.length,first=p.pending[0].label;assert.ok(n>=2);
+   await page2.locator(`[data-pending-del="${first}"]`).click();p=await savedProject(page2);assert.equal(p.pending.length,n-1);assert.ok(!p.pending.some(r=>r.label===first));
+   await page2.keyboard.press('Control+z');p=await savedProject(page2);assert.equal(p.pending.length,n);
+   page2.once('dialog',d=>d.accept());await page2.locator('#pending-clear').click();p=await savedProject(page2);
+   assert.equal((p.pending||[]).length,0);assert.equal(p.markers.filter(m=>m.kind==='sample').length,3,'platzierte Punkte bleiben');
+   await page2.keyboard.press('Control+z');p=await savedProject(page2);assert.equal(p.pending.length,n);
+  });
+  await check(`${engine}: platzierten Probenpunkt direkt in der Liste löschen – Punkt verschwindet aus dem Plan`,async()=>{
+   let p=await savedProject(page2);const m=p.markers.find(x=>x.kind==='sample');
+   await page2.locator(`#marker-list [data-del="${m.id}"]`).click();p=await savedProject(page2);
+   assert.ok(!p.markers.some(x=>x.id===m.id));assert.equal(await page2.locator(`#marks [data-id="${m.id}"]`).count(),0);
+   await page2.keyboard.press('Control+z');p=await savedProject(page2);assert.ok(p.markers.some(x=>x.id===m.id));
+  });
+  assert.deepEqual(errors,[]);
  }finally{await browser.close();}
 }
