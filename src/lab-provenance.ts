@@ -1,4 +1,4 @@
-import {allAreas,allMarkers,clone,type LabOrigin,type LabSample,type LabSources,type Project} from './model';
+import {allAreas,allMarkers,clone,typeFromArt,shapeForType,type LabOrigin,type LabSample,type LabSources,type Project} from './model';
 import type {LabReport} from './labreport';
 
 const idPattern=/^[\w-]{1,80}$/;
@@ -25,10 +25,13 @@ export function applyLabImport(project:Project,report:LabReport,choices:Readonly
   const choice=choices.get(input),hit=[...allMarkers(next),...allAreas(next),...next.pending].find(r=>r.label.toUpperCase()===input.label.toUpperCase());
   if(choice==='skip')continue;
   if(hit&&choice!=='update'&&choice!=='next')throw Error(`${input.label}: Herkunftskonflikt bitte ausdrücklich auflösen.`);
-  const row:LabSample={label:input.label,ref:input.ref,desc:input.desc,...(input.art!==undefined?{art:input.art}:{}),...(input.labNr!==undefined?{labNr:input.labNr}:{}),...(input.datum!==undefined?{datum:input.datum}:{}),...(input.werte?{werte:input.werte.map(w=>({...w}))}:{}),bericht:origin.bericht,reportId:origin.id};
+  const row:LabSample={label:input.label,ref:input.ref,desc:input.desc,...(input.art!==undefined?{art:input.art}:{}),...(input.labNr!==undefined?{labNr:input.labNr}:{}),...(input.datum!==undefined?{datum:input.datum}:{}),...(input.werte?{werte:input.werte.map(w=>({...w}))}:{}),bericht:origin.bericht,reportId:origin.id,...(input.typ?{typ:input.typ}:{})};
   if(choice==='update'){
    if(!hit||('kind' in hit&&hit.kind!=='sample')||'points' in hit)throw Error(`${input.label}: Nur Laborproben oder Probenmarker können ersetzt werden.`);
-   const {label,...lab}=row;if('kind' in hit){hit.note=row.desc;hit.lab=lab;}else Object.assign(hit,row);
+   // Probenart aus LabelKit (Form/Legende) bleibt erhalten, auch wenn der Laborbericht eine andere Probenart nennt
+   const {label,typ,...lab}=row;
+   if('kind' in hit){const old=hit.typ||typ||typeFromArt(hit.lab?.art)?.typ;if(old&&!hit.typ){hit.typ=old;if(!hit.shape&&shapeForType(old)!=='circle')hit.shape=shapeForType(old);}hit.note=row.desc;hit.lab=lab;}
+   else{const old=hit.typ||typeFromArt(hit.art)?.typ||typ;Object.assign(hit,row);if(old)hit.typ=old;else delete hit.typ;}
   }else{
    if(choice==='next'){while(occupied.has(`P${number}`))number++;if(number>=999999999)throw Error('Probenzähler ausgeschöpft.');row.label=`P${number++}`;}
    occupied.add(row.label);next.pending.push(row);

@@ -8,8 +8,23 @@ export interface LabData {ref:string;desc:string;art?:string;labNr?:string;datum
 export interface Category {name:string;from:number;color:string}
 export interface Scale {name:string;cats:Category[]}
 export interface ResultSettings {usage?:'residential'|'industrial';parameter:string;scales:Record<string,Scale>}
-export interface LabSample extends LabData {label:string}
-export interface Marker { id: string; kind: Kind; label: string; note: string; x: number; y: number; lx: number; ly: number; lab?:LabData }
+/** typ: Probenart aus LabelKit (PAK, Chlorid, Asbest, Sonstige) – bleibt erhalten, wenn der Laborbericht die Probe ergänzt. */
+export interface LabSample extends LabData {label:string;typ?:string}
+/** Form der Probenahmestelle (Kreis ist Standard und wird nicht gespeichert); typ = Probenart aus LabelKit für die Legende. */
+export type Shape = 'circle' | 'square' | 'diamond';
+export const SHAPES:readonly Shape[]=['circle','square','diamond'];
+export const SHAPE_NAMES:Record<Shape,string>={circle:'Kreis',square:'Quadrat',diamond:'Raute'};
+export interface Marker { id: string; kind: Kind; label: string; note: string; x: number; y: number; lx: number; ly: number; lab?:LabData; shape?:Shape; typ?:string }
+/** LabelKit-Probenart („PAK · Wischprobe“) → Typ und Standardform: PAK Kreis, Chlorid Quadrat, Asbest Raute, Sonstige Kreis. */
+const TYPES:[RegExp,string,Shape][]=[[/^pak\b/i,'PAK','circle'],[/^chlorid\b/i,'Chlorid','square'],[/^asbest\b/i,'Asbest','diamond'],[/^sonstige\b/i,'Sonstige','circle']];
+export function typeFromArt(art?:string):{typ:string;shape:Shape}|null{const a=(art||'').trim();for(const [re,typ,shape] of TYPES)if(re.test(a))return {typ,shape};return null;}
+export function shapeForType(typ?:string):Shape{return TYPES.find(t=>t[1]===typ)?.[2]||'circle';}
+export const TYPE_ORDER=TYPES.map(t=>t[1]);
+export function shapeOf(m:Marker):Shape{return m.shape||typeFromArt(m.lab?.art)?.shape||'circle';}
+export function typeOf(m:Marker):string{return m.typ||typeFromArt(m.lab?.art)?.typ||'';}
+/** Roter Stern für den Brandherd (ohne Kennung). */
+export function starPath(cx:number,cy:number,R:number){const pts:string[]=[];for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,r=i%2?R*.45:R;pts.push(`${(cx+r*Math.cos(a)).toFixed(3)} ${(cy+r*Math.sin(a)).toFixed(3)}`);}return `M ${pts.join(' L ')} Z`;}
+export const FIRE_RED='#d42a1f';
 export interface Rect { x:number; y:number; width:number; height:number }
 export interface Point { x:number; y:number }
 export interface Area { id:string; label:string; name:string; color:string; opacity:number; points:Point[] }
@@ -61,16 +76,20 @@ export function markerSize(p: Project) { return Math.max(p.plan.width,p.plan.hei
 export function labelRadius(p: Project,m:Marker) { return markerSize(p)*Math.max(1,m.label.length*.34); }
 export function bounds(p:Project) {
   let x=0,y=0,right=p.plan.width,bottom=p.plan.height; const r=markerSize(p);
-  for(const m of p.markers){const rx=labelRadius(p,m)*(m.kind==='fire'?1.2:1)+r*.3;x=Math.min(x,m.x-r,m.lx-rx);y=Math.min(y,m.y-r,m.ly-r*1.5);right=Math.max(right,m.x+r,m.lx+rx);bottom=Math.max(bottom,m.y+r,m.ly+r*1.5);}
+  for(const m of p.markers){const rx=(m.kind==='fire'?r*1.4:labelRadius(p,m)*(shapeOf(m)==='diamond'?1.2:1))+r*.3;x=Math.min(x,m.x-r,m.lx-rx);y=Math.min(y,m.y-r,m.ly-r*1.5);right=Math.max(right,m.x+r,m.lx+rx);bottom=Math.max(bottom,m.y+r,m.ly+r*1.5);}
   return {x,y,width:right-x,height:bottom-y};
 }
 /** fill: Füllfarbe für die Ergebniskarte (sonst weiß). */
 export function markerSVG(p:Project,m:Marker,selected=false,minSize=0,fill?:string) {
-  const r=Math.max(markerSize(p),minSize),rx=r*Math.max(1,m.label.length*.34),color=m.kind==='sample'?'#17665e':'#ae4328';
+  const r=Math.max(markerSize(p),minSize),rx=r*Math.max(1,m.label.length*.34),color=m.kind==='sample'?'#17665e':FIRE_RED;
   const n=fill?parseInt(fill.slice(1),16):0,text=fill?((n>>16)*299+(n>>8&255)*587+(n&255)*114)/1000>150?'#1d2a33':'#ffffff':color;
   const displaced=Math.hypot(m.x-m.lx,m.y-m.ly)>.01;
-  const shape=m.kind==='sample'?`<ellipse cx="${m.lx}" cy="${m.ly}" rx="${rx}" ry="${r}"/>`:`<path d="M ${m.lx} ${m.ly-r*1.3} L ${m.lx+rx*1.2} ${m.ly} L ${m.lx} ${m.ly+r*1.3} L ${m.lx-rx*1.2} ${m.ly} Z"/>`;
-  return `<g data-id="${m.id}">${selected?`<ellipse cx="${m.lx}" cy="${m.ly}" rx="${rx+r*.6}" ry="${r*1.8}" fill="none" stroke="#e0ae42" stroke-width="${r*.2}" stroke-dasharray="${r*.3} ${r*.2}"/>`:''}${displaced?`<path d="M${m.x} ${m.y} L${m.lx} ${m.ly}" stroke="white" stroke-width="${r*.3}"/><path d="M${m.x} ${m.y} L${m.lx} ${m.ly}" stroke="${color}" stroke-width="${r*.12}"/><g data-drag="point"><circle cx="${m.x}" cy="${m.y}" r="${Math.max(r*.85,minSize*1.85)}" fill="transparent"/><circle cx="${m.x}" cy="${m.y}" r="${r*.24}" fill="${color}" stroke="white" stroke-width="${r*.1}"/><path d="M${m.x-r*.45} ${m.y}h${r*.9}M${m.x} ${m.y-r*.45}v${r*.9}" stroke="${color}" stroke-width="${r*.1}"/></g>`:''}<g data-drag="${displaced?'label':'point'}" fill="${fill||'white'}" stroke="${fill?'#1d2a33':color}" stroke-width="${r*.18}">${minSize?`<ellipse cx="${m.lx}" cy="${m.ly}" rx="${Math.max(rx,minSize*1.85)}" ry="${Math.max(r,minSize*1.85)}" fill="transparent" stroke="none"/>`:''}${shape}</g><text data-drag="${displaced?'label':'point'}" x="${m.lx}" y="${m.ly+r*.3}" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="${r*.87}" fill="${text}">${escape(m.label)}</text></g>`;
+  const fire=m.kind==='fire',form=shapeOf(m),sq=Math.max(rx,r*1.05);
+  const shape=fire?`<path d="${starPath(m.lx,m.ly,r*1.35)}" fill="${FIRE_RED}" stroke="#ffffff" stroke-width="${r*.12}" stroke-linejoin="round"/>`
+    :form==='square'?`<rect x="${m.lx-sq}" y="${m.ly-r*1.05}" width="${sq*2}" height="${r*2.1}" rx="${r*.12}"/>`
+    :form==='diamond'?`<path d="M ${m.lx} ${m.ly-r*1.3} L ${m.lx+rx*1.2} ${m.ly} L ${m.lx} ${m.ly+r*1.3} L ${m.lx-rx*1.2} ${m.ly} Z"/>`
+    :`<ellipse cx="${m.lx}" cy="${m.ly}" rx="${rx}" ry="${r}"/>`;
+  return `<g data-id="${m.id}">${selected?`<ellipse cx="${m.lx}" cy="${m.ly}" rx="${rx+r*.6}" ry="${r*1.8}" fill="none" stroke="#e0ae42" stroke-width="${r*.2}" stroke-dasharray="${r*.3} ${r*.2}"/>`:''}${displaced?`<path d="M${m.x} ${m.y} L${m.lx} ${m.ly}" stroke="white" stroke-width="${r*.3}"/><path d="M${m.x} ${m.y} L${m.lx} ${m.ly}" stroke="${color}" stroke-width="${r*.12}"/><g data-drag="point"><circle cx="${m.x}" cy="${m.y}" r="${Math.max(r*.85,minSize*1.85)}" fill="transparent"/><circle cx="${m.x}" cy="${m.y}" r="${r*.24}" fill="${color}" stroke="white" stroke-width="${r*.1}"/><path d="M${m.x-r*.45} ${m.y}h${r*.9}M${m.x} ${m.y-r*.45}v${r*.9}" stroke="${color}" stroke-width="${r*.1}"/></g>`:''}<g data-drag="${displaced?'label':'point'}" fill="${fill||'white'}" stroke="${fill?'#1d2a33':color}" stroke-width="${r*.18}">${minSize?`<ellipse cx="${m.lx}" cy="${m.ly}" rx="${Math.max(rx,minSize*1.85)}" ry="${Math.max(r,minSize*1.85)}" fill="transparent" stroke="none"/>`:''}${shape}</g>${fire?'':`<text data-drag="${displaced?'label':'point'}" x="${m.lx}" y="${m.ly+r*.3}" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="${r*.87}" fill="${text}">${escape(m.label)}</text>`}</g>`;
 }
 export class History {
   past:Project[]=[]; future:Project[]=[];
