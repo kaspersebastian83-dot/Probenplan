@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.15.1 – 19. Oktober 2026
+
+- Behoben: Die Leiste oben zeigt jetzt das Objekt aus der Projektzentrale neben dem Projekt. Sie suchte es bisher an einer Stelle in „_Projekt.json“, an der die Projektzentrale es nicht ablegt.
+
 ## 1.15.0 – 19. Oktober 2026
 
 - **Formen für Probenahmestellen:** Kreis, Quadrat oder Raute – jeweils mit Nummer, gemeinsame Zählung P1, P2 … (die Zuordnung „Probe 3“ = P3 bleibt). Die Form wird beim Setzen gewählt (Werkzeug „Probe“ → „Form“) und lässt sich rechts im Seitenfeld je Punkt ändern.
