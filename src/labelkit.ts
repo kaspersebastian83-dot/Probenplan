@@ -25,7 +25,7 @@ export function labelkitReport(text:string,quelle:string,project:string):LabRepo
     if(!raw||typeof raw!=='object')continue;const n=number(raw);
     if(!n){report.warnings.push(`${type}: eine Probe ohne Nummer wurde übersprungen.`);continue;}
     if(seen.has(n)){report.warnings.push(`Probe ${n} ist in LabelKit doppelt vergeben (${type}) und wurde übersprungen.`);continue;}seen.add(n);
-    const row:LabSample={label:`P${n}`,ref:`Probe ${n}`,desc:description(raw).slice(0,500),art:`${type}${str(raw.matrix)?` · ${str(raw.matrix)}`:''}`.slice(0,160)};
+    const row:LabSample={label:`P${n}`,typ:type,ref:`Probe ${n}`,desc:description(raw).slice(0,500),art:`${type}${str(raw.matrix)?` · ${str(raw.matrix)}`:''}`.slice(0,160)};
     const datum=isoDate(raw.datum);if(datum)row.datum=datum;
     report.rows.push(row);
   }

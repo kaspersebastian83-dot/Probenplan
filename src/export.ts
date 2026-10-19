@@ -1,4 +1,4 @@
-import {bounds, floorName, markerSize, markerSVG, type Project} from './model';
+import {bounds, floorName, markerSize, markerSVG, shapeOf, typeOf, starPath, FIRE_RED, SHAPES, SHAPE_NAMES, TYPE_ORDER, type Project, type Shape} from './model';
 import {loadImage} from './import';
 import {planMatrix,preparation} from './preparation';
 import {areaAnchor,areaCategories,areaSVG,palette} from './areas';
@@ -8,7 +8,19 @@ export function wrap(ctx:CanvasRenderingContext2D,text:string,width:number){
   for(const word of text.split(/\s+/)){if(line&&ctx.measureText(`${line} ${word}`).width<=width){line+=` ${word}`;continue;}if(line){lines.push(line);line='';}for(const char of word){if(line&&ctx.measureText(line+char).width>width){lines.push(line);line='';}line+=char;}}
   if(line)lines.push(line);return lines;
 }
-interface LegendVariant {color:string;opacity:number;outline:string;dash:readonly number[];round:boolean;text:string}
+interface LegendVariant {color:string;opacity:number;outline:string;dash:readonly number[];round:boolean;text:string;shape?:Shape|'star'}
+/** Legende der Formen: mehrere Formen im Plan → je Form die Probenarten (aus LabelKit). Probe/Brandherd stehen fest in der Fußzeile. */
+const DEFAULT_TYPE:Record<Shape,string>={circle:'PAK',square:'Chlorid',diamond:'Asbest'};
+export function markerLegend(p:Project):{name:string;variants:LegendVariant[]}|null{
+  const samples=p.markers.filter(m=>m.kind==='sample');
+  const used=SHAPES.filter(f=>samples.some(m=>shapeOf(m)===f));
+  const variants:LegendVariant[]=[];
+  if(used.length>1)for(const f of used){
+    const types=[...new Set(samples.filter(m=>shapeOf(m)===f).map(typeOf).filter(Boolean))].sort((a,b)=>(TYPE_ORDER.indexOf(a)+1||99)-(TYPE_ORDER.indexOf(b)+1||99)||a.localeCompare(b,'de'));
+    variants.push({color:'#ffffff',opacity:1,outline:'#17665e',dash:[],round:false,shape:f,text:(types.length?types.join(', '):DEFAULT_TYPE[f])+` (${SHAPE_NAMES[f]})`});
+  }
+  return variants.length?{name:'Probenarten',variants}:null;
+}
 function legendBlocks(p:Project,rated?:Rated|null){
   const blocks:{name:string;variants:LegendVariant[]}[]=[];
   if(rated){
@@ -16,6 +28,7 @@ function legendBlocks(p:Project,rated?:Rated|null){
     for(const g of qualifierGroups(rated))blocks.push({name:g.name,variants:[{color:g.color,opacity:1,outline:'#1d2a33',dash:[],round:true,text:g.labels.join(', ')}]});
     if(rated.unrated.length)blocks.push({name:'Ohne Bewertung',variants:[{color:UNRATED,opacity:1,outline:'#1d2a33',dash:[],round:true,text:`${rated.unrated.join(', ')} – kein Wert für ${shortParameter(rated.parameter)} oder keine anwendbare Skala / Zahl nicht eindeutig`}]});
   }
+  const ml=markerLegend(p);if(ml)blocks.push(ml);
   for(const c of areaCategories(p.areas||[]))blocks.push({name:c.name,variants:c.variants.map(v=>{const pal=palette(v.color);return {color:v.color,opacity:v.opacity,outline:pal.outline,dash:pal.dash,round:false,text:`${v.labels.join(', ')} · ${Math.round(v.opacity*100)} %`};})});
   return blocks;
 }
@@ -25,7 +38,8 @@ export function legendLayout(p:Project,width:number,fs:number,rated?:Rated|null)
   let y=fs*2.7;
   const entries=legendBlocks(p,rated).map(c=>{const lines=wrap(ctx,c.name,width),top=y;y+=lines.length*fs*1.35+fs*.35;
     const variants=c.variants.map(v=>{ctx.font=`${fs*.85}px Arial`;const ids=wrap(ctx,v.text,width-fs*3.2),top=y;y+=Math.max(fs*1.2,ids.length*fs*1.15)+fs*.4;ctx.font=`bold ${fs}px Arial`;return{...v,ids,top};});y+=fs*.8;return{...c,lines,top,variants};});
-  const title=rated&&p.areas?.length?'Legende':rated?'Ergebnisse':'Flächenkennzeichnung';
+  const kinds=[!!rated,!!markerLegend(p),!!p.areas?.length].filter(Boolean).length;
+  const title=kinds>1?'Legende':rated?'Ergebnisse':p.areas?.length?'Flächenkennzeichnung':'Legende';
   return {entries,height:y,fs,title};
 }
 /** Plan mit allen Markierungen, Beschriftungen und Flächenschildern. */
@@ -53,12 +67,16 @@ export function drawLegend(ctx:CanvasRenderingContext2D,legend:LegendLayout,x:nu
   if(title){ctx.fillStyle='#263b35';ctx.font=`bold ${fs*1.15}px Arial`;ctx.fillText(legend.title,x,y+fs*1.2);}
   for(const c of entries){ctx.fillStyle='#263b35';ctx.font=`bold ${fs}px Arial`;c.lines.forEach((line,i)=>ctx.fillText(line,x,y+c.top+i*fs*1.35));
     for(const v of c.variants){const top=y+v.top-fs*.8,w=fs*2.2,h=fs*.9;ctx.fillStyle=v.color;ctx.globalAlpha=v.opacity;ctx.strokeStyle=v.outline;ctx.lineWidth=fs*.08;
-      if(v.round){ctx.beginPath();ctx.arc(x+w/2,top+h/2,h*.62,0,2*Math.PI);ctx.fill();ctx.globalAlpha=1;ctx.stroke();}
+      if(v.shape){const cx=x+w/2,cy=top+h/2,R=h*.62;ctx.lineWidth=fs*.1;ctx.beginPath();
+        if(v.shape==='star')ctx.fill(new Path2D(starPath(cx,cy,R*1.25)));
+        else{if(v.shape==='circle')ctx.arc(cx,cy,R,0,2*Math.PI);else if(v.shape==='square')ctx.rect(cx-R,cy-R,2*R,2*R);else{ctx.moveTo(cx,cy-R*1.25);ctx.lineTo(cx+R*1.25,cy);ctx.lineTo(cx,cy+R*1.25);ctx.lineTo(cx-R*1.25,cy);ctx.closePath();}ctx.fill();ctx.stroke();}
+        ctx.globalAlpha=1;}
+      else if(v.round){ctx.beginPath();ctx.arc(x+w/2,top+h/2,h*.62,0,2*Math.PI);ctx.fill();ctx.globalAlpha=1;ctx.stroke();}
       else{ctx.fillRect(x,top,w,h);ctx.globalAlpha=1;ctx.setLineDash(v.dash.map(n=>n*fs*.08));ctx.strokeRect(x,top,w,h);ctx.setLineDash([]);}ctx.fillStyle='#263b35';ctx.font=`${fs*.85}px Arial`;v.ids.forEach((line,i)=>ctx.fillText(line,x+fs*3.2,y+v.top+i*fs*1.15));}
   }
 }
 export function exportLayout(p:Project,longSide:number,rated?:Rated|null){
-  const hasLegend=!!(p.areas?.length||(rated&&(rated.groups.some(g=>g.scale)||rated.unrated.length||qualifierGroups(rated).length)));
+  const hasLegend=!!(p.areas?.length||markerLegend(p)||(rated&&(rated.groups.some(g=>g.scale)||rated.unrated.length||qualifierGroups(rated).length)));
   const b=contentBounds(p),unit=Math.max(b.width,b.height),pad=unit*.028;
   const footer=unit*(hasLegend ? .14 : .12);
   let width=Math.max(b.width+2*pad,unit*.6),height=b.height+2*pad+footer;
@@ -90,7 +108,7 @@ export async function exportImage(p:Project,longSide:number,format:'png'|'jpeg',
     ctx.fillText(meta,l.pad,y+fs*3.5,l.planWidth-2*l.pad);
     const ly=y+fs*5.6,r=fs*.6;ctx.strokeStyle='#17665e';ctx.lineWidth=fs*.13;ctx.beginPath();ctx.arc(l.pad+r,ly,r,0,2*Math.PI);ctx.stroke();
     ctx.fillText('P · Probenahmestelle',l.pad+fs*2,ly+fs*.35);
-    const bx=l.pad+fs*18;ctx.strokeStyle='#ae4328';ctx.beginPath();ctx.moveTo(bx,ly-r);ctx.lineTo(bx+r,ly);ctx.lineTo(bx,ly+r);ctx.lineTo(bx-r,ly);ctx.closePath();ctx.stroke();ctx.fillText('B · Brandherd',bx+fs*1.6,ly+fs*.35);
+    const bx=l.pad+fs*18;ctx.fillStyle=FIRE_RED;ctx.fill(new Path2D(starPath(bx,ly,r*1.35)));ctx.fillStyle='#263b35';ctx.fillText('Brandherd',bx+fs*1.6,ly+fs*.35);
     if(l.legend)drawLegend(ctx,l.legend,l.legendX,l.legendY);
     const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('Der Browser konnte das Bild nicht speichern.')),`image/${format}`,0.96));
     if(blob.size<100)throw Error('Der Bildexport ist leer.');return blob;

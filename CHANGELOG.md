@@ -1,5 +1,13 @@
 # Änderungen
 
+## 1.15.0 – 19. Oktober 2026
+
+- **Formen für Probenahmestellen:** Kreis, Quadrat oder Raute – jeweils mit Nummer, gemeinsame Zählung P1, P2 … (die Zuordnung „Probe 3“ = P3 bleibt). Die Form wird beim Setzen gewählt (Werkzeug „Probe“ → „Form“) und lässt sich rechts im Seitenfeld je Punkt ändern.
+- **Automatisch aus LabelKit:** Proben aus der LabelKit-Probenerfassung bekommen beim Platzieren die Form ihrer Probenart: PAK Kreis, Chlorid Quadrat, Asbest Raute, Sonstige Kreis. Die Probenart bleibt erhalten, wenn später der Laborbericht die Probe ergänzt.
+- **Legende:** Sobald mehr als eine Form im Plan vorkommt, zeigt der Export einen Block „Probenarten“ (z. B. „PAK (Kreis)“, „Chlorid (Quadrat)“).
+- **Brandherd als roter Stern** ohne Kennung; bestehende Pläne werden automatisch so dargestellt.
+- **„Proben übernehmen …“** (vorher „Laborbericht importieren …“): nimmt neben Laborberichten auch die LabelKit-Datei (`…_Daten.json`) direkt an – auch ohne Projektordner. Im Projekt werden alle LabelKit-Dateien aus „Laboraufträge“ angeboten (neueste zuerst); fehlt noch eine, steht ein Hinweis im Dialog.
+
 ## 1.14.2 – 18. Oktober 2026
 
 - Die Leiste oben zeigt links den Namen der App-Suite „Spektron“ (die Büro-Apps Projektzentrale, LabelKit, FotoKit, PlanKit, BelegKit und SpesenKit). Sonst unverändert.

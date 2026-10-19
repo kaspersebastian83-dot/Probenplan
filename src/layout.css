@@ -220,3 +220,14 @@ dialog.export-card label.export-check input{width:auto;margin:0}
 #align-actions .align-num{display:flex;align-items:center;gap:3px;margin:0;font-size:12px;font-weight:600}
 #align-actions .align-num input{width:72px;min-height:30px;height:30px;padding:2px 6px;margin:0;font-family:var(--kit-mono)}
 #align-edge.active{background:var(--kit-focus);border-color:var(--kit-accent);color:var(--kit-accent-2)}
+/* 1.15: Formen der Probenahmestellen, Brandherd als roter Stern */
+#shape-field{display:none!important;margin:0!important;gap:6px;font-size:11px!important;font-weight:600;color:var(--kit-text);white-space:nowrap;border-left:1px solid var(--kit-line);padding-left:10px}
+#stage[data-mode=sample] #toolbar #mode-hint:not([hidden])~#shape-field{display:flex!important}
+#shape-field select{min-height:28px;height:28px;padding:2px 6px;margin:0}
+.marker-badge.square{border-radius:4px}
+.marker-badge.diamond{border:none;position:relative}
+.marker-badge.diamond::before{content:'';position:absolute;inset:4px;border:1.6px solid #267267;border-radius:2px;transform:rotate(45deg)}
+.marker-badge.fire{border:none;font-size:0;color:transparent}
+.marker-badge.fire::before{content:'★';font-size:24px;line-height:1;color:#d42a1f}
+.legend-star{color:#d42a1f;font-size:12px;line-height:1}
+.rail .mode .fire-icon{color:#d42a1f}
