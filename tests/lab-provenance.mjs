@@ -68,7 +68,7 @@ for(const engine of ['chromium','webkit']){
      const before=await savedProject(page),buttons={undo:await page.locator('#undo').isEnabled(),redo:await page.locator('#redo').isEnabled()};
      await page.evaluate(()=>{window.noopWrites=0;window.noopOriginalPut=IDBObjectStore.prototype.put;IDBObjectStore.prototype.put=function(...args){if(this.name==='projects')window.noopWrites++;return window.noopOriginalPut.apply(this,args);};});
      try{
-      await review(page,files);for(const row of await page.locator('[data-lab-row]').all())await row.locator('select').selectOption('skip');await accept(page);
+      await review(page,files);for(const row of await page.locator('[data-lab-row]').all())await row.locator('.lab-conflict select').selectOption('skip');await accept(page);
       assert.deepEqual(await savedProject(page),before);assert.equal(await page.evaluate(()=>window.noopWrites),0,'No-op darf keine Autosicherung auslösen');
       assert.deepEqual({undo:await page.locator('#undo').isEnabled(),redo:await page.locator('#redo').isEnabled()},buttons);
      }finally{await page.evaluate(()=>{IDBObjectStore.prototype.put=window.noopOriginalPut;delete window.noopOriginalPut;delete window.noopWrites;});}
@@ -105,7 +105,7 @@ for(const engine of ['chromium','webkit']){
   await check(`${engine}: vier getrennte Berichte bei gleicher/fehlender Nummer und gleicher Datei, eindeutiger JSON-Export`,async()=>{
    for(let i=0;i<4;i++){
     await review(page,[file('shared.xml',labXML(labRows.slice(0,i<2?2:1)))],{bericht:i<2?metadata.bericht:'',labor:`Synthetisches Labor ${i+1}`,auftragsreferenz:`99.90${String(i+1).padStart(2,'0')} Vollständige Referenz ${i+1}`});
-    for(const row of await page.locator('[data-lab-row]').all()){const select=row.locator('select');if(await select.count())await select.selectOption('next');}
+    for(const row of await page.locator('[data-lab-row]').all()){const select=row.locator('.lab-conflict select');if(await select.count())await select.selectOption('next');}
     await accept(page);
    }
    const p=await downloadedProject(page);assert.equal(p.labReports.length,4);assert.equal(new Set(p.labReports.map(r=>r.id)).size,4);assert.equal(p.pending.length,6);
@@ -116,14 +116,14 @@ for(const engine of ['chromium','webkit']){
   await check(`${engine}: Abbruch und Überspringen bewahren Zuordnungen, Ersetzen ist explizit und undo-fähig`,async()=>{
    const before=await savedProject(page);await review(page,[file('replacement.xml',labXML(labRows.slice(0,2)))]);
    assert.equal(await page.locator('#lab-confirm').isDisabled(),true);await page.locator('#lab-review').getByText('Abbrechen',{exact:true}).click();assert.deepEqual(await savedProject(page),before);
-   await review(page,[file('replacement.xml',labXML(labRows.slice(0,2)))]);for(const row of await page.locator('[data-lab-row]').all())await row.locator('select').selectOption('skip');await accept(page);assert.deepEqual(await savedProject(page),before);
-   await review(page,[file('replacement.xml',labXML(labRows.slice(0,2)))]);await page.locator('[data-lab-row]').nth(0).locator('select').selectOption('update');await page.locator('[data-lab-row]').nth(1).locator('select').selectOption('skip');assert.match(await page.locator('#lab-warnings').textContent(),/Herkunft.*ersetzt/);
+   await review(page,[file('replacement.xml',labXML(labRows.slice(0,2)))]);for(const row of await page.locator('[data-lab-row]').all())await row.locator('.lab-conflict select').selectOption('skip');await accept(page);assert.deepEqual(await savedProject(page),before);
+   await review(page,[file('replacement.xml',labXML(labRows.slice(0,2)))]);await page.locator('[data-lab-row]').nth(0).locator('.lab-conflict select').selectOption('update');await page.locator('[data-lab-row]').nth(1).locator('.lab-conflict select').selectOption('skip');assert.match(await page.locator('#lab-warnings').textContent(),/Herkunft.*ersetzt/);
    const after=await accept(page);assert.notEqual(after.pending[0].reportId,before.pending[0].reportId);assert.equal(after.pending[1].reportId,before.pending[1].reportId);assert.deepEqual(after.labReports.slice(0,4),before.labReports);
    await page.locator('#undo').click();assert.deepEqual(await savedProject(page),before);await page.locator('#redo').click();assert.deepEqual(await savedProject(page),after);
   });
   await check(`${engine}: platzierte Probe ersetzen/umnummerieren, History und Herkunftsexport bleiben konsistent`,async()=>{
    await placeFirst(page,210,310);const before=await savedProject(page),m=before.markers[0];
-   await review(page,[file('placed.xml',labXML(labRows.slice(0,1)))]);await page.locator('[data-lab-row]').first().locator('select').selectOption('update');const after=await accept(page);
+   await review(page,[file('placed.xml',labXML(labRows.slice(0,1)))]);await page.locator('[data-lab-row]').first().locator('.lab-conflict select').selectOption('update');const after=await accept(page);
    assert.notEqual(after.markers[0].lab.reportId,m.lab.reportId);for(const k of ['id','x','y','lx','ly','label','kind'])assert.equal(after.markers[0][k],m[k]);
    await page.locator('#undo').click();assert.deepEqual(await savedProject(page),before);await page.locator('#redo').click();assert.deepEqual(await savedProject(page),after);
    await page.locator('[data-select]').first().click();await page.locator('#label').fill('P20');await page.locator('#label').press('Tab');const numbered=await savedProject(page);assert.equal(numbered.markers[0].lab.reportId,after.markers[0].lab.reportId);

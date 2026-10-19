@@ -25,11 +25,12 @@ export function applyLabImport(project:Project,report:LabReport,choices:Readonly
   const choice=choices.get(input),hit=[...allMarkers(next),...allAreas(next),...next.pending].find(r=>r.label.toUpperCase()===input.label.toUpperCase());
   if(choice==='skip')continue;
   if(hit&&choice!=='update'&&choice!=='next')throw Error(`${input.label}: Herkunftskonflikt bitte ausdrücklich auflösen.`);
-  const row:LabSample={label:input.label,ref:input.ref,desc:input.desc,...(input.art!==undefined?{art:input.art}:{}),...(input.labNr!==undefined?{labNr:input.labNr}:{}),...(input.datum!==undefined?{datum:input.datum}:{}),...(input.werte?{werte:input.werte.map(w=>({...w}))}:{}),bericht:origin.bericht,reportId:origin.id,...(input.typ?{typ:input.typ}:{})};
+  const row:LabSample={label:input.label,ref:input.ref,desc:input.desc,...(input.art!==undefined?{art:input.art}:{}),...(input.labNr!==undefined?{labNr:input.labNr}:{}),...(input.datum!==undefined?{datum:input.datum}:{}),...(input.werte?{werte:input.werte.map(w=>({...w}))}:{}),bericht:origin.bericht,reportId:origin.id,...(input.typ?{typ:input.typ}:{}),...(input.shape?{shape:input.shape}:{})};
   if(choice==='update'){
    if(!hit||('kind' in hit&&hit.kind!=='sample')||'points' in hit)throw Error(`${input.label}: Nur Laborproben oder Probenmarker können ersetzt werden.`);
    // Probenart aus LabelKit (Form/Legende) bleibt erhalten, auch wenn der Laborbericht eine andere Probenart nennt
-   const {label,typ,...lab}=row;
+   const {label,typ,shape,...lab}=row;
+   if('kind' in hit&&shape){if(shape==='circle')delete hit.shape;else hit.shape=shape;}
    if('kind' in hit){const old=hit.typ||typ||typeFromArt(hit.lab?.art)?.typ;if(old&&!hit.typ){hit.typ=old;if(!hit.shape&&shapeForType(old)!=='circle')hit.shape=shapeForType(old);}hit.note=row.desc;hit.lab=lab;}
    else{const old=hit.typ||typeFromArt(hit.art)?.typ||typ;Object.assign(hit,row);if(old)hit.typ=old;else delete hit.typ;}
   }else{

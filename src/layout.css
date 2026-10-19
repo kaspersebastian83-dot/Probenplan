@@ -231,3 +231,16 @@ dialog.export-card label.export-check input{width:auto;margin:0}
 .marker-badge.fire::before{content:'★';font-size:24px;line-height:1;color:#d42a1f}
 .legend-star{color:#d42a1f;font-size:12px;line-height:1}
 .rail .mode .fire-icon{color:#d42a1f}
+/* 1.16: Löschen direkt in den Listen, Form schon vor dem Platzieren sichtbar */
+.marker-item,.pending-item{display:flex;align-items:center;gap:2px}
+.marker-item>.marker-row,.pending-item>.pending-row{flex:1;min-width:0}
+.row-del{flex:none;border:0;background:none;color:var(--kit-muted,#87907e);padding:4px 7px;font-size:12px;line-height:1;cursor:pointer;opacity:.55}
+.row-del:hover,.row-del:focus-visible{opacity:1;color:#b3261e}
+.pending-row.square>span:first-child{border-radius:3px}
+.pending-row.diamond>span:first-child{border-color:transparent;position:relative}
+.pending-row.diamond>span:first-child::before{content:'';position:absolute;inset:1px;border:2px solid #17665e;border-radius:2px;transform:rotate(45deg)}
+#pending-clear{margin-left:6px}
+#lab-review .lab-tools{display:flex;justify-content:flex-end;margin:8px 0}
+#lab-review .lab-tools label{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600}
+#lab-review .lab-tools select{width:auto;min-width:170px}
+#lab-review [data-field=shape]{min-width:112px}
