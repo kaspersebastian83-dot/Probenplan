@@ -7,7 +7,7 @@ const A='26.0142 Teststadt',B='26.0150 Köln & Süd + 50% #Hof';
 await (async () => {
   const name='chromium',url=base+'/';
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({viewport: {width: 1400, height: 900}});
+  const ctx = await browser.newContext({viewport: {width: 1400, height: 900}, serviceWorkers: 'block'});
   await ctx.addInitScript(() => { try { localStorage.setItem('willkommen-gelesen', '1'); } catch (e) {} });
   const page = await ctx.newPage();
   const errors = [];
@@ -75,6 +75,7 @@ await (async () => {
   }
   assert.equal(await leiste.locator('input, textarea').count(), 0);
   // Bereits geöffnetes benanntes App-Fenster muss bei erneutem Absprung wirklich neu laden.
+  // Die synthetische Fremd-App darf nicht vom am Testserver unter / registrierten PlanKit-Worker ersetzt werden.
   const quer = leiste.locator('a.ml-step').first(), querUrl = new URL(await quer.getAttribute('href'), page.url());
   const routeMatch = u => u.pathname.startsWith(querUrl.pathname);
   const querAnfragen = [];
@@ -82,9 +83,9 @@ await (async () => {
     querAnfragen.push(route.request().url());
     return route.fulfill({contentType:'text/html', body:'<!doctype html><body><script>document.body.dataset.projekt=new URLSearchParams(location.hash.slice(1)).get("projekt");</script></body>'});
   });
-  const [anderesFenster] = await Promise.all([page.waitForEvent('popup'), quer.click()]);
-  await anderesFenster.waitForFunction(name => document.body.dataset.projekt === name, A);
-  await Promise.all([anderesFenster.waitForEvent('load'), quer.click()]);
+  const [anderesFenster] = await Promise.all([page.waitForEvent('popup', {timeout:10000}), quer.click()]);
+  await anderesFenster.waitForFunction(name => document.body.dataset.projekt === name, A, {timeout:10000});
+  await Promise.all([anderesFenster.waitForEvent('load', {timeout:10000}), quer.click()]);
   assert.equal(ctx.pages().length, 2, 'Benanntes Fenster wird wiederverwendet');
   assert.equal(new URLSearchParams(new URL(anderesFenster.url()).hash.slice(1)).get('projekt'), A);
   assert.ok(querAnfragen.length >= 2, 'Zweiter Absprung lädt ein neues Dokument');
@@ -107,7 +108,7 @@ await (async () => {
   page.removeAllListeners('dialog');
   page.on('dialog', d => d.dismiss());
   await leiste.locator('.ml-proj').click();
-  await Promise.all([page.waitForEvent('dialog'), pop.locator('a', {hasText: B}).click()]);
+  await Promise.all([page.waitForEvent('dialog', {timeout:10000}), pop.locator('a', {hasText: B}).click()]);
   assert.equal(page.url(), vorher, 'Abbruch erhält alte Adresse');
   assert.ok((await leiste.locator('.ml-proj b').textContent()).includes(A));
   await page.evaluate(() => window.removeEventListener('beforeunload', window.__wechselSperre));
@@ -115,7 +116,7 @@ await (async () => {
   await page.keyboard.press('Escape');
   const projektAnfragen = [];
   page.on('request', req => { if (req.isNavigationRequest()) projektAnfragen.push(req.url()); });
-  await Promise.all([page.waitForEvent('load'), page.waitForURL(/projekt=26\.0150/), (async () => { await leiste.locator('.ml-proj').click(); await pop.locator('a', {hasText: B}).click(); })()]);
+  await Promise.all([page.waitForEvent('load', {timeout:10000}), page.waitForURL(/projekt=26\.0150/), (async () => { await leiste.locator('.ml-proj').click(); await pop.locator('a', {hasText: B}).click(); })()]);
   await page.waitForSelector('#mosaikLeiste .ml-proj b').catch(async e => { await page.screenshot({path: '/tmp/pk-fail.png'}); console.log(errors, page.url(), await page.evaluate(() => document.readyState)); throw e; });
   assert.match(await leiste.locator('.ml-proj b').textContent(), /26\.0150 Köln/);
   await page.waitForFunction(() => document.querySelectorAll('#mosaikLeiste .ml-step.done').length === 0);   // Projekt B ist leer: keine Haken
