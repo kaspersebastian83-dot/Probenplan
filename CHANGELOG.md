@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.16.1 – 20. Oktober 2026
+
+- Projektzentrale und Spektron-Leiste übergeben Projekte jetzt über #projekt im Fragment. Sonderzeichen bleiben erhalten; alte ?projekt-Links funktionieren weiterhin und werden nach dem Laden bereinigt. Projektwechsel laden auch bereits geöffnete App-Fenster neu; eine Warnung vor ungesicherten Eingaben kann den Wechsel abbrechen. Die Anlagenaktion aktion=anlage wird ebenfalls im Fragment übergeben. Installiertes PlanKit nach einer Online-Aktualisierung vollständig schließen und erneut öffnen.
+
 ## 1.16.0 – 19. Oktober 2026
 
 - **Form schon beim Übernehmen festlegen:** Im Dialog „Laborproben prüfen“ hat jede Zeile eine Spalte „Form“ (Kreis, Quadrat, Raute), oben „Form der Probenpunkte für alle Zeilen“. LabelKit-Proben sind nach Probenart vorbelegt. Beim Platzieren bekommt der Punkt genau diese Form; in „Noch zu platzieren“ ist sie schon zu sehen.
