@@ -29,9 +29,18 @@ const browser=await chromium.launch();
 try{
  const context=await browser.newContext({viewport:{width:1366,height:768},acceptDownloads:true}),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(base);await fs(page,'setup',NAME,svg,labXML());
+ await check('Fragmentprojekt mit Sonderzeichen hat Vorrang; andere URL-Bestandteile bleiben erhalten',async()=>{
+  const special='26.0987 Köln & Süd + 50% #Hof';await fs(page,'setup',special,svg,labXML());
+  await page.goto(`${base}/?projekt=falsch&ansicht=liste#plan&projekt=${encodeURIComponent(special)}`);
+  await page.locator('#project-badge:not([hidden])').waitFor();
+  assert.equal((await page.locator('#project-badge').textContent()).trim(),special);
+  const url=new URL(page.url());assert.equal(url.searchParams.has('projekt'),false);assert.equal(url.searchParams.get('ansicht'),'liste');assert.ok(url.hash.startsWith('#plan&'));
+  assert.equal(new URLSearchParams(url.hash.slice(1)).get('projekt'),special);
+ });
  await check('?projekt= öffnet das Projekt, zeigt Nummer/Ort und bietet Grundrisse aus „Pläne“ an',async()=>{
   await page.goto(`${base}/?projekt=${encodeURIComponent(NAME)}`);await page.locator('#project-badge:not([hidden])').waitFor();
   assert.equal((await page.locator('#project-badge').textContent()).trim(),'26.0123 Köln');
+  assert.equal(new URL(page.url()).searchParams.has('projekt'),false);assert.equal(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('projekt'),NAME);
   await page.locator('#folder-plans button',{hasText:'Grundriss EG.svg'}).click();await page.locator('#welcome').waitFor({state:'hidden'});
   const file=await saved(page);assert.equal(file.report,NAME);assert.equal(file.plan.name,'Grundriss EG.svg');
  });
