@@ -1,12 +1,16 @@
 # PlanKit (früher Probenplan)
 
-Aktuelle Version **1.16.0** – alle Änderungen in `CHANGELOG.md`. Schritt ③ der Büro-App-Suite **Spektron** (Projektzentrale, LabelKit, FotoKit, PlanKit, BelegKit, SpesenKit; Übersicht im [README der Projektzentrale](https://github.com/kaspersebastian83-dot/Projektzentrale#readme)).
+Aktuelle Version **1.16.1** – alle Änderungen in `CHANGELOG.md`. Schritt ③ der Büro-App-Suite **Spektron** (Projektzentrale, LabelKit, FotoKit, PlanKit, BelegKit, SpesenKit; Übersicht im [README der Projektzentrale](https://github.com/kaspersebastian83-dot/Projektzentrale#readme)).
 
 PlanKit gehört zur Familie von LabelKit und FotoKit und sieht genauso aus. Webadresse, Repository, Startdatei und das Dateiformat `.probenplan` behalten den bisherigen Namen – bestehende Projekte, Lesezeichen und installierte Apps funktionieren unverändert weiter.
 
 Lokale Webapp für beschriftete Grundrisse nach Brandschäden. TypeScript + Vite, ohne UI-Framework, Serverdatenbank, Konten oder externe Dienste.
 
 Version 1.14 richtet fotografierte oder schief gescannte Pläne fein aus (Werkzeug „Ausrichten“, Projektformat 6). Version 1.13 bringt die gemeinsame Leiste der Projekt-Apps (Projekt, Arbeitsschritte mit Haken, „Weiter“). Version 1.12 exportiert PNG/JPG standardmäßig mit Schriftfeld wie das PDF, sperrt die Ergebniskarte ohne Laborwerte, öffnet mit `?aktion=anlage` direkt den Export der Anlage und liest Projektdaten beim Zurückkehren ins Fenster neu. Version 1.11 erstellt die Word-Anlage Probenahme. Version 1.10 exportiert maßstäbliche PDFs (A4/A3) mit Schriftfeld, Maßstabsleiste und Nordpfeil. Version 1.9 macht die Punktgröße je Plan einstellbar (Regler und Tasten < >). Version 1.8 arbeitet direkt im Projektordner: aus der Projektzentrale „Plan bearbeiten“ oder „📁 Projekt“ – automatisches Speichern in „Pläne“, Bilder ebenfalls dorthin, Laborberichte aus „Laborergebnisse“. Version 1.7 bringt die Ergebniskarte: Probenmarker werden nach Ihrer Bewertungsskala (dieselbe wie in FotoKits Ergebnistabelle) eingefärbt, mit Legende im Export. Version 1.6 bringt mehrere Pläne pro Projekt (z. B. EG, 1. OG, 2. OG) mit einer Vorschauleiste unter dem Plan, fortlaufenden Probennummern über alle Pläne und Export je Plan. Version 1.5 gibt dem Plan den Vorrang: eine schlanke Kopfzeile, Werkzeuge links, einklappbare Liste rechts und Export als schwebende Karte – je nach Bildschirm 87–92 % der Fläche für den Plan. Version 1.4 brachte den Namen PlanKit und das Aussehen von FotoKit/LabelKit. Version 1.3.1 bewahrt die Labor-Herkunft dauerhaft beim Speichern und Wiederöffnen. Der lokale Laborimport aus Eurofins-XML/PDF und die Platzierung offener Proben bleiben erhalten. PDF-Grundrisse, Bildvorbereitung, Schadensflächen, Tastaturkürzel und intuitives Verschieben in Setzwerkzeugen bleiben erhalten. Änderungen siehe `CHANGELOG.md`. Die Freigabe erfolgt über einen Pull Request; der Feature-Branch wird nicht auf die produktive Website bereitgestellt.
+
+## Neu in 1.16.1 · 20.10.2026
+
+Projektzentrale und Spektron-Leiste übergeben Projekte jetzt über #projekt im Fragment. Sonderzeichen bleiben erhalten; alte ?projekt-Links funktionieren weiterhin und werden nach dem Laden bereinigt. Projektwechsel laden auch bereits geöffnete App-Fenster neu; eine Warnung vor ungesicherten Eingaben kann den Wechsel abbrechen. Die Anlagenaktion aktion=anlage wird ebenfalls im Fragment übergeben. Installiertes PlanKit nach einer Online-Aktualisierung vollständig schließen und erneut öffnen.
 
 ## Online öffnen und installieren
 
