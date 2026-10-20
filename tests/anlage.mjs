@@ -137,6 +137,11 @@ try{
   await page.locator('#saved',{hasText:/gespeichert/}).waitFor();await page.waitForTimeout(1500);
   await page.goto(`${base}/?projekt=${encodeURIComponent(NAME)}&aktion=anlage`);await page.locator('button',{hasText:'Datei verwenden'}).click({timeout:4000}).catch(()=>{});
   await page.locator('#export-dialog[open]').waitFor();assert.equal(await page.locator('#format').inputValue(),'anlage');assert.ok(await page.locator('#annex-fields').isVisible());
+  assert.equal(new URL(page.url()).searchParams.has('projekt'),false);assert.equal(new URL(page.url()).searchParams.has('aktion'),false);
+  assert.equal(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('aktion'),'anlage');
+  await page.goto(`${base}/#projekt=${encodeURIComponent(NAME)}&aktion=anlage`);await page.locator('button',{hasText:'Datei verwenden'}).click({timeout:4000}).catch(()=>{});
+  await page.locator('#export-dialog[open]').waitFor();assert.equal(await page.locator('#format').inputValue(),'anlage');assert.ok(await page.locator('#annex-fields').isVisible());
+
  });
  assert.deepEqual(errors,[]);
 }finally{await browser.close();}

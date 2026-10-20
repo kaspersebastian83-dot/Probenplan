@@ -21,6 +21,28 @@ import {hasValues,parameters,prepare,rangeText,rateMarkers,saveShared,fromShared
 import type {Scale} from './model';
 import {addArea,areaSVG,cleanName,MAX_POINTS,PALETTE,palette,polygonError} from './areas';
 
+// Projektübergabe: Fragment hat Vorrang; alte Query-Links früh und ohne Anfrage bereinigen.
+const PROJEKT_URL = (() => {
+  const start = new URL(location.href);
+  const projekt = new URLSearchParams(start.hash.slice(1)).get('projekt') ?? start.searchParams.get('projekt');
+  const aktion = new URLSearchParams(start.hash.slice(1)).get('aktion') ?? start.searchParams.get('aktion');
+  function setzen(name: string | null){
+    const url = new URL(location.href);
+    // Fremde Fragmentbestandteile (auch reine Anker wie #fotos) unverändert erhalten.
+    const teile = url.hash.slice(1).split('&').filter(t => t && !new URLSearchParams(t).has('projekt'));
+    if (name !== null) teile.push('projekt=' + encodeURIComponent(name));
+    if (name !== null && url.searchParams.has('aktion')){
+      if (!new URLSearchParams(url.hash.slice(1)).has('aktion')) teile.push('aktion=' + encodeURIComponent(url.searchParams.get('aktion')!));
+      url.searchParams.delete('aktion');
+    }
+    url.searchParams.delete('projekt');
+    url.hash = teile.join('&');
+    if (url.href !== location.href) try{ window.history.replaceState(window.history.state, '', url); }catch(e){}
+  }
+  if (start.searchParams.has('projekt') || (projekt !== null && start.searchParams.has('aktion'))) setzen(projekt);
+  return { projekt, aktion, setzen };
+})();
+
 document.querySelector<HTMLDivElement>('#app')!.innerHTML=`
 <header class="header topbar"><a class="brand" href="./" aria-label="PlanKit Start"><span class="brand-icon" aria-hidden="true">⬡</span><span>PlanKit</span></a><span id="app-version" class="version-badge" title="Version"></span>
 <div class="tb-group" id="file-actions"><button id="load" class="tb" title="Grundriss laden: PDF, Polycam-ZIP, SVG, PNG oder JPG">＋ Plan</button><input id="file" type="file" accept=".zip,.svg,.png,.jpg,.jpeg" hidden><button id="open-project" class="tb" title="Projektdatei (.probenplan) öffnen">Öffnen</button><button id="save-project" class="tb" title="Projekt als .probenplan-Datei speichern" disabled>Speichern</button><input id="project-file" type="file" accept=".probenplan,.json" hidden></div>
@@ -747,7 +769,7 @@ async function enterFolder(dir:Parameters<typeof openFolder>[0]){
   if(next){if(!next.report)next.report=target.name;await install(next,true,transition);$('saved').textContent=recovered?'Wiederhergestellt – bitte prüfen und „Speichern“ klicken':`✓ Aus „${PLAENE}“ geladen`;}
   else{await preserveUnsavedProject();transition();labUI?.reset();project=null;history.clear();render();$('saved').textContent=`Projekt ${target.name}`;}
   showFolder();$('folder-prompt').hidden=true;await renderFolderPlans();
-  window.history.replaceState(null,'',`?projekt=${encodeURIComponent(target.name)}`);
+  PROJEKT_URL.setzen(target.name);
   (window as any).MosaikLeiste?.aktualisieren();
   toast(next?`Projekt ${target.name}: Probenplan aus „${PLAENE}“ geöffnet.`:`Projekt ${target.name}: noch kein Probenplan – Grundriss wählen.`);
 }
@@ -774,9 +796,9 @@ $('lab-import').onclick=async()=>{
   $('lab-folder-other').onclick=()=>{d.close();input('lab-files').click();};d.showModal();
 };
 document.querySelector('#help-dialog h3')!.insertAdjacentHTML('beforebegin',`<h3>Projektordner</h3><p>Aus der Projektzentrale „Plan bearbeiten“ wählen oder hier „📁 Projekt …“ und den Projektordner (z. B. „26.0123 Köln“) auswählen. PlanKit speichert dann jede Änderung automatisch als „Probenplan &lt;Projekt&gt;.probenplan“ im Ordner „${PLAENE}“; exportierte Bilder landen ebenfalls dort. Grundrisse aus „${PLAENE}“, Laborberichte aus „${LABOR}“ und die Probenerfassung aus LabelKit („${AUFTRAEGE}“) stehen direkt zur Auswahl. Mit LabelKit erfasste Proben erscheinen so schon vor dem Laborbericht unter „Noch zu platzieren“; kommt der Bericht, ergänzt „Alle Konflikte: Aktualisieren“ Labordaten und Messwerte. Hat ein Kollege den Plan zwischenzeitlich gespeichert, fragt PlanKit nach, statt zu überschreiben. Vor jedem Überschreiben bleibt die vorherige Datei als eindeutig benannte „(vorher …)“-Kopie erhalten. Eine Wiederherstellungsdatei sichert die neue Fassung bis zum bestätigten Speichern. Bei Fehlern „Speichern“ erneut versuchen und ggf. Ordnerzugriff erlauben; „Notfallkopie“ lädt die geöffnete Fassung herunter. Nach einem Abbruch Wiederherstellungs-/Browserfassung ausdrücklich auswählen, prüfen und speichern.</p>`);
-const startProject=new URLSearchParams(location.search).get('projekt');
+const startProject=PROJEKT_URL.projekt;
 /** ?aktion=anlage (aus der Projektzentrale): nach dem Öffnen gleich den Export „Word · Anlage Probenahme“ zeigen. */
-const startAktion=new URLSearchParams(location.search).get('aktion');   // vor dem Öffnen merken – die Adresse wird dabei umgeschrieben
+const startAktion=PROJEKT_URL.aktion;   // vor dem Öffnen merken – die Adresse wird dabei umgeschrieben
 function startAction(){if(startAktion!=='anlage')return;
   if(!project){toast('Anlage Probenahme: In diesem Projekt gibt es noch keinen Plan – zuerst einen Grundriss laden und die Proben setzen.',true);return;}
   input('format').value='anlage';if(!exportCard.open)exportCard.show();dimensions();}
