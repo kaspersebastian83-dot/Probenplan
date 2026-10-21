@@ -44,6 +44,37 @@ check('bestehende Listen, Nummern, Beschreibungen und Datumsformate bleiben erha
 check('beschädigte und fachfremde JSON bleiben abgewiesen',()=>{
  for(const text of ['{','null','{}','[]'])assert.throws(()=>labelkitReport(text,quelle,project,()=>true));
 });
+check('freier Plan erhält nur die Quellreferenz und keine erfundene Zielnummer',()=>{
+ const r=labelkitReport(JSON.stringify(data('26.0999')),quelle,null);
+ assert.equal(r.auftragsreferenz,'26.0999');assert.equal(r.rows.length,1);
+});
+check('nummernlose freie Datei braucht ausdrückliches OK, Referenz bleibt leer',()=>{
+ for(const confirm of [undefined,()=>false])assert.throws(()=>labelkitReport(JSON.stringify(data('')),quelle,null,confirm),/abgebrochen/);
+ const r=labelkitReport(JSON.stringify(data('')),quelle,null,m=>{assert.match(m,/freien Plan/);return true;});
+ assert.equal(r.auftragsreferenz,'');assert.equal(r.rows.length,1);
+});
+check('unlesbare vorhandene Zielkennung ist kein freier Plan',()=>{
+ for(const target of ['', 'unbekannt', '2026-0142'])assert.throws(()=>labelkitReport(JSON.stringify(data('26.0999')),quelle,target,()=>true),/aktiven Projekts/);
+});
+// Echter manueller Importhandler mit verzögertem Dateilesen; kein DOM nötig.
+const labui=readFileSync(new URL('../src/labui.ts',import.meta.url),'utf8');
+const importStart=labui.indexOf(' async import(files:File[])'),importEnd=labui.indexOf('\n private collision',importStart);
+const manualMethod=stripTypeScriptTypes('class TestUI {'+labui.slice(importStart,importEnd)+'}',{mode:'transform'});
+async function manual(target,nr,approval,change){
+ const errors=[],prompts=[];let active={},currentTarget=target,shown=0;
+ const context=vm.createContext({labelkitReport,window:{confirm:m=>{prompts.push(m);return approval;}}});
+ const UI=vm.runInContext(manualMethod+'; TestUI',context),ui=new UI();
+ Object.assign(ui,{hooks:{project:()=>active,labelkitProject:()=>currentTarget,blocked:()=>false,busy(){},error:e=>errors.push(e.message)},review:{open:false,showModal(){shown++;}},open:{},choices:new Map(),meta:new Map(),renderTable(){},render(){}});
+ await ui.import([{name:quelle,text:async()=>{if(change==='project')active={};if(change==='target')currentTarget='26.0888';return JSON.stringify(data(nr));}}]);
+ return{errors,prompts,shown,report:ui.report,loading:ui.loading};
+}
+for(const [target,nr,approval,accepted,promptCount] of [[null,'26.0999',false,true,0],[null,'',false,false,1],[null,'',true,true,1],[project,'26.0999',true,false,0],[project,'26.0101',false,true,0],[project,'',false,false,1],[project,'',true,true,1]]){
+ const r=await manual(target,nr,approval);assert.equal(r.shown,accepted?1:0);assert.equal(r.errors.length,accepted?0:1);assert.equal(r.prompts.length,promptCount);assert.equal(r.loading,false);checks++;
+}
+for(const change of ['project','target']){
+ const r=await manual(null,'26.0999',true,change);assert.equal(r.shown,0);assert.match(r.errors[0],/gewechselt/);assert.equal(r.prompts.length,0);checks++;
+}
+console.log('OK F1 manueller Handler: freier Plan, Zielnummer, Altdateien und Projektwechsel');
 // Der tatsächliche asynchrone Klickhandler darf die Prüftabelle erst nach erfolgreicher Zuordnung öffnen.
 const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
 const start=main.indexOf("$('lab-folder-list').onclick=async e=>"),end=main.indexOf("\n  $('lab-folder-other')",start);

@@ -4,7 +4,7 @@ import {applyLabImport,originFromReport,projectLabRows,sourceFilename,sourceText
 import {copyLab,validLab} from './import';
 import {blankReport,readLabFiles,reportWarnings,type LabReport} from './labreport';
 import {download} from './storage';
-interface Hooks {project:()=>Project|null;blocked:()=>boolean;busy:(value:boolean)=>void;mutate:(fn:(p:Project)=>void)=>void;point:(e:{clientX:number;clientY:number})=>Point;mode:(mode:string)=>void;error:(e:unknown)=>void;selected:(id:string)=>void}
+interface Hooks {project:()=>Project|null;labelkitProject:()=>string|null;blocked:()=>boolean;busy:(value:boolean)=>void;mutate:(fn:(p:Project)=>void)=>void;point:(e:{clientX:number;clientY:number})=>Point;mode:(mode:string)=>void;error:(e:unknown)=>void;selected:(id:string)=>void}
 const el=<K extends keyof HTMLElementTagNameMap>(tag:K,text='')=>{const e=document.createElement(tag);e.textContent=text;return e;};
 const button=(text:string,fn:()=>void)=>{const b=el('button',text);b.type='button';b.onclick=fn;return b;};
 const shapeSelect=(value:string,placeholder?:string)=>{const s=el('select');if(placeholder)s.append(new Option(placeholder,''));for(const f of SHAPES)s.append(new Option(`${SHAPE_SYMBOL[f]} ${SHAPE_NAMES[f]}`,f));s.value=value;return s;};
@@ -36,7 +36,22 @@ export class LabUI {
  }
  /** Fertige Probenliste (z. B. aus LabelKit) wie einen Bericht prüfen und übernehmen. */
  show(report:LabReport){if(!this.hooks.project()){this.hooks.error(Error('Bitte zuerst einen Grundriss laden.'));return;}if(this.loading||this.hooks.blocked()||this.review.open)return;this.report=report;this.choices.clear();for(const [key,input] of this.meta)input.value=this.report[key as 'bericht'];this.renderTable();this.review.showModal();}
- async import(files:File[]){if(!this.hooks.project()){this.hooks.error(Error('Bitte zuerst einen Grundriss laden.'));return;}if(this.loading||this.hooks.blocked())return;if(this.review.open){this.hooks.error(Error('Bitte die aktuelle Laborprüfung zuerst übernehmen oder abbrechen.'));return;}this.loading=true;this.hooks.busy(true);this.open.textContent='Bericht wird gelesen …';try{const json=files.find(f=>/\.json$/i.test(f.name));if(json&&files.length>1)throw Error('Die LabelKit-Probenerfassung (JSON) bitte einzeln übernehmen – nicht zusammen mit einem Laborbericht.');this.report=json?labelkitReport(await json.text(),json.name,this.hooks.project()?.report||''):await readLabFiles(files);this.choices.clear();for(const [key,input] of this.meta)input.value=this.report[key as 'bericht'];this.renderTable();this.review.showModal();}catch(e){this.hooks.error(e);}finally{this.loading=false;this.open.textContent='Proben übernehmen …';this.hooks.busy(false);this.render(this.hooks.project());}}
+ async import(files:File[]){
+  if(!this.hooks.project()){this.hooks.error(Error('Bitte zuerst einen Grundriss laden.'));return;}
+  if(this.loading||this.hooks.blocked())return;
+  if(this.review.open){this.hooks.error(Error('Bitte die aktuelle Laborprüfung zuerst übernehmen oder abbrechen.'));return;}
+  this.loading=true;this.hooks.busy(true);this.open.textContent='Bericht wird gelesen …';
+  try{
+   const json=files.find(f=>/\.json$/i.test(f.name));
+   if(json&&files.length>1)throw Error('Die LabelKit-Probenerfassung (JSON) bitte einzeln übernehmen – nicht zusammen mit einem Laborbericht.');
+   if(json){
+    const active=this.hooks.project(),target=this.hooks.labelkitProject(),text=await json.text();
+    if(this.hooks.project()!==active||this.hooks.labelkitProject()!==target)throw Error('LabelKit-Import abgebrochen: Das aktive Projekt wurde während des Lesens gewechselt. Bitte die Datei erneut auswählen.');
+    this.report=labelkitReport(text,json.name,target,message=>window.confirm(message));
+   }else this.report=await readLabFiles(files);
+   this.choices.clear();for(const [key,input] of this.meta)input.value=this.report[key as 'bericht'];this.renderTable();this.review.showModal();
+  }catch(e){this.hooks.error(e);}finally{this.loading=false;this.open.textContent='Proben übernehmen …';this.hooks.busy(false);this.render(this.hooks.project());}
+ }
  private collision(row:LabSample){const p=this.hooks.project()!;return [...allMarkers(p),...allAreas(p),...(p.pending||[]).map(r=>({...r,id:''}))].find(r=>r.label.toUpperCase()===row.label.toUpperCase());}
  private renderTable(){this.table.replaceChildren();this.report.rows.forEach((row,index)=>{const tr=el('tr');tr.dataset.labRow=String(index);fields.forEach((field,i)=>{const td=el('td'),input=field==='desc'?el('textarea'):el('input');input.value=row[field]||'';input.dataset.field=field;input.setAttribute('aria-label',`${names[i]} Zeile ${index+1}`);input.maxLength=field==='desc'?500:field==='label'?16:160;if(field==='datum')(input as HTMLInputElement).type='date';input.oninput=()=>{row[field]=input.value;this.check();};td.append(input);tr.append(td);});const formTd=el('td'),form=shapeSelect(pendingShape(row));form.dataset.field='shape';form.setAttribute('aria-label',`Form Zeile ${index+1}`);form.onchange=()=>{row.shape=form.value as Shape;};formTd.append(form);tr.append(formTd);const conflict=el('td');conflict.className='lab-conflict';tr.append(conflict);const actions=el('td');actions.append(button('↑',()=>{if(index){[this.report.rows[index-1],this.report.rows[index]]=[row,this.report.rows[index-1]];this.renderTable();}}),button('↓',()=>{if(index<this.report.rows.length-1){[this.report.rows[index+1],this.report.rows[index]]=[row,this.report.rows[index+1]];this.renderTable();}}),button('Entfernen',()=>{this.report.rows.splice(index,1);this.renderTable();}));tr.append(actions);this.table.append(tr);});this.check();}
  private check(){

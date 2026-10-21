@@ -453,7 +453,7 @@ async function runExport(){if(!project||busy||!requireFinished())return;
   }catch(e){fail(e);$('export-result').hidden=false;$('export-link').hidden=!exportURL||all||pdf;$('smaller').hidden=pdf||quality<=3500;}finally{busy=false;$<HTMLButtonElement>('export').disabled=false;dimensions();render();}}
 $('export').onclick=runExport;$('smaller').onclick=()=>{input('quality').value='3500';dimensions();void runExport();};$('help').onclick=()=>$<HTMLDialogElement>('help-dialog').showModal();
 async function offline(){if(!('serviceWorker' in navigator)){ $('offline').textContent='○ Offline nicht verfügbar';return;}const update=()=>{$('offline').textContent=navigator.serviceWorker.controller?'● Offline bereit':'● Offline nach erneutem Öffnen bereit';$('offline').classList.add('ready');};navigator.serviceWorker.addEventListener('controllerchange',update);try{await navigator.serviceWorker.register('./sw.js');await navigator.serviceWorker.ready;update();}catch{if(navigator.serviceWorker.controller)update();else $('offline').textContent='○ Offline nicht eingerichtet';}}
-labUI=new LabUI({project:()=>project,blocked:()=>busy||cropping||!!draftPoints.length,busy:value=>{busy=value;render();},mutate,point,mode:next=>{if(next==='lab-place'){selected=null;selectedArea=null;}setMode(next);render();},error:fail,selected:id=>{selected=id;selectedArea=null;}});
+labUI=new LabUI({project:()=>project,labelkitProject:()=>folder?.name||project?.report||null,blocked:()=>busy||cropping||!!draftPoints.length,busy:value=>{busy=value;render();},mutate,point,mode:next=>{if(next==='lab-place'){selected=null;selectedArea=null;}setMode(next);render();},error:fail,selected:id=>{selected=id;selectedArea=null;}});
 setMode('navigate');
 
 // ---- PlanKit-Layout: Karte zuerst ----
