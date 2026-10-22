@@ -681,6 +681,28 @@ $('open-folder').hidden=!folderSupported();
 document.querySelector('#welcome-load')!.insertAdjacentHTML('afterend','<div id="folder-prompt" class="folder-prompt" hidden><p id="folder-prompt-text"></p><button id="folder-allow" class="primary">Zugriff erlauben und Projekt öffnen</button></div><div id="folder-plans" class="folder-plans" hidden></div>');
 document.body.insertAdjacentHTML('beforeend','<dialog id="ask-dialog"><h2 id="ask-title"></h2><p id="ask-text"></p><div class="dialog-actions" id="ask-actions"></div></dialog><dialog id="lab-folder-dialog"><form method="dialog"><button class="close" aria-label="Schließen">×</button></form><span class="eyebrow">PROBEN ÜBERNEHMEN</span><h2>Welche Proben übernehmen?</h2><p class="muted">Laborberichte aus „Laborergebnisse“ (XML und PDF mit gleichem Namen gemeinsam) oder die Probenerfassung aus LabelKit.</p><div id="lab-folder-list"></div><div class="dialog-actions"><button id="lab-folder-other">Andere Datei …</button></div></dialog>');
 function ask(title:string,text:string,choices:string[]):Promise<string>{return new Promise(resolve=>{const d=$<HTMLDialogElement>('ask-dialog');$('ask-title').textContent=title;$('ask-text').textContent=text;$('ask-actions').replaceChildren(...choices.map((c,i)=>{const b=document.createElement('button');b.textContent=c;if(i===choices.length-1)b.className='primary';b.onclick=()=>{d.close();resolve(c);};return b;}));d.oncancel=e=>{e.preventDefault();};d.showModal();});}
+/** No silent 30-file cutoff: all readable versions remain reachable, in pages of 20. */
+async function chooseStoredVersion(target:ProjectFolder,revision:string|null,hasMain:boolean,exclude:string|null){
+ const versions:{name:string;project:Project}[]=[],seen=new Set<string>(),invalid:string[]=[];
+ for(const candidate of await listFiles(target.plaene,/\.probenplan$/i)){
+  if(candidate.name===projectFileName(target)||candidate.name===exclude)continue;
+  try{
+   const file=await candidate.handle.getFile(),hash=await fileRevision(file);
+   if(hasMain&&hash===revision||hash&&seen.has(hash))continue;
+   const project=await validateProject(JSON.parse(await file.text()));if(hash)seen.add(hash);versions.push({name:candidate.name,project});
+  }catch{invalid.push(candidate.name);}
+ }
+ if(!versions.length&&!invalid.length&&!(!hasMain&&revision))return undefined;
+ let page=0;
+ for(;;){
+  const names=versions.slice(page*20,(page+1)*20).map(x=>x.name),pages=Math.max(1,Math.ceil(versions.length/20));
+  const choice=await ask(hasMain?'Gespeicherte Fassungen prüfen':'Projektdatei fehlt oder ist beschädigt',`${versions.length} abweichende Fassung(en), Seite ${page+1} von ${pages}. Sie können von früheren, parallelen oder unterbrochenen Speicherungen stammen. Eine Fassung nur zur Prüfung öffnen; keine automatische Zusammenführung und kein Überschreiben.${invalid.length?` ${invalid.length} unlesbare/beschädigte Datei(en) bleiben unverändert: ${invalid.join(', ')}.`:''}`,['Abbrechen',...(hasMain?['Datei verwenden']:[]),...names,...(page?['Vorherige Seite']:[]),...(page+1<pages?['Weitere Fassungen']:[])]);
+  if(choice==='Abbrechen')return null;
+  if(choice==='Datei verwenden')return undefined;
+  if(choice==='Weitere Fassungen'){page++;continue;}if(choice==='Vorherige Seite'){page--;continue;}
+  return versions.find(x=>x.name===choice)?.project;
+ }
+}
 function footerExtra(){const o=String(projectData.objekt||'').trim();return o?`Objekt ${o}`:'';}
 function showFolder(){$('emergency-copy').hidden=!folder;const b=$('project-badge');b.hidden=!folder;document.body.classList.toggle('in-project',!!folder);if(folder){b.innerHTML=`<b>${escape(folder.nr)}</b> ${escape(folder.ort)}`;b.title=`Projektordner „${folder.name}“ – PlanKit speichert in „${PLAENE}“`;document.title=`${folder.name} · PlanKit`;}}
 function scheduleFolderSave(){clearTimeout(folderTimer);$('saved').textContent=`Wird in „${PLAENE}“ gespeichert …`;folderTimer=window.setTimeout(()=>void saveToFolder(false),700);}
@@ -753,18 +775,9 @@ async function enterFolder(dir:Parameters<typeof openFolder>[0]){
    if(choice==='Datei verwenden'){try{preservedBrowserDraft=await writeProjectCopy(target,'Wiederherstellung',JSON.stringify(local!.project));}catch(e){fail(e);return;}}
    if(choice==='Browser-Fassung verwenden'){try{next=await validateProject(local!.project);recovered=true;}catch(e){fail(e);return;}}
   }
-  if(next&&!recovered){
-   const recoveryFiles=(await listFiles(target.plaene,/\.probenplan$/i)).filter(f=>f.name!==preservedBrowserDraft&&f.name.startsWith(`Probenplan ${target.name} (Wiederherstellung `)).slice(0,30);
-   const differing:typeof recoveryFiles=[];for(const candidate of recoveryFiles)if(await fileRevision(await candidate.handle.getFile())!==currentRevision)differing.push(candidate);
-   if(differing.length){const choice=await ask('Unterbrochenes Speichern prüfen','Es gibt abweichende Wiederherstellungsdateien. Aktuelle Datei verwenden oder eine Fassung zur Prüfung öffnen?',['Abbrechen','Datei verwenden',...differing.map(f=>f.name)]);if(choice==='Abbrechen')return;const selected=differing.find(f=>f.name===choice);if(selected){try{next=await validateProject(JSON.parse(await(await selected.handle.getFile()).text()));recovered=true;}catch(e){fail(e);return;}}}
-  }
-  if(!next){
-   const candidates=(await listFiles(target.plaene,/\.probenplan$/i)).filter(f=>f.name!==projectFileName(target)).slice(0,30);
-   if(canonical||candidates.length){
-    const choice=await ask('Projektdatei fehlt oder ist beschädigt','Bitte eine Sicherungs-/Wiederherstellungsdatei ausdrücklich auswählen. Die vorhandenen Dateien werden nicht verändert.',['Abbrechen',...candidates.map(f=>f.name)]);
-    const selected=candidates.find(f=>f.name===choice);if(!selected)return;
-    try{file=await selected.handle.getFile();next=await validateProject(JSON.parse(await file.text()));recovered=true;}catch(e){fail(e);return;}
-   }
+  if(!recovered){
+   const selected=await chooseStoredVersion(target,currentRevision,!!next,preservedBrowserDraft);if(selected===null)return;
+   if(selected){next=selected;recovered=true;}
   }
   const metadata=await readProjectData(target),transition=()=>{folder=target;folderRevision=currentRevision;folderDirty=recovered;folderBlocked=false;projectData=metadata;};
   if(next){if(!next.report)next.report=target.name;await install(next,true,transition);$('saved').textContent=recovered?'Wiederhergestellt – bitte prüfen und „Speichern“ klicken':`✓ Aus „${PLAENE}“ geladen`;}
@@ -796,7 +809,7 @@ $('lab-import').onclick=async()=>{
   $('lab-folder-list').onclick=async e=>{const lk=(e.target as HTMLElement).closest<HTMLElement>('[data-labelkit]');if(lk){const erfassung=erfassungen[Number(lk.dataset.labelkit)];d.close();try{labUI?.show(labelkitReport(await (await erfassung.handle.getFile()).text(),erfassung.name,folder!.name));}catch(err){fail(err);}return;}const b=(e.target as HTMLElement).closest<HTMLElement>('[data-lab-file]');if(!b)return;d.close();await labUI?.import(await Promise.all(entries[Number(b.dataset.labFile)].map(f=>f.handle.getFile())));};
   $('lab-folder-other').onclick=()=>{d.close();input('lab-files').click();};d.showModal();
 };
-document.querySelector('#help-dialog h3')!.insertAdjacentHTML('beforebegin',`<h3>Projektordner</h3><p>Aus der Projektzentrale „Plan bearbeiten“ wählen oder hier „📁 Projekt …“ und den Projektordner (z. B. „26.0123 Köln“) auswählen. PlanKit speichert dann jede Änderung automatisch als „Probenplan &lt;Projekt&gt;.probenplan“ im Ordner „${PLAENE}“; exportierte Bilder landen ebenfalls dort. Grundrisse aus „${PLAENE}“, Laborberichte aus „${LABOR}“ und die Probenerfassung aus LabelKit („${AUFTRAEGE}“) stehen direkt zur Auswahl. Mit LabelKit erfasste Proben erscheinen so schon vor dem Laborbericht unter „Noch zu platzieren“; kommt der Bericht, ergänzt „Alle Konflikte: Aktualisieren“ Labordaten und Messwerte. Hat ein Kollege den Plan zwischenzeitlich gespeichert, fragt PlanKit nach, statt zu überschreiben. Vor jedem Überschreiben bleibt die vorherige Datei als eindeutig benannte „(vorher …)“-Kopie erhalten. Eine Wiederherstellungsdatei sichert die neue Fassung bis zum bestätigten Speichern. Bei Fehlern „Speichern“ erneut versuchen und ggf. Ordnerzugriff erlauben; „Notfallkopie“ lädt die geöffnete Fassung herunter. Nach einem Abbruch Wiederherstellungs-/Browserfassung ausdrücklich auswählen, prüfen und speichern.</p>`);
+document.querySelector('#help-dialog h3')!.insertAdjacentHTML('beforebegin',`<h3>Projektordner</h3><p>Aus der Projektzentrale „Plan bearbeiten“ wählen oder hier „📁 Projekt …“ und den Projektordner (z. B. „26.0123 Köln“) auswählen. PlanKit speichert dann jede Änderung automatisch als „Probenplan &lt;Projekt&gt;.probenplan“ im Ordner „${PLAENE}“; exportierte Bilder landen ebenfalls dort. Grundrisse aus „${PLAENE}“, Laborberichte aus „${LABOR}“ und die Probenerfassung aus LabelKit („${AUFTRAEGE}“) stehen direkt zur Auswahl. Mit LabelKit erfasste Proben erscheinen so schon vor dem Laborbericht unter „Noch zu platzieren“; kommt der Bericht, ergänzt „Alle Konflikte: Aktualisieren“ Labordaten und Messwerte. Hat ein Kollege den Plan zwischenzeitlich gespeichert, fragt PlanKit nach, statt zu überschreiben. Vor jedem Überschreiben bleibt die vorherige Datei als eindeutig benannte „(vorher …)“-Kopie erhalten. Ein geprüfter Speicherkandidat erhält jede unterschiedliche neue Fassung dauerhaft, auch nach bestätigtem Speichern und parallelen Schreibvorgängen. Beim Öffnen können Sie gespeicherte Fassungen seitenweise prüfen; es wird nichts automatisch zusammengeführt. Ältere Sicherungen werden nur entfernt, wenn identische Bytes zusätzlich in einem dauerhaft geschützten Kandidaten liegen. Bei Fehlern „Speichern“ erneut versuchen und ggf. Ordnerzugriff erlauben; „Notfallkopie“ lädt die geöffnete Fassung herunter. Nach einem Abbruch Wiederherstellungs-/Browserfassung ausdrücklich auswählen, prüfen und speichern.</p>`);
 const startProject=PROJEKT_URL.projekt;
 /** ?aktion=anlage (aus der Projektzentrale): nach dem Öffnen gleich den Export „Word · Anlage Probenahme“ zeigen. */
 const startAktion=PROJEKT_URL.aktion;   // vor dem Öffnen merken – die Adresse wird dabei umgeschrieben

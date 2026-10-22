@@ -1,0 +1,47 @@
+name: F2 with pinned F1
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: f2-f1-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  compatibility:
+    if: github.head_ref == 'fix/f2-dauerhafte-speicherkandidaten' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Apply reviewed F1 changes in disposable checkout only
+        run: |
+          git fetch --depth=1 https://github.com/kaspersebastian83-dot/Probenplan.git 1773fb482760ffd31ec1daff4acf36702bd40143
+          git diff 5f577e702a430ac4614a4b77c13cd1f9d38e4b15 1773fb482760ffd31ec1daff4acf36702bd40143 -- src/labelkit.ts src/labui.ts src/main.ts tests/labelkit-project.mjs tests/labelkit-project-browser.mjs > "$RUNNER_TEMP/f1.patch"
+          git apply --check "$RUNNER_TEMP/f1.patch"
+          git apply "$RUNNER_TEMP/f1.patch"
+          node --input-type=module -e "import fs from 'node:fs'; const p='tests/run.mjs'; let s=fs.readFileSync(p,'utf8'); if(!s.includes(\"const suites=[\"))throw Error('suite anchor missing'); s=s.replace(\"const suites=[\",\"const suites=['labelkit-project','labelkit-project-browser',\"); fs.writeFileSync(p,s);"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium webkit
+      - name: Combined production build and TypeScript check
+        run: pnpm build
+      - name: Full combined F1 and F2 suite
+        run: pnpm test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: f2-f1-results
+          path: |
+            .test-output/summary.json
+            .test-output/*.log
+          retention-days: 7
