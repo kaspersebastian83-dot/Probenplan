@@ -246,4 +246,6 @@ dialog.export-card label.export-check input{width:auto;margin:0}
 #lab-review [data-field=shape]{min-width:112px}
 
 /* F7: persistent read warning; separate from transient save/export toasts. */
-.project-data-warning{flex:none;display:flex;align-items:center;gap:12px;background:#fff0cf;color:#603b00;border:2px solid #bd7900;padding:8px 14px;font-size:14px;max-height:25vh;overflow:auto}.project-data-warning span{flex:1}.project-data-warning[hidden],#project-data-refresh[hidden]{display:none}
+.project-data-warning{flex:none;display:flex;align-items:center;gap:12px;background:#fff0cf;color:#603b00;border:2px solid #bd7900;padding:8px 14px;font-size:14px;max-height:25vh;overflow:auto}.project-data-warning span{flex:1}.project-data-warning[hidden]{display:none}
+
+.topbar #project-badge{min-height:26px;height:26px;border:0;cursor:pointer}.topbar #project-badge::after{content:"↻";margin-left:5px}.topbar #project-badge:focus-visible{outline:2px solid #fff;outline-offset:2px}

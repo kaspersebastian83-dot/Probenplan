@@ -681,12 +681,11 @@ async function preserveUnsavedProject(){
 }
 const folderKey=(f:ProjectFolder)=>`projekt:${f.name}`;
 const clock=(t:number)=>new Date(t).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-document.querySelector('#app-version')!.insertAdjacentHTML('afterend','<span id="project-badge" class="project-badge" hidden></span>');
+document.querySelector('#app-version')!.insertAdjacentHTML('afterend','<button id="project-badge" class="project-badge" type="button" aria-label="Gemeinsame Projektdaten neu einlesen" hidden></button>');
 $('file-actions').insertAdjacentHTML('afterbegin','<button id="open-folder" class="tb" title="Projektordner wählen (z. B. „26.0123 Köln“) – PlanKit speichert dann direkt in dessen Ordner „Pläne“">📁 Projekt</button>');
 $('open-folder').hidden=!folderSupported();
-$('file-actions').insertAdjacentHTML('beforeend','<button id="project-data-refresh" class="tb" hidden>Projektdaten ↻</button>');
 document.querySelector('.topbar')!.insertAdjacentHTML('afterend','<div id="project-data-warning" class="project-data-warning" role="alert" hidden><span id="project-data-warning-text"></span><button id="project-data-retry">Erneut einlesen</button></div>');
-for(const id of ['project-data-refresh','project-data-retry'])$(id).onclick=()=>void refreshProjectData(true);
+for(const id of ['project-badge','project-data-retry'])$(id).onclick=()=>void refreshProjectData(true);
 document.querySelector('#welcome-load')!.insertAdjacentHTML('afterend','<div id="folder-prompt" class="folder-prompt" hidden><p id="folder-prompt-text"></p><button id="folder-allow" class="primary">Zugriff erlauben und Projekt öffnen</button></div><div id="folder-plans" class="folder-plans" hidden></div>');
 document.body.insertAdjacentHTML('beforeend','<dialog id="ask-dialog"><h2 id="ask-title"></h2><p id="ask-text"></p><div class="dialog-actions" id="ask-actions"></div></dialog><dialog id="lab-folder-dialog"><form method="dialog"><button class="close" aria-label="Schließen">×</button></form><span class="eyebrow">PROBEN ÜBERNEHMEN</span><h2>Welche Proben übernehmen?</h2><p class="muted">Laborberichte aus „Laborergebnisse“ (XML und PDF mit gleichem Namen gemeinsam) oder die Probenerfassung aus LabelKit.</p><div id="lab-folder-list"></div><div class="dialog-actions"><button id="lab-folder-other">Andere Datei …</button></div></dialog>');
 function ask(title:string,text:string,choices:string[]):Promise<string>{return new Promise(resolve=>{const d=$<HTMLDialogElement>('ask-dialog');$('ask-title').textContent=title;$('ask-text').textContent=text;$('ask-actions').replaceChildren(...choices.map((c,i)=>{const b=document.createElement('button');b.textContent=c;if(i===choices.length-1)b.className='primary';b.onclick=()=>{d.close();resolve(c);};return b;}));d.oncancel=e=>{e.preventDefault();};d.showModal();});}
@@ -737,10 +736,10 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
  *  sonst steht im Schriftfeld, in der Fußzeile und in der Anlage das alte Objekt. Eine kurz leere/halb geschriebene Datei ersetzt vorhandene Angaben nicht. */
 function projectDataChanged(){
   const status=projectReader.state;projectData=status.data;
-  const warning=$('project-data-warning'),text=$('project-data-warning-text'),button=$<HTMLButtonElement>('project-data-refresh');
+  const warning=$('project-data-warning'),text=$('project-data-warning-text'),button=$<HTMLButtonElement>('project-badge');
   warning.hidden=!folder||!status.stale;text.textContent=projectDataWarning(status);
-  button.hidden=!folder;button.disabled=status.checking;button.textContent=status.checking?'Projektdaten …':'Projektdaten ↻';
-  button.title=status.status==='missing'&&!status.stale?'Keine _Projekt.json im erreichbaren Projektordner vorhanden.':projectDataWarning(status)||'Gemeinsame Projektdaten ausdrücklich neu einlesen';
+  button.disabled=status.checking;button.setAttribute('aria-busy',String(status.checking));
+  button.title=(status.status==='missing'&&!status.stale?'Keine _Projekt.json im erreichbaren Projektordner vorhanden. ':projectDataWarning(status)+' ')+'Gemeinsame Projektdaten ausdrücklich neu einlesen';
   button.dataset.status=status.status;button.dataset.stale=String(status.stale);
   try{(window as any).MosaikLeiste?.aktualisieren();}catch{/* Anzeige wird beim nächsten Leistenlauf erneuert. */}
 }
@@ -754,6 +753,7 @@ async function projectDataForExport(){
   return folder===f&&projectReader.state===status&&choice==='Für diesen Export ausdrücklich verwenden';
 }
 window.addEventListener('focus',()=>{void refreshProjectData();});
+setInterval(()=>{if(!document.hidden&&!busy&&folder&&!projectReader.state.checking)void refreshProjectData();},20000);
 $('save-project').insertAdjacentHTML('afterend','<button id="emergency-copy" class="tb" title="Geöffnete Fassung zusätzlich als Datei herunterladen" hidden>Notfallkopie</button>');
 $('emergency-copy').onclick=()=>{if(project)void download(new Blob([JSON.stringify(project)],{type:'application/json'}),`PlanKit Notfallkopie ${folder?.name||project.report||'Projekt'} ${Date.now()}.probenplan`);};
 async function renderFolderPlans(){

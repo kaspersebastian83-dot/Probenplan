@@ -50,3 +50,8 @@ DOM-Lesefehler beweisen keine bestimmte physische Fehlerursache; sie werden nich
 als Erfolg verschluckt. Erfolgreiches Lesen garantiert weder SMB-Cache-Aktualität
 noch unveränderliche Daten nach dem Lesezeitpunkt. Bestehende native WebKit-Ordner-
 API-Skips bleiben dokumentiert; die neuen F7-Fälle laufen vollständig synthetisch.
+
+Die Aktualisieren-Aktion sitzt platzsparend in der vorhandenen Projektkennung
+(↻, per Tastatur erreichbar). Der bestehende Speicherstatus bleibt sichtbar.
+Bei sichtbarer App wird auch regelmäßig nach 20 Sekunden gelesen, sofern kein
+Lese-/Exportvorgang läuft; die Leiste verwendet denselben Status wie Dokumente.
