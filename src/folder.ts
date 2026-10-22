@@ -65,10 +65,11 @@ export function stampTime(rest:string):number|null{
 }
 const uniqueName=(f:ProjectFolder,kind:string)=>`Probenplan ${f.name} (${kind} ${localStamp()} ${crypto.randomUUID()}).probenplan`;
 /** Always use a fresh filename: backups/recovery files are never recycled. */
-export async function writeProjectCopy(f:ProjectFolder,kind:string,text:string){const name=uniqueName(f,kind);if(await fileInfo(f.plaene,name))throw Error('Der Name einer Sicherungsdatei ist bereits belegt. Bitte erneut versuchen.');await writeFile(f.plaene,name,text);if(await (await fileInfo(f.plaene,name))?.text()!==text)throw Error('Sicherungsdatei konnte nicht bestätigt werden.');return name;}
+export async function writeProjectCopy(f:ProjectFolder,kind:string,data:string|Blob){const name=uniqueName(f,kind);if(await fileInfo(f.plaene,name))throw Error('Der Name einer Sicherungsdatei ist bereits belegt. Bitte erneut versuchen.');const wanted=await fileRevision(new File([data],name));await writeFile(f.plaene,name,data);if(await fileRevision(await fileInfo(f.plaene,name))!==wanted)throw Error('Sicherungsdatei konnte nicht bestätigt werden.');return name;}
 /** These candidates are never cleaned up. Reuse only a byte-identical, re-read copy. */
 async function retainCandidate(f:ProjectFolder,text:string){
- for(const file of await listFiles(f.plaene,/\.probenplan$/i))if(file.name.startsWith(`Probenplan ${f.name} (Speicherkandidat `)&&await(await file.handle.getFile()).text()===text)return file.name;
+ const wanted=await fileRevision(new File([text],'candidate'));
+ for(const file of await listFiles(f.plaene,/\.probenplan$/i))if(file.name.startsWith(`Probenplan ${f.name} (Speicherkandidat `)&&await fileRevision(await file.handle.getFile())===wanted)return file.name;
  return writeProjectCopy(f,'Speicherkandidat',text);
 }
 /** Serialize cooperating tabs; detect external changes again immediately before replacement.
@@ -81,7 +82,7 @@ export async function saveFolderProject(f:ProjectFolder,text:string,expected:str
   const name=projectFileName(f),current=await fileInfo(f.plaene,name),revision=await fileRevision(current);
   if(revision!==expected)throw new FolderConflict(current,revision);
   // A failed backup must stop the save before touching the canonical project file.
-  const backup=current?await writeProjectCopy(f,'vorher',await current.text()):null;
+  const backup=current?await writeProjectCopy(f,'vorher',current):null;
   const latest=await fileInfo(f.plaene,name),latestRevision=await fileRevision(latest);
   if(latestRevision!==expected)throw new FolderConflict(latest,latestRevision);
   await writeFile(f.plaene,name,text);
@@ -112,10 +113,10 @@ export async function pruneBackups(f:ProjectFolder){
    if(!days.has(day)&&days.size<KEEP_DAYS){days.add(day);keep.add(n);}}
   const candidates=(await listFiles(f.plaene,/\.probenplan$/i)).filter(x=>x.name.startsWith(`Probenplan ${f.name} (Speicherkandidat `));
   for(const n of names)if(!keep.has(n)){
-   const original=await fileInfo(f.plaene,n);if(!original)continue;const text=await original.text();
-   for(const candidate of candidates)if(await(await candidate.handle.getFile()).text()===text){
+   const original=await fileInfo(f.plaene,n);if(!original)continue;const revision=await fileRevision(original);
+   for(const candidate of candidates)if(await fileRevision(await candidate.handle.getFile())===revision){
     // Check both copies again immediately before deletion. App code never deletes permanent candidates.
-    if(await(await fileInfo(f.plaene,n))?.text()===text&&await(await candidate.handle.getFile()).text()===text)await f.plaene.removeEntry(n).catch(()=>{});
+    if(await fileRevision(await fileInfo(f.plaene,n))===revision&&await fileRevision(await candidate.handle.getFile())===revision)await f.plaene.removeEntry(n).catch(()=>{});
     break;
    }
   }

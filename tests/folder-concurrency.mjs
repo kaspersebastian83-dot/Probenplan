@@ -23,7 +23,7 @@ class Dir{
  async getFileHandle(name,{create=false}={}){
   if(create&&this.gate)await this.gate(name);
   const p=join(this.path,name);try{await stat(p);}catch(e){if(e.code!=='ENOENT')throw e;if(!create)throw Object.assign(Error('Missing'),{name:'NotFoundError'});await writeFile(p,'');}
-  return{name,kind:'file',getFile:async()=>new File([await readFile(p)],name,{lastModified:(await stat(p)).mtimeMs}),createWritable:async()=>{let bytes;return{write:async x=>{bytes=x;},close:async()=>writeFile(p,bytes),abort:async()=>{}};}};
+  return{name,kind:'file',getFile:async()=>new File([await readFile(p)],name,{lastModified:(await stat(p)).mtimeMs}),createWritable:async()=>{let bytes;return{write:async x=>{bytes=x instanceof Blob?Buffer.from(await x.arrayBuffer()):x;},close:async()=>writeFile(p,bytes),abort:async()=>{}};}};
  }
  async *values(){for(const e of await readdir(this.path,{withFileTypes:true}))if(e.isFile())yield await this.getFileHandle(e.name);}
  async removeEntry(name){await rm(join(this.path,name));}
@@ -61,6 +61,12 @@ try{
  await writeFile(join(plaene.path,legacy),JSON.stringify({...alt,report:'LEGACY EINZIGARTIG'}));
  for(let i=0;i<45;i++)await writeFile(join(plaene.path,`Probenplan ${name} (vorher 2026-10-20 12-00-${String(i).padStart(2,'0')}-000 test).probenplan`),textB);
  await A.m.pruneBackups(folder);assert.equal(await readFile(join(plaene.path,candidateA),'utf8'),textA);assert.match(await readFile(join(plaene.path,legacy),'utf8'),/LEGACY EINZIGARTIG/);
+ // UTF-8 replacement characters are not proof of identical bytes in damaged files.
+ const badBackup=`Probenplan ${name} (vorher 1999-01-01T00-00-00-000Z-invalid).probenplan`;
+ const decodedCopy=await A.m.writeProjectCopy(folder,'Speicherkandidat','\ufffd');
+ await writeFile(join(plaene.path,badBackup),Buffer.from([0xff]));await A.m.pruneBackups(folder);
+ assert.deepEqual(await readFile(join(plaene.path,badBackup)),Buffer.from([0xff]));
+ const rawCopy=await A.m.writeProjectCopy(folder,'Kopie',new File([new Uint8Array([0xff])],'raw'));assert.deepEqual(await readFile(join(plaene.path,rawCopy)),Buffer.from([0xff]));
  // Name collisions must never overwrite a verified copy.
  const FixedDate=class extends Date{constructor(...args){super(...(args.length?args:['2026-10-21T12:00:00Z']));}};
  const collision=session({Date:FixedDate,crypto:{subtle:crypto.subtle,randomUUID:()=> '00000000-0000-4000-8000-000000000000'}}).m;
@@ -69,6 +75,7 @@ try{
  // Carry exactly the verified race results into fresh UI sessions; no synthesized replacement for A/B.
  files=Object.fromEntries(await Promise.all((await readdir(plaene.path)).map(async n=>[n,await readFile(join(plaene.path,n),'utf8')])));
  delete files[copy]; // the intentionally non-project collision fixture is covered above
+ delete files[decodedCopy];delete files[badBackup];delete files[rawCopy];
 }finally{await rm(tmp,{recursive:true,force:true});}
 if(!process.env.F2_NODE_ONLY){
  const browser=await chromium.launch();
