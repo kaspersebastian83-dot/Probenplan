@@ -683,13 +683,13 @@ document.body.insertAdjacentHTML('beforeend','<dialog id="ask-dialog"><h2 id="as
 function ask(title:string,text:string,choices:string[]):Promise<string>{return new Promise(resolve=>{const d=$<HTMLDialogElement>('ask-dialog');$('ask-title').textContent=title;$('ask-text').textContent=text;$('ask-actions').replaceChildren(...choices.map((c,i)=>{const b=document.createElement('button');b.textContent=c;if(i===choices.length-1)b.className='primary';b.onclick=()=>{d.close();resolve(c);};return b;}));d.oncancel=e=>{e.preventDefault();};d.showModal();});}
 /** No silent 30-file cutoff: all readable versions remain reachable, in pages of 20. */
 async function chooseStoredVersion(target:ProjectFolder,revision:string|null,hasMain:boolean,exclude:string|null){
- const versions:{name:string;project:Project}[]=[],seen=new Set<string>(),invalid:string[]=[];
+ const versions:{name:string;handle:FileSystemFileHandle;revision:string|null}[]=[],seen=new Set<string>(),invalid:string[]=[];
  for(const candidate of await listFiles(target.plaene,/\.probenplan$/i)){
   if(candidate.name===projectFileName(target)||candidate.name===exclude)continue;
   try{
    const file=await candidate.handle.getFile(),hash=await fileRevision(file);
    if(hasMain&&hash===revision||hash&&seen.has(hash))continue;
-   const project=await validateProject(JSON.parse(await file.text()));if(hash)seen.add(hash);versions.push({name:candidate.name,project});
+   await validateProject(JSON.parse(await file.text()));if(hash)seen.add(hash);versions.push({name:candidate.name,handle:candidate.handle,revision:hash});
   }catch{invalid.push(candidate.name);}
  }
  if(!versions.length&&!invalid.length&&!(!hasMain&&revision))return undefined;
@@ -700,7 +700,9 @@ async function chooseStoredVersion(target:ProjectFolder,revision:string|null,has
   if(choice==='Abbrechen')return null;
   if(choice==='Datei verwenden')return undefined;
   if(choice==='Weitere Fassungen'){page++;continue;}if(choice==='Vorherige Seite'){page--;continue;}
-  return versions.find(x=>x.name===choice)?.project;
+  const selected=versions.find(x=>x.name===choice);if(!selected)return undefined;
+  const file=await selected.handle.getFile();if(await fileRevision(file)!==selected.revision)throw Error('Die gewählte Sicherungsfassung wurde während der Auswahl verändert. Bitte den Projektordner erneut öffnen und die Fassungen prüfen.');
+  return validateProject(JSON.parse(await file.text()));
  }
 }
 function footerExtra(){const o=String(projectData.objekt||'').trim();return o?`Objekt ${o}`:'';}
