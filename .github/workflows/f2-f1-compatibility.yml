@@ -20,7 +20,7 @@ jobs:
       - name: Apply reviewed F1 changes in disposable checkout only
         run: |
           git fetch --depth=1 https://github.com/kaspersebastian83-dot/Probenplan.git 1773fb482760ffd31ec1daff4acf36702bd40143
-          git diff 5f577e702a430ac4614a4b77c13cd1f9d38e4b15 1773fb482760ffd31ec1daff4acf36702bd40143 -- src/labelkit.ts src/labui.ts src/main.ts tests/labelkit-project.mjs tests/labelkit-project-browser.mjs > "$RUNNER_TEMP/f1.patch"
+          git diff --unified=1 5f577e702a430ac4614a4b77c13cd1f9d38e4b15 1773fb482760ffd31ec1daff4acf36702bd40143 -- src/labelkit.ts src/labui.ts src/main.ts tests/labelkit-project.mjs tests/labelkit-project-browser.mjs > "$RUNNER_TEMP/f1.patch"
           git apply --check "$RUNNER_TEMP/f1.patch"
           git apply "$RUNNER_TEMP/f1.patch"
           node --input-type=module -e "import fs from 'node:fs'; const p='tests/run.mjs'; let s=fs.readFileSync(p,'utf8'); if(!s.includes(\"const suites=[\"))throw Error('suite anchor missing'); s=s.replace(\"const suites=[\",\"const suites=['labelkit-project','labelkit-project-browser',\"); fs.writeFileSync(p,s);"

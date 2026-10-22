@@ -89,7 +89,7 @@ if(!process.env.F2_NODE_ONLY){
    await page.locator('#ask-title',{hasText:damaged?'Projektdatei fehlt oder ist beschädigt':'Gespeicherte Fassungen prüfen'}).waitFor();
    assert.match(await page.locator('#ask-text').textContent(),/unlesbare\/beschädigte/);
    for(let i=0;!await page.getByRole('button',{name:candidateA,exact:true}).isVisible();i++){assert.ok(i<5);await page.getByRole('button',{name:'Weitere Fassungen',exact:true}).click();}
-   await page.getByRole('button',{name:candidateA,exact:true}).click();await page.locator('#saved',{hasText:'Wiederhergestellt'}).waitFor();
+   await page.getByRole('button',{name:candidateA,exact:true}).click();await page.locator('#saved',{hasText:'Wiederhergestellt'}).waitFor({state:'attached'});
    assert.equal(await page.locator('#report').inputValue(),'NEU A');
    const disk=await page.evaluate(async({name,main,candidateA})=>{const dir=await(await(await(await navigator.storage.getDirectory()).getDirectoryHandle('F2 Archiv')).getDirectoryHandle(name)).getDirectoryHandle('Pläne');const text=async n=>(await(await dir.getFileHandle(n)).getFile()).text();return{main:await text(main),candidate:await text(candidateA),invalid:await text(`Probenplan ${name} (Wiederherstellung defekt).probenplan`)};},{name,main,candidateA});
    assert.equal(disk.main,damaged?'{damaged-main':files[main]);assert.equal(disk.candidate,files[candidateA]);assert.equal(disk.invalid,'{interrupted');assert.deepEqual(errors,[]);
