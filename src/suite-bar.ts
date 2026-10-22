@@ -92,7 +92,9 @@
     }
     if (!proj) return null;
     var s = { label: false, fotos: false, plan: false, beleg: false, objekt: '' };
-    try{
+    var activeData = window.SpektronProjectData && window.SpektronProjectData(name);
+    if (activeData) s.objekt = String(activeData.data.objekt || '').trim();
+    else try{
       var pj = await proj.getFileHandle('_Projekt.json').then(function(f){ return f.getFile(); }).then(function(f){ return f.text(); }).catch(function(){ return ''; });
       if (pj){ var j = JSON.parse(pj), o = j && (typeof j.objekt === 'string' ? j.objekt : j.daten && j.daten.objekt); if (typeof o === 'string') s.objekt = o.trim(); }   // Projektzentrale schreibt die Felder direkt in _Projekt.json (ältere Testdateien: unter „daten“)
     }catch(e3){}
@@ -180,7 +182,10 @@
       var pb = h('button', { class: 'ml-proj', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', title: 'Anderes Projekt öffnen' }, h('b', { text: name }), h('span', { text: '▾', 'aria-hidden': 'true' }));
       pb.onclick = function(ev){ ev.stopPropagation(); oeffnePop(pb); };
       bar.appendChild(pb);
-      if (stand && stand.objekt) bar.appendChild(h('span', { class: 'ml-obj', text: stand.objekt, title: stand.objekt }));
+      var shared = window.SpektronProjectData && window.SpektronProjectData(name);
+      var objekt = shared ? String(shared.data.objekt || '').trim() : stand && stand.objekt;
+      var suffix = shared && shared.stale ? ' · möglicherweise veraltet' : shared && shared.checking ? ' · wird geprüft' : '';
+      if (objekt) bar.appendChild(h('span', { class: 'ml-obj', text: objekt + suffix, title: objekt + suffix }));
       bar.appendChild(h('span', { class: 'ml-sp' }));
       var steps = h('span', { class: 'ml-steps' });
       var nx = naechster();

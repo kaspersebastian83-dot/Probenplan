@@ -1,0 +1,52 @@
+F7 – Aktualität gemeinsamer Projektdaten
+
+Basis: main 5f577e702a430ac4614a4b77c13cd1f9d38e4b15.
+Kompatibilität: F1 PR #34, 1773fb482760ffd31ec1daff4acf36702bd40143;
+F2 PR #35, 532132c3dac9a4a087c18197dec1d204809b57f2.
+
+PlanKit verwendet einen expliziten Lesestatus für _Projekt.json. Erfolgreiche Daten,
+bestätigt fehlende Datei, ungültiges JSON/UTF-8, nicht unterstütztes Format,
+Berechtigungsprobleme, Verbindungsfehler/Zeitüberschreitung und sonstige Lesefehler
+werden unterschieden. NotFound wird nur bei auflistbarem Projektordner ohne diese
+Datei als Abwesenheit behandelt. Ein neues Projekt ohne gemeinsame Datei ist kein
+Netzwerkfehler. Nach vorherigem Erfolg verschwundene Dateien bleiben unsicher.
+
+Bei fehlgeschlagener Aktualisierung bleiben bestätigte Werte erhalten. Eine eigene,
+dauerhafte Warnung und die Kennzeichnung in der Leiste sind von Speicher-/Export-
+Toasts unabhängig. Eine ausdrückliche Wiederholung ist möglich. Die Warnung wird
+erst nach erfolgreichem Lesen oder bestätigter Abwesenheit ohne alte Daten entfernt.
+Ein gültiges leeres Objekt leert die Angaben ausdrücklich und gilt als Erfolg.
+
+Alle Bild-, PDF- und Word-Exporte prüfen vor Verwendung der gemeinsamen Angaben
+erneut. Bleibt der Stand unsicher, muss die Verwendung für diesen einzelnen Export
+ausdrücklich bestätigt werden. Die Warnung bleibt dabei bestehen. Die Exportaktion
+ist bereits während dieser Prüfung gesperrt. Die Word-Anlage bezeichnet bestätigte
+alte Angaben im Quellen-/Prüfprotokoll als möglicherweise veraltet; deren Prüfsumme
+bezieht sich auf die zuvor tatsächlich gelesenen Bytes, nicht auf eine spätere
+unlesbare oder veränderte Datei. Es wird keine aktuelle Quellenidentität vorgetäuscht.
+
+Projekt- und Anfragegeneration verhindern die Übernahme verspäteter Daten. Auch
+ein älterer Erfolg desselben Projekts darf eine jüngere Warnung nicht löschen.
+Projektwechsel aktivieren den Reader erst im übernommenen Projektkontext. Ein
+nach zehn Sekunden noch offener Leseversuch meldet Zeitüberschreitung; spätere
+Ergebnisse werden nicht nachträglich übernommen.
+
+Die Leselogik ist identisch zum inline eingebetteten LabelKit-F7-Reader. Die kleine
+JS-Datei hat eine TypeScript-Schnittstellendeklaration; bestehende strikte Typprüfung
+und Produktionsbuild bleiben unverändert. Es gibt keine Schreib-/Create-/Reparatur-
+zugriffe auf _Projekt.json und keine Änderung des .probenplan-Formats. F2-Speicherung,
+Konflikt-/Wiederherstellungsverfahren und F1-Importregeln werden nicht verändert.
+
+Prüfung: 26 Node-Readerfälle und zehn vollständige UI-Szenarien je Chromium/WebKit,
+einschließlich A–D, echtem PNG/PDF/Word-Export und Zustimmung/Abbruch. Nur synthetische
+In-Memory-Dateihandles, keine API-Skips in den neuen Fällen. Alle bestehenden Suites
+bleiben registriert. Temporäre CI-Checkouts prüfen F7+F1, F7+F2 und F7+F1+F2 mit
+vollständigem Build, Typprüfung und allen jeweiligen Tests. Es werden keine
+bestehenden Draft-Branches geändert. Die gemeinsame Spektron-Integration liegt im
+LabelKit-F7-Workflow und dokumentiert beide exakten F7-SHAs im Manifest.
+
+Grenzen: Keine praktischen Windows-/SMB-/RDP-/Netzunterbrechungsversuche. Generische
+DOM-Lesefehler beweisen keine bestimmte physische Fehlerursache; sie werden nicht
+als Erfolg verschluckt. Erfolgreiches Lesen garantiert weder SMB-Cache-Aktualität
+noch unveränderliche Daten nach dem Lesezeitpunkt. Bestehende native WebKit-Ordner-
+API-Skips bleiben dokumentiert; die neuen F7-Fälle laufen vollständig synthetisch.
