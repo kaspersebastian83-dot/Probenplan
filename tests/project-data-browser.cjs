@@ -109,7 +109,7 @@ let browser,server;
   assert.equal(await t.page.locator(t.warning).isVisible(),true,'Zustimmung löscht keine Warnung');
  });
  await scenario('C: Wiederholung übernimmt NEU und entfernt Warnung, Export nutzt NEU',async t=>{
-  await t.open('A');t.faults[names.A]={name:'NetworkError'};await t.refresh();t.put('A',pj('NEU'));delete t.faults[names.A];await t.refresh();
+  await t.open('A');t.put('A',JSON.stringify({daten:{objekt:'Altbestand'}}));await t.refresh();assert.match(await t.page.locator('#mosaikLeiste .ml-obj').textContent(),/Altbestand/);t.put('A',pj('ALT'));await t.refresh();t.faults[names.A]={name:'NetworkError'};await t.refresh();t.put('A',pj('NEU'));delete t.faults[names.A];await t.refresh();
   assert.equal((await t.status()).data.objekt,'NEU');assert.equal((await t.status()).stale,false);assert.equal(await t.page.locator(t.warning).isVisible(),false);
   if(plan){await t.exportStart('pdf-a4');await t.page.waitForFunction(()=>!document.querySelector('#export').disabled);const pdf=t.exported().find(p=>p.endsWith('.pdf'));assert.ok(pdf,await t.page.locator('#toast').textContent());const subjectHex=/\/Subject <FEFF([A-F0-9]+)>/.exec(Buffer.from(t.files.get(pdf)).toString('latin1'))[1];const subject=Buffer.from(subjectHex,'hex').swap16().toString('utf16le');assert.match(subject,/NEU/);assert.doesNotMatch(subject,/ALT/);}
   else{const dl=t.page.waitForEvent('download');await t.exportStart();const text=fs.readFileSync(await(await dl).path(),'latin1');assert.match(text,/Objekt: \\b NEU/);assert.doesNotMatch(text,/Objekt: \\b ALT/);assert.equal(t.confirmations.length,0);}
