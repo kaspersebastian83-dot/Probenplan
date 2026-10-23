@@ -1,3 +1,4 @@
+import {validateSketch} from './sketch';
 import {validDate} from './labreport';
 import type {LabData} from './model';
 import {copyOrigin,validOrigin} from './lab-provenance';
@@ -125,6 +126,7 @@ async function validateSingle(p:Project,fine=false):Promise<Project>{
     plan.preparation={sourceWidth:edit.sourceWidth,sourceHeight:edit.sourceHeight,rotation:edit.rotation as Preparation['rotation'],crop:{x:c.x,y:c.y,width:c.width,height:c.height},...(edit.angle!==undefined?{angle:edit.angle}:{})};plan.width=c.width;plan.height=c.height;
   }
   if(p.plan.markerScale!==undefined){const s=p.plan.markerScale;if(typeof s!=='number'||!Number.isFinite(s)||s<MARKER_SCALE.min||s>MARKER_SCALE.max)throw Error('Ungültige Punktgröße in der Projektdatei.');if(s!==1)plan.markerScale=s;}
+  if(p.plan.sketch!==undefined){if(!plan.vector)throw Error('Ungültige Skizze in der Projektdatei.');plan.sketch=validateSketch(p.plan.sketch);}
   if(p.plan.autoLabels!==undefined){if(p.plan.autoLabels!==false)throw Error('Ungültige Beschriftungseinstellung in der Projektdatei.');plan.autoLabels=false;}
   if(p.plan.valueLabels!==undefined){if(p.plan.valueLabels!==true)throw Error('Ungültige Beschriftungseinstellung in der Projektdatei.');plan.valueLabels=true;}
   if(p.plan.calibration!==undefined){const c=p.plan.calibration;if(!c||typeof c!=='object'||![c.units,c.meters].every(n=>typeof n==='number'&&Number.isFinite(n)&&n>0)||c.meters>100_000||c.units>10_000_000||c.meters/c.units>1000||c.meters/c.units<1e-7)throw Error('Ungültiger Maßstab in der Projektdatei.');plan.calibration={units:c.units,meters:c.meters};}
