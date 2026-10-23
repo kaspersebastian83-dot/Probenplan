@@ -187,6 +187,9 @@ dialog.export-card #export{min-height:44px}
 .size-row{display:flex;align-items:center;gap:8px}
 .size-row button{font-size:11px;min-height:26px;padding:2px 8px;white-space:nowrap}
 .size-row .tiny{margin:0}
+#label-section .check-row{display:flex;align-items:center;gap:8px;font-weight:600;margin:8px 0 2px}
+#label-section .check-row input{width:auto;margin:0;accent-color:var(--kit-accent)}
+#label-section .tiny{margin:0 0 4px 24px}
 
 /* Maßstab & Norden */
 .check-row{display:flex;align-items:center;gap:6px;margin:8px 0 4px;font-size:12px}

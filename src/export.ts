@@ -1,4 +1,5 @@
-import {bounds, floorName, markerSize, markerSVG, shapeOf, typeOf, starPath, FIRE_RED, SHAPES, SHAPE_NAMES, TYPE_ORDER, type Project, type Shape} from './model';
+import {labeled,shownSVG,ensureInk} from './labels';
+import {bounds, floorName, markerSize, shapeOf, typeOf, starPath, FIRE_RED, SHAPES, SHAPE_NAMES, TYPE_ORDER, type Project, type Shape} from './model';
 import {loadImage} from './import';
 import {planMatrix,preparation} from './preparation';
 import {areaAnchor,areaCategories,areaSVG,palette} from './areas';
@@ -51,12 +52,13 @@ export function contentBounds(p:Project){
 }
 /** Grundriss (zugeschnitten/gedreht) und Markierungen auf ctx zeichnen: Planeinheit u erscheint bei (x0+(u-b.x)*k, y0+(v-b.y)*k). */
 export async function drawPlanContent(ctx:CanvasRenderingContext2D,p:Project,b:{x:number;y:number;width:number;height:number},x0:number,y0:number,k:number,rated?:Rated|null){
+  await ensureInk(p.plan);p=labeled(p,rated);
   ctx.save();ctx.translate(x0,y0);ctx.scale(k,k);ctx.translate(-b.x,-b.y);
   ctx.beginPath();ctx.rect(0,0,p.plan.width,p.plan.height);ctx.clip();ctx.transform(...planMatrix(p.plan));
   const source=preparation(p.plan),base=await loadImage(p.plan.data,'Der Grundriss');ctx.drawImage(base,0,0,source.sourceWidth,source.sourceHeight);
   ctx.restore();
   const w=b.width*k,h=b.height*k;
-  const overlay=`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(w)}" height="${Math.ceil(h)}" viewBox="${b.x} ${b.y} ${b.width} ${b.height}">${areaSVG(p.areas||[],p.plan)}${p.markers.map(m=>markerSVG(p,m,false,0,rated?.fill.get(m.id))).join('')}</svg>`;
+  const overlay=`<svg xmlns="http://www.w3.org/2000/svg" width="${Math.ceil(w)}" height="${Math.ceil(h)}" viewBox="${b.x} ${b.y} ${b.width} ${b.height}">${areaSVG(p.areas||[],p.plan)}${p.markers.map(m=>shownSVG(p,m,false,0,rated?.fill.get(m.id))).join('')}</svg>`;
   const url=URL.createObjectURL(new Blob([overlay],{type:'image/svg+xml'}));
   try{ctx.drawImage(await loadImage(url,'Die Markierungsebene'),x0,y0,w,h);}finally{URL.revokeObjectURL(url);}
 }
@@ -76,6 +78,7 @@ export function drawLegend(ctx:CanvasRenderingContext2D,legend:LegendLayout,x:nu
   }
 }
 export function exportLayout(p:Project,longSide:number,rated?:Rated|null){
+  p=labeled(p,rated);
   const hasLegend=!!(p.areas?.length||markerLegend(p)||(rated&&(rated.groups.some(g=>g.scale)||rated.unrated.length||qualifierGroups(rated).length)));
   const b=contentBounds(p),unit=Math.max(b.width,b.height),pad=unit*.028;
   const footer=unit*(hasLegend ? .14 : .12);
@@ -87,6 +90,7 @@ export function exportLayout(p:Project,longSide:number,rated?:Rated|null){
   return {b,pad,width,height,scale,pixelWidth:Math.round(width*scale),pixelHeight:Math.round(height*scale),footer,legend,legendX,legendY,legendWidth,planWidth:right&&legend?legendX-pad:width};
 }
 export async function exportImage(p:Project,longSide:number,format:'png'|'jpeg',rated?:Rated|null,extra=''):Promise<Blob>{
+  await ensureInk(p.plan);p=labeled(p,rated);
   const l=exportLayout(p,longSide,rated);const canvas=document.createElement('canvas');canvas.width=l.pixelWidth;canvas.height=l.pixelHeight;
   try {
     const ctx=canvas.getContext('2d');if(!ctx)throw Error('Kein Bildspeicher verfügbar.');
@@ -97,7 +101,7 @@ export async function exportImage(p:Project,longSide:number,format:'png'|'jpeg',
     ctx.beginPath();ctx.rect(0,0,p.plan.width,p.plan.height);ctx.clip();ctx.transform(...planMatrix(p.plan));
     const source=preparation(p.plan),base=await loadImage(p.plan.data);ctx.drawImage(base,0,0,source.sourceWidth,source.sourceHeight);
     ctx.restore();
-    const overlay=`<svg xmlns="http://www.w3.org/2000/svg" width="${l.pixelWidth}" height="${l.pixelHeight}" viewBox="0 0 ${l.width} ${l.height}"><g transform="translate(${l.pad-l.b.x} ${l.pad-l.b.y})">${areaSVG(p.areas||[],p.plan)}${p.markers.map(m=>markerSVG(p,m,false,0,rated?.fill.get(m.id))).join('')}</g></svg>`;
+    const overlay=`<svg xmlns="http://www.w3.org/2000/svg" width="${l.pixelWidth}" height="${l.pixelHeight}" viewBox="0 0 ${l.width} ${l.height}"><g transform="translate(${l.pad-l.b.x} ${l.pad-l.b.y})">${areaSVG(p.areas||[],p.plan)}${p.markers.map(m=>shownSVG(p,m,false,0,rated?.fill.get(m.id))).join('')}</g></svg>`;
     const url=URL.createObjectURL(new Blob([overlay],{type:'image/svg+xml'}));
     try{ctx.drawImage(await loadImage(url),0,0,l.width,l.height);}finally{URL.revokeObjectURL(url);}
     const fs=Math.max(l.b.width,l.b.height)*(l.legend ? .019 : .0145);const y=l.pad+l.b.height+l.pad;

@@ -1,5 +1,11 @@
 # Änderungen
 
+## 1.19.0 – 23. Oktober 2026
+
+- **Schilder automatisch platzieren** (Liste → „Beschriftung“, je Plan, Standard an): Die Probenstelle bleibt exakt, nur das Schild weicht Raumnamen, Linien, Schraffur und anderen Schildern aus – mit kurzer Hinweislinie und weißem Rand. Freie Proben behalten ihr Schild am Punkt. Die berechnete Lage wird nicht gespeichert; ein von Hand gezogenes Schild bleibt, wo es ist. „Schilder neu anordnen“ gibt von Hand versetzte Schilder dieses Plans wieder frei (rückgängig machbar). Bildschirm, PNG/JPG, PDF und Anlage zeigen dieselbe Anordnung.
+- **Messwerte am Plan** (Liste → „Beschriftung“ oder Exportkarte bei „Ergebniskarte“, je Plan, Standard aus): In der Ergebniskarte ein Wertkästchen je Probe – Kennung, Wert wie im Prüfbericht, Einheit und Kategorie in der Farbe der Skala, Hinweislinie zur farbigen Probenstelle.
+- Projektdatei: Abweichungen vom Standard stehen am Plan (`autoLabels: false`, `valueLabels: true`); das Projektformat bleibt unverändert. Ältere PlanKit-Versionen ignorieren die Einstellungen.
+
 ## 1.18.0 – 23. Oktober 2026
 
 - Projektordner „26.0123 Köln Nad“: Mit der Mitarbeiterliste der Projektzentrale (im Archivordner) steht der Ort ohne Kürzel – in der Projektanzeige und in der Word-Anlage Probenahme („Projekt … · Ort“). PlanKit liest die Liste nur; ohne Liste unverändert.
