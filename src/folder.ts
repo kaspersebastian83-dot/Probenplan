@@ -63,38 +63,41 @@ export function stampTime(rest:string):number|null{
  m=rest.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2})-(\d{2})-(\d{2})-(\d{3})(?=[ )])/);if(m)return new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6],+m[7]).getTime();
  return null;
 }
-const uniqueName=(f:ProjectFolder,kind:string)=>`Probenplan ${f.name} (${kind} ${localStamp()} ${crypto.randomUUID().slice(0,8)}).probenplan`;
+const uniqueName=(f:ProjectFolder,kind:string)=>`Probenplan ${f.name} (${kind} ${localStamp()} ${crypto.randomUUID()}).probenplan`;
 /** Always use a fresh filename: backups/recovery files are never recycled. */
-export async function writeProjectCopy(f:ProjectFolder,kind:string,text:string){const name=uniqueName(f,kind);await writeFile(f.plaene,name,text);if(await (await fileInfo(f.plaene,name))?.text()!==text)throw Error('Sicherungsdatei konnte nicht bestätigt werden.');return name;}
+export async function writeProjectCopy(f:ProjectFolder,kind:string,data:string|Blob){const name=uniqueName(f,kind);if(await fileInfo(f.plaene,name))throw Error('Der Name einer Sicherungsdatei ist bereits belegt. Bitte erneut versuchen.');const wanted=await fileRevision(new File([data],name));await writeFile(f.plaene,name,data);if(await fileRevision(await fileInfo(f.plaene,name))!==wanted)throw Error('Sicherungsdatei konnte nicht bestätigt werden.');return name;}
+/** These candidates are never cleaned up. Reuse only a byte-identical, re-read copy. */
+async function retainCandidate(f:ProjectFolder,text:string){
+ const wanted=await fileRevision(new File([text],'candidate'));
+ for(const file of await listFiles(f.plaene,/\.probenplan$/i))if(file.name.startsWith(`Probenplan ${f.name} (Speicherkandidat `)&&await fileRevision(await file.handle.getFile())===wanted)return file.name;
+ return writeProjectCopy(f,'Speicherkandidat',text);
+}
 /** Serialize cooperating tabs; detect external changes again immediately before replacement.
- * File System Access commits a writable stream on close. A recovery file survives a failed close. */
+ * File System Access commits a writable stream on close. Permanent candidates survive failed closes and later independent writers. */
 export async function saveFolderProject(f:ProjectFolder,text:string,expected:string|null){
  if(!navigator.locks)throw Error('Sicheres Speichern benötigt Chrome oder Edge mit Web Locks.');
  return navigator.locks.request(`plankit:project:${f.name}`,async()=>{
   if(!await permission(f.dir))throw Error('Schreibzugriff fehlt. Bitte „Speichern“ klicken und den Zugriff erneut erlauben.');
+  const candidate=await retainCandidate(f,text);
   const name=projectFileName(f),current=await fileInfo(f.plaene,name),revision=await fileRevision(current);
   if(revision!==expected)throw new FolderConflict(current,revision);
   // A failed backup must stop the save before touching the canonical project file.
-  const backup=current?await writeProjectCopy(f,'vorher',await current.text()):null;
-  const recovery=await writeProjectCopy(f,'Wiederherstellung',text);
+  const backup=current?await writeProjectCopy(f,'vorher',current):null;
   const latest=await fileInfo(f.plaene,name),latestRevision=await fileRevision(latest);
   if(latestRevision!==expected)throw new FolderConflict(latest,latestRevision);
   await writeFile(f.plaene,name,text);
   const committed=await fileInfo(f.plaene,name),wanted=await fileRevision(new File([text],name));
-  if(await fileRevision(committed)!==wanted)throw Error('Die geschriebene Datei konnte nicht bestätigt werden. Wiederherstellungsdatei bleibt erhalten.');
-  // Cleanup failure does not invalidate a verified save; the candidate remains available.
-  await f.plaene.removeEntry(recovery).catch(()=>{});
-  // Older interrupted attempts with the exact committed bytes are resolved too.
-  // Different candidates and all previous-file backups remain untouched.
-  try{for(const candidate of await listFiles(f.plaene,/\.probenplan$/i))if(candidate.name.startsWith(`Probenplan ${f.name} (Wiederherstellung `)&&await fileRevision(await candidate.handle.getFile())===wanted)await f.plaene.removeEntry(candidate.name);}catch{/* Keep candidates if cleanup is unavailable. */}
+  if(await fileRevision(committed)!==wanted)throw Error('Die geschriebene Datei konnte nicht bestätigt werden. Der geprüfte Speicherkandidat bleibt erhalten.');
+  // A later writer can still replace the main file after our readback. Keep our candidate permanently.
   await pruneBackups(f);
-  return {revision:wanted,backup};
+  return {revision:wanted,backup,candidate};
  });
 }
 
 /** Every save keeps the previous file as a backup. To stop them piling up in the shared folder, keep the newest
  * KEEP_RECENT plus the newest one of each of the last KEEP_DAYS days. Only "(vorher …)" backups are touched –
- * recovery files, manual copies and the project file itself are never removed. Failures here never fail a save. */
+ * A backup outside that window is removable only with a byte-identical permanent candidate.
+ * Unique old backups, recovery files, candidates and manual copies are never removed. */
 export const KEEP_RECENT=10,KEEP_DAYS=30;
 export async function pruneBackups(f:ProjectFolder){
  try{
@@ -108,6 +111,14 @@ export async function pruneBackups(f:ProjectFolder){
    if(t==null){keep.add(n);continue;}
    const d=new Date(t),day=`${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
    if(!days.has(day)&&days.size<KEEP_DAYS){days.add(day);keep.add(n);}}
-  for(const n of names)if(!keep.has(n))await f.plaene.removeEntry(n).catch(()=>{});
+  const candidates=(await listFiles(f.plaene,/\.probenplan$/i)).filter(x=>x.name.startsWith(`Probenplan ${f.name} (Speicherkandidat `));
+  for(const n of names)if(!keep.has(n)){
+   const original=await fileInfo(f.plaene,n);if(!original)continue;const revision=await fileRevision(original);
+   for(const candidate of candidates)if(await fileRevision(await candidate.handle.getFile())===revision){
+    // Check both copies again immediately before deletion. App code never deletes permanent candidates.
+    if(await fileRevision(await fileInfo(f.plaene,n))===revision&&await fileRevision(await candidate.handle.getFile())===revision)await f.plaene.removeEntry(n).catch(()=>{});
+    break;
+   }
+  }
  }catch{/* pruning is best effort */}
 }

@@ -24,10 +24,13 @@ const fs=(page,action,...args)=>page.evaluate(async([action,args])=>{
 const saved=async page=>{await page.locator('#saved',{hasText:/^✓ In „Pläne“ gespeichert$/}).waitFor({state:'attached'});for(let i=0;i<40;i++){const t=await fs(page,'read',[NAME,'Pläne'],FILE);if(t)return JSON.parse(t);await page.waitForTimeout(100);}throw Error('Projektdatei fehlt');};
 const editReport=async(page,text)=>{await openExport(page);await page.locator('#report').fill(text);await page.locator('#report').press('Tab');await closeExport(page);};
 const browserDraft=page=>page.evaluate(name=>new Promise((resolve,reject)=>{const r=indexedDB.open('probenplan',1);r.onsuccess=()=>{const q=r.result.transaction('projects').objectStore('projects').get(`projekt:${name}`);q.onsuccess=()=>{r.result.close();resolve(q.result);};q.onerror=()=>reject(q.error);};r.onerror=()=>reject(r.error);}),NAME);
-const recoveryProjects=async page=>Promise.all((await fs(page,'list',[NAME,'Pläne'])).filter(n=>n.includes('(Wiederherstellung ')).map(async name=>{try{return {name,project:JSON.parse(await fs(page,'read',[NAME,'Pläne'],name))};}catch{return {name,project:null};}}));
+const recoveryProjects=async page=>Promise.all((await fs(page,'list',[NAME,'Pläne'])).filter(n=>n.includes('(Wiederherstellung ')||n.includes('(Speicherkandidat ')).map(async name=>{try{return {name,project:JSON.parse(await fs(page,'read',[NAME,'Pläne'],name))};}catch{return {name,project:null};}}));
 const browser=await chromium.launch();
 try{
  const context=await browser.newContext({viewport:{width:1366,height:768},acceptDownloads:true}),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ // These existing cases explicitly keep the main file when opening their accumulated history.
+ // folder-concurrency.mjs tests conscious candidate selection separately.
+ await page.addLocatorHandler(page.locator('#ask-title',{hasText:'Gespeicherte Fassungen prüfen'}),()=>page.locator('#ask-actions button',{hasText:'Datei verwenden'}).click());
  await page.goto(base);await fs(page,'setup',NAME,svg,labXML());
  await check('Fragmentprojekt mit Sonderzeichen hat Vorrang; andere URL-Bestandteile bleiben erhalten',async()=>{
   const special='26.0987 Köln & Süd + 50% #Hof';await fs(page,'setup',special,svg,labXML());
@@ -110,7 +113,7 @@ try{
   const names=await fs(page,'list',[NAME,'Pläne']);assert.ok((await Promise.all(names.filter(n=>n.includes('(vorher ')).map(n=>fs(page,'read',[NAME,'Pläne'],n)))).includes('{interrupted'));
  });
  await check('Conflict choices preserve the current unsaved revision; failed recovery creation blocks replacement',async()=>{
-  await page.evaluate(()=>{const original=FileSystemFileHandle.prototype.createWritable;window.failRecovery=true;FileSystemFileHandle.prototype.createWritable=async function(...args){if(this.name.includes('(Wiederherstellung ')&&window.failRecovery)throw Error('Synthetic recovery creation failure');return original.apply(this,args);};});
+  await page.evaluate(()=>{const original=FileSystemFileHandle.prototype.createWritable;window.failRecovery=true;FileSystemFileHandle.prototype.createWritable=async function(...args){if((this.name.includes('(Wiederherstellung ')||this.name.includes('(Speicherkandidat '))&&window.failRecovery)throw Error('Synthetic recovery creation failure');return original.apply(this,args);};});
   const external=JSON.parse(await fs(page,'read',[NAME,'Pläne'],FILE));external.report='External discard';await fs(page,'write',[NAME,'Pläne'],FILE,JSON.stringify(external));
   await editReport(page,'Unsaved protect');await page.locator('#saved',{hasText:/^⚠ Nicht im Projektordner gespeichert$/}).waitFor();
   assert.equal(await page.locator('#ask-dialog').isVisible(),false);assert.equal(await page.locator('#report').inputValue(),'Unsaved protect');const draft=await browserDraft(page);assert.equal(draft.dirty,true);assert.equal(draft.project.report,'Unsaved protect');assert.equal(JSON.parse(await fs(page,'read',[NAME,'Pläne'],FILE)).report,'External discard');
@@ -145,8 +148,8 @@ try{
  });
  await check('Choosing the file at startup preserves the only browser draft, and refuses a failed preservation',async()=>{
   // Isolate the cold-start draft from earlier, already asserted recovery candidates.
-  await page.evaluate(async name=>{const root=await navigator.storage.getDirectory(),archive=await root.getDirectoryHandle('Mosaik Archivordner'),dir=await(await archive.getDirectoryHandle(name)).getDirectoryHandle('Pläne');for await(const h of dir.values())if(h.name.includes('(Wiederherstellung '))await dir.removeEntry(h.name);},NAME);
-  await context.addInitScript(()=>{window.failRecovery=localStorage.getItem('synthetic:failRecovery')==='yes';const original=FileSystemFileHandle.prototype.createWritable;FileSystemFileHandle.prototype.createWritable=async function(...args){if(window.failRecovery&&this.name.includes('(Wiederherstellung '))throw Error('Synthetic recovery creation failure');return original.apply(this,args);};});
+  await page.evaluate(async name=>{const root=await navigator.storage.getDirectory(),archive=await root.getDirectoryHandle('Mosaik Archivordner'),dir=await(await archive.getDirectoryHandle(name)).getDirectoryHandle('Pläne');for await(const h of dir.values())if(h.name!==`Probenplan ${name}.probenplan`&&h.name.endsWith('.probenplan'))await dir.removeEntry(h.name);},NAME);
+  await context.addInitScript(()=>{window.failRecovery=localStorage.getItem('synthetic:failRecovery')==='yes';const original=FileSystemFileHandle.prototype.createWritable;FileSystemFileHandle.prototype.createWritable=async function(...args){if(window.failRecovery&&(this.name.includes('(Wiederherstellung ')||this.name.includes('(Speicherkandidat ')))throw Error('Synthetic recovery creation failure');return original.apply(this,args);};});
   await page.evaluate(()=>{window.failRecovery=true;localStorage.setItem('synthetic:failRecovery','yes');});await editReport(page,'Cold dirty draft');await page.locator('#saved',{hasText:/^⚠ Nicht im Projektordner gespeichert$/}).waitFor();const draft=await browserDraft(page);
   page.once('dialog',dialog=>dialog.accept());await page.reload();await page.locator('#ask-title',{hasText:'Ungespeicherte Browser-Fassung'}).waitFor();await page.locator('#ask-actions button',{hasText:'Datei verwenden'}).click();await page.locator('#toast.error',{hasText:'Synthetic recovery creation failure'}).waitFor();
   assert.deepEqual(await browserDraft(page),draft);assert.equal(JSON.parse(await fs(page,'read',[NAME,'Pläne'],FILE)).report,'Snapshot B');assert.equal(await page.locator('#welcome').isVisible(),true);
