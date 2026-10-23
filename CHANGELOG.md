@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.17.0 – 23. Oktober 2026
+
+- Die Spektron-Leiste oben zeigt „Nr. Ort · zuständige Person“: Liegt im Archivordner die Mitarbeiterliste der Projektzentrale, wird das Kürzel am Ende des Projektordners erkannt und mit Namen angezeigt; eine in der Projektzentrale abweichend gewählte Person hat Vorrang.
+
 ## 1.16.1 – 20. Oktober 2026
 
 - Projektzentrale und Spektron-Leiste übergeben Projekte jetzt über #projekt im Fragment. Sonderzeichen bleiben erhalten; alte ?projekt-Links funktionieren weiterhin und werden nach dem Laden bereinigt. Projektwechsel laden auch bereits geöffnete App-Fenster neu; eine Warnung vor ungesicherten Eingaben kann den Wechsel abbrechen. Die Anlagenaktion aktion=anlage wird ebenfalls im Fragment übergeben. Installiertes PlanKit nach einer Online-Aktualisierung vollständig schließen und erneut öffnen.

@@ -18,6 +18,34 @@
   var ZENTRALE = '../Projektzentrale/', MAX = 6;
   var ich = '', kompakt = false, name = '', stand = null, zuletzt = [], bar = null, pop = null, timer = 0, lauf = 0;
   var nfc = function(s){ try{ return String(s).normalize('NFC'); }catch(e){ return String(s); } };
+  /* Kurzfassung von SPEKTRON-ORDNERNAME v1 (Projektzentrale): Kürzel am Ende des Ordnernamens anhand der Mitarbeiterliste */
+  var maNorm = function(x){ return nfc(x == null ? '' : x).toLowerCase().replace(/[\s.]+/g, ''); };
+  function ordnerName(n, personen){
+    var m = /^(\d{2})\.(\d{2,6})(?:[\s_-]+(.*))?$/.exec(nfc(n).trim());
+    if (!m) return null;
+    var rest = (m[3] || '').trim(), r = { nr: m[1] + '.' + m[2], ort: rest, kuerzel: '' };
+    if (!personen || !personen.length) return r;
+    var w = [], re = /[^\s_]+/g, x;
+    while ((x = re.exec(rest))) w.push(x);
+    for (var k = Math.min(3, w.length); k >= 1; k--){
+      var ende = maNorm(w.slice(-k).map(function(y){ return y[0]; }).join(''));
+      var p = personen.find(function(q){ return q && maNorm(q.ordnerKuerzel) === ende; });
+      if (p){ r.kuerzel = String(p.ordnerKuerzel).trim(); r.ort = rest.slice(0, w[w.length - k].index).replace(/[\s_-]+$/, ''); return r; }
+    }
+    return r;
+  }
+  /* Anzeige „Nr. Ort“ und zuständige Person (manuell aus _Projekt.json, sonst aus dem Ordnernamen) */
+  async function personUndAnzeige(arch, s, zust){
+    var personen = null;
+    try{
+      var mt = await arch.getFileHandle('_Spektron-Mitarbeiter.json').then(function(f){ return f.getFile(); }).then(function(f){ return f.text(); });
+      var mj = JSON.parse(mt); if (mj && mj.format === 'spektron-mitarbeiter' && Array.isArray(mj.personen)) personen = mj.personen;
+    }catch(e){}
+    var o = ordnerName(name, personen);
+    if (o) s.anzeige = o.nr + (o.ort ? ' ' + o.ort : '');
+    var k = zust && typeof zust === 'object' && typeof zust.kuerzel === 'string' ? zust.kuerzel : (o ? o.kuerzel : '');
+    if (k){ var pp = (personen || []).find(function(q){ return q && maNorm(q.ordnerKuerzel) === maNorm(k); }); s.person = pp && pp.name ? pp.name : k; }
+  }
   var h = function(tag, attrs){
     var el = document.createElement(tag);
     for (var k in (attrs || {})){ if (k === 'text') el.textContent = attrs[k]; else el.setAttribute(k, attrs[k]); }
@@ -91,13 +119,14 @@
       try{ for await (var e of arch.values()) if (e.kind === 'directory' && nfc(e.name) === nfc(name)){ proj = e; break; } }catch(e2){}
     }
     if (!proj) return null;
-    var s = { label: false, fotos: false, plan: false, beleg: false, objekt: '' };
+    var s = { label: false, fotos: false, plan: false, beleg: false, objekt: '', anzeige: '', person: '' }, zust = null;
     var activeData = window.SpektronProjectData && window.SpektronProjectData(name);
-    if (activeData){ var activeObjekt = typeof activeData.data.objekt === 'string' ? activeData.data.objekt : activeData.data.daten && activeData.data.daten.objekt; if (typeof activeObjekt === 'string') s.objekt = activeObjekt.trim(); }
+    if (activeData){ var activeObjekt = typeof activeData.data.objekt === 'string' ? activeData.data.objekt : activeData.data.daten && activeData.data.daten.objekt; if (typeof activeObjekt === 'string') s.objekt = activeObjekt.trim(); zust = activeData.data.zustaendig; }
     else try{
       var pj = await proj.getFileHandle('_Projekt.json').then(function(f){ return f.getFile(); }).then(function(f){ return f.text(); }).catch(function(){ return ''; });
-      if (pj){ var j = JSON.parse(pj), o = j && (typeof j.objekt === 'string' ? j.objekt : j.daten && j.daten.objekt); if (typeof o === 'string') s.objekt = o.trim(); }   // Projektzentrale schreibt die Felder direkt in _Projekt.json (ältere Testdateien: unter „daten“)
+      if (pj){ var j = JSON.parse(pj), o = j && (typeof j.objekt === 'string' ? j.objekt : j.daten && j.daten.objekt); if (typeof o === 'string') s.objekt = o.trim(); zust = j && j.zustaendig; }   // Projektzentrale schreibt die Felder direkt in _Projekt.json (ältere Testdateien: unter „daten“)
     }catch(e3){}
+    await personUndAnzeige(arch, s, zust);
     try{ var fo = await unterordner(proj, 'Fotos'); if (fo) s.fotos = await fo.getFileHandle('_Bildumbenenner.json').then(function(){ return true; }, function(){ return false; }); }catch(e4){}
     try{
       var la = await unterordner(proj, 'Laboraufträge');
@@ -129,7 +158,7 @@
       '#mosaikLeiste .ml-home,#mosaikLeiste .ml-proj{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 9px;color:#c9d6df}' +
       '#mosaikLeiste .ml-home:hover,#mosaikLeiste .ml-proj:hover,#mosaikLeiste .ml-proj[aria-expanded=true]{background:rgba(255,255,255,.1);color:#fff}' +
       '#mosaikLeiste .ml-marke{flex:none;padding:0 6px 0 2px;color:#8fb3d1;font-weight:700;font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;white-space:nowrap}' +
-      '#mosaikLeiste .ml-proj b{color:#fff;font-weight:650}#mosaikLeiste .ml-obj{color:#9fb1be;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto;max-width:34ch}' +
+      '#mosaikLeiste .ml-proj b{color:#fff;font-weight:650}#mosaikLeiste .ml-obj{color:#9fb1be;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto;max-width:34ch}#mosaikLeiste .ml-wer{color:#dfe8ee;flex:0 0 auto}' +
       '#mosaikLeiste .ml-sp{flex:1 1 0;min-width:4px}' +
       '#mosaikLeiste .ml-steps{display:flex;align-items:center;gap:2px}' +
       '#mosaikLeiste .ml-step{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 9px;color:#b9c8d3;position:relative}' +
@@ -179,13 +208,14 @@
     bar.appendChild(h('span', { class: 'ml-marke', title: 'Spektron – die Büro-Apps', text: 'Spektron' }));
     bar.appendChild(h('a', { class: 'ml-home', href: ZENTRALE, target: 'projektzentrale', title: 'Alle Projekte (Projektzentrale)' }, h('b', { text: '⌂', 'aria-hidden': 'true' }), h('span', { text: 'Projektzentrale' })));
     if (name){
-      var pb = h('button', { class: 'ml-proj', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', title: 'Anderes Projekt öffnen' }, h('b', { text: name }), h('span', { text: '▾', 'aria-hidden': 'true' }));
+      var pb = h('button', { class: 'ml-proj', type: 'button', 'aria-haspopup': 'menu', 'aria-expanded': 'false', title: 'Anderes Projekt öffnen' }, h('b', { text: (stand && stand.anzeige) || name, title: name }), h('span', { text: '▾', 'aria-hidden': 'true' }));
       pb.onclick = function(ev){ ev.stopPropagation(); oeffnePop(pb); };
       bar.appendChild(pb);
       var shared = window.SpektronProjectData && window.SpektronProjectData(name);
       var sharedObjekt = shared && (typeof shared.data.objekt === 'string' ? shared.data.objekt : shared.data.daten && shared.data.daten.objekt);
       var objekt = shared ? (typeof sharedObjekt === 'string' ? sharedObjekt.trim() : '') : stand && stand.objekt;
       var suffix = shared && shared.stale ? ' · möglicherweise veraltet' : shared && shared.checking ? ' · wird geprüft' : '';
+      if (stand && stand.person) bar.appendChild(h('span', { class: 'ml-obj ml-wer', text: '· ' + stand.person, title: 'Zuständig: ' + stand.person }));
       if (objekt) bar.appendChild(h('span', { class: 'ml-obj', text: objekt + suffix, title: objekt + suffix }));
       bar.appendChild(h('span', { class: 'ml-sp' }));
       var steps = h('span', { class: 'ml-steps' });
