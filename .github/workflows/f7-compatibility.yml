@@ -50,7 +50,15 @@ jobs:
         run: |
           node --input-type=module -e "import fs from 'node:fs';const p='tests/run.mjs';let s=fs.readFileSync(p,'utf8');const extra=[];if(process.env.VARIANT.includes('F1'))extra.push('labelkit-project','labelkit-project-browser');if(process.env.VARIANT.includes('F2'))extra.push('folder-concurrency');if(!s.includes('const suites=['))throw Error('suite anchor missing');s=s.replace('const suites=[','const suites=['+extra.filter(x=>![34,39].some(n=>s.includes(String.fromCharCode(n)+x+String.fromCharCode(n)))).map(x=>JSON.stringify(x)+',').join(''));fs.writeFileSync(p,s);"
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium webkit
+      - name: Install Playwright Linux dependencies from Ubuntu HTTPS mirrors
+        timeout-minutes: 10
+        run: |
+          # Avoid the Azure HTTP mirror that stalled package downloads on hosted runners.
+          printf '%s\n' 'https://archive.ubuntu.com/ubuntu' 'https://security.ubuntu.com/ubuntu' | sudo tee /etc/apt/apt-mirrors.txt
+          pnpm exec playwright install-deps chromium webkit
+      - name: Install Playwright Chromium and WebKit
+        timeout-minutes: 5
+        run: pnpm exec playwright install chromium webkit
       - name: Composed production build and TypeScript check
         run: pnpm build
       - name: Complete combined Node and browser suite
