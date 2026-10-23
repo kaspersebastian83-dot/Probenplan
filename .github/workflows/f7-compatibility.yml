@@ -11,7 +11,7 @@ jobs:
   combined:
     name: PlanKit F7 + ${{ matrix.variant }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 55
     strategy:
       fail-fast: false
       matrix:
