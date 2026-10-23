@@ -27,11 +27,11 @@ jobs:
           VARIANT: ${{ matrix.variant }}
         run: |
           git fetch origin 1773fb482760ffd31ec1daff4acf36702bd40143 532132c3dac9a4a087c18197dec1d204809b57f2
-          if [[ "$VARIANT" == *F2* ]]; then
+          if [[ "$VARIANT" == *F2* ]] && ! git merge-base --is-ancestor 532132c3dac9a4a087c18197dec1d204809b57f2 HEAD; then
             git diff --unified=1 5f577e702a430ac4614a4b77c13cd1f9d38e4b15 532132c3dac9a4a087c18197dec1d204809b57f2 -- src/folder.ts src/main.ts tests/folder-concurrency.mjs tests/folder-safety.mjs tests/folder.mjs > "$RUNNER_TEMP/f2.patch"
             git apply --3way "$RUNNER_TEMP/f2.patch"
           fi
-          if [[ "$VARIANT" == *F1* ]]; then
+          if [[ "$VARIANT" == *F1* ]] && ! git merge-base --is-ancestor 1773fb482760ffd31ec1daff4acf36702bd40143 HEAD; then
             git diff --unified=1 5f577e702a430ac4614a4b77c13cd1f9d38e4b15 1773fb482760ffd31ec1daff4acf36702bd40143 -- src/labelkit.ts src/labui.ts src/main.ts tests/labelkit-project-browser.mjs tests/labelkit-project.mjs > "$RUNNER_TEMP/f1.patch"
             git apply --3way "$RUNNER_TEMP/f1.patch"
           fi
@@ -48,7 +48,7 @@ jobs:
         env:
           VARIANT: ${{ matrix.variant }}
         run: |
-          node --input-type=module -e "import fs from 'node:fs';const p='tests/run.mjs';let s=fs.readFileSync(p,'utf8');const extra=[];if(process.env.VARIANT.includes('F1'))extra.push('labelkit-project','labelkit-project-browser');if(process.env.VARIANT.includes('F2'))extra.push('folder-concurrency');if(!s.includes('const suites=['))throw Error('suite anchor missing');s=s.replace('const suites=[','const suites=['+extra.map(x=>JSON.stringify(x)+',').join(''));fs.writeFileSync(p,s);"
+          node --input-type=module -e "import fs from 'node:fs';const p='tests/run.mjs';let s=fs.readFileSync(p,'utf8');const extra=[];if(process.env.VARIANT.includes('F1'))extra.push('labelkit-project','labelkit-project-browser');if(process.env.VARIANT.includes('F2'))extra.push('folder-concurrency');if(!s.includes('const suites=['))throw Error('suite anchor missing');s=s.replace('const suites=[','const suites=['+extra.filter(x=>![34,39].some(n=>s.includes(String.fromCharCode(n)+x+String.fromCharCode(n)))).map(x=>JSON.stringify(x)+',').join(''));fs.writeFileSync(p,s);"
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium webkit
       - name: Composed production build and TypeScript check
