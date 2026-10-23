@@ -44,6 +44,8 @@ for(const engine of engines){
   await page.keyboard.press('p');const pm=await toScreen(page,mid[0],mid[1]);await page.mouse.click(pm.x,pm.y);await page.keyboard.press('v');
 
   await check(`${engine}: Werkzeug „Entzerren“ mit vier Ecken, Lupe beim Ziehen, überkreuztes Viereck abgewiesen`,async()=>{
+   // Hinweis „Plan geladen …“ noch sichtbar: darf das Ziehen der Ecken nicht behindern
+   await page.locator('#toast:not([hidden])').waitFor({state:'attached'}).catch(()=>{});
    await page.keyboard.press('w');await page.locator('#warp-actions').waitFor();assert.equal(await page.locator('#warp-overlay [data-corner]').count(),4);
    // Ecke 1 auf Ecke 3 ziehen: überkreuzt
    const c0=await page.locator('#warp-overlay [data-corner="0"] circle').nth(1).boundingBox(),far=await toScreen(page,FW*.9,FH*.9);
@@ -57,6 +59,9 @@ for(const engine of engines){
    for(const i of [0,1,2,3]){const c=await page.locator(`#warp-overlay [data-corner="${i}"] circle`).nth(1).boundingBox(),t=await toScreen(page,...CORNERS[i]);
     await page.mouse.move(c.x+c.width/2,c.y+c.height/2);await page.mouse.down();await page.mouse.move(t.x,t.y,{steps:4});if(i===2&&process.env.SHOT)await page.screenshot({path:process.env.SHOT+'-1.png'});await page.mouse.up();}
    assert.match(await page.locator('#warp-info').textContent(),/Ergebnis/);
+   // Jede Ecke liegt dort, wo sie hingezogen wurde (Hinweise oder Leisten dürfen keinen Griff verdecken)
+   for(const i of [0,1,2,3]){const c=await page.locator(`#warp-overlay [data-corner="${i}"] circle`).nth(1).boundingBox(),t=await toScreen(page,...CORNERS[i]);
+    assert.ok(Math.hypot(c.x+c.width/2-t.x,c.y+c.height/2-t.y)<4,`Ecke ${i+1} nicht an der Zielstelle`);}
    await page.locator('#warp-confirm').click();await page.locator('#toast',{hasText:'Plan entzerrt'}).waitFor({timeout:30000});
    assert.equal(await page.locator('#warp-actions').isVisible(),false);
    if(process.env.SHOT){await page.waitForTimeout(400);await page.screenshot({path:process.env.SHOT+'-2.png'});}

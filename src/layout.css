@@ -94,7 +94,7 @@ body{height:100dvh;overflow:hidden;display:flex;flex-direction:column}
 #sheet-dialog{max-width:560px}
 #sheet-dialog .dialog-actions button{white-space:nowrap}
 /* Meldungen über der Planleiste, damit „＋ Plan“ frei bleibt */
-#toast{bottom:76px}
+#toast{bottom:76px;pointer-events:none}   /* reiner Hinweis: darf nie Ecken, Marker oder Knöpfe darunter verdecken */
 
 /* Ergebniskarte */
 #results-toggle::before{content:"";display:inline-block;width:10px;height:10px;margin-right:6px;border-radius:50%;vertical-align:-1px;background:conic-gradient(#4caf50 0 33%,#f2c94c 0 66%,#e0453a 0);box-shadow:0 0 0 1px #fff}

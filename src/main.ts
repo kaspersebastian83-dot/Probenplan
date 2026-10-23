@@ -290,7 +290,7 @@ function warpLoupe(i:number|null){
 function warpFit(){if(!project)return;const r=svg.getBoundingClientRect(),top=$('warp-actions').offsetHeight+70,availH=Math.max(120,r.height-top-24),W=project.plan.width,H=project.plan.height;
   const k=Math.max(W/(r.width*.9),H/(availH*.9));camera={x:W/2-r.width*k/2,y:-(top*k)-(availH*k-H)/2,width:r.width*k,height:r.height*k};updateCamera();}
 function endWarp(){warping=null;cropping=false;setMode('navigate');renderWarp();warpLoupe(null);render();fit();}
-$('warp-start').onclick=()=>{if(!project||busy||cropping||!requireFinished())return;warping={q:initialQuad(project.plan),drag:null,busy:false};cropping=true;selected=null;selectedArea=null;setMode('navigate');$('stage').dataset.mode='warp';render();renderWarp();warpFit();renderWarp();
+$('warp-start').onclick=()=>{if(!project||busy||cropping||!requireFinished())return;warping={q:initialQuad(project.plan),drag:null,busy:false};cropping=true;$('toast').hidden=true;selected=null;selectedArea=null;setMode('navigate');$('stage').dataset.mode='warp';render();renderWarp();warpFit();renderWarp();
   };
 $('warp-cancel').onclick=()=>{if(!warping?.busy)endWarp();};
 input('warp-aspect').onchange=()=>renderWarp();
