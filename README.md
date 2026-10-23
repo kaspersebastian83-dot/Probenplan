@@ -196,7 +196,7 @@ In den Repository-Einstellungen unter **Pages → Build and deployment → Sourc
 
 Vite verwendet relative Assetpfade. Die App funktioniert dadurch sowohl lokal als auch im GitHub-Pages-Unterverzeichnis `/Probenplan/`.
 
-Änderungen kommen über Pull Requests; die Tests (`.github/workflows/tests.yml`) laufen bei jedem Pull Request. Der Pages-Workflow veröffentlicht nur Pushes auf `main` (oder einen ausdrücklich ausgelösten manuellen Lauf) – erst das Mergen nach Freigabe aktualisiert die Website.
+Änderungen kommen über Pull Requests; die Tests (`.github/workflows/tests.yml`) laufen bei jedem Pull Request. Es gibt nur diesen einen Test-Workflow; zusätzliche Kompatibilitäts- und Integrations-Workflows wurden am 23.10.2026 entfernt. Der Pages-Workflow veröffentlicht nur Pushes auf `main` (oder einen ausdrücklich ausgelösten manuellen Lauf) – erst das Mergen nach Freigabe aktualisiert die Website.
 
 ## Laborergebnisse ab 1.8.1
 
