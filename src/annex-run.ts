@@ -10,7 +10,7 @@ import {hasValues,prepare,rateMarkers} from './results';
 import {fileInfo,fileRevision,findSubdir,listFiles,projectFileName,AUFTRAEGE,LABOR,PLAENE,type ProjectFolder} from './folder';
 
 export const ANNEX_DIR='Mitteilungen',ANNEX_LOG='_Anlagen-Protokoll.txt',FOTOS='Fotos',FOTOKIT_FILE='_Bildumbenenner.json';
-export interface AnnexOptions {title:string;maxPhotos:number;results:boolean;objekt:string;projectData:Record<string,unknown>;app:string;progress?:(text:string)=>void}
+export interface AnnexOptions {title:string;maxPhotos:number;results:boolean;objekt:string;projectData:Record<string,unknown>;projectDataSource?:File|null;projectDataStale?:boolean;app:string;progress?:(text:string)=>void}
 type Dir=ProjectFolder['dir'];
 
 const stand=(ms:number)=>{const d=new Date(ms),z=(n:number)=>String(n).padStart(2,'0');return `${z(d.getDate())}.${z(d.getMonth()+1)}.${d.getFullYear()} ${z(d.getHours())}:${z(d.getMinutes())}`;};
@@ -109,7 +109,9 @@ export async function createAnnex(p:Project,folder:ProjectFolder|null,o:AnnexOpt
       await hashSource(lab,LABOR,name,`Laborbericht ${r.bericht||''} ${r.labor?`(${r.labor})`:''}`.replace(/\s+/g,' ').trim(),sources,missing);
     const auftraege=await findSubdir(folder.dir,AUFTRAEGE),daten=auftraege?(await listFiles(auftraege,/_Daten\.json$/i))[0]:undefined;
     if(daten){const file=await daten.handle.getFile();sources.push({role:'Probenerfassung LabelKit (neueste Datei)',name:`${AUFTRAEGE}/${daten.name}`,stand:stand(file.lastModified),sha:await sha(await file.arrayBuffer())});}
-    const pj=await fileInfo(folder.dir,'_Projekt.json');if(pj)sources.push({role:'Projektdaten (Projektzentrale)',name:'_Projekt.json',stand:stand(pj.lastModified),sha:await sha(await pj.arrayBuffer())});
+    const pj=o.projectDataSource===undefined?await fileInfo(folder.dir,'_Projekt.json'):o.projectDataSource;
+    if(pj)sources.push({role:o.projectDataStale?'Projektdaten (möglicherweise veraltet; Verwendung bestätigt)':'Projektdaten (Projektzentrale)',name:'_Projekt.json',stand:stand(pj.lastModified),sha:await sha(await pj.arrayBuffer())});
+    if(o.projectDataStale)extra.push({text:'Gemeinsame Projektdaten möglicherweise veraltet',ok:false,detail:'Die erneute Aktualisierung war nicht erfolgreich. Verwendung für diese Anlage ausdrücklich bestätigt.'});
     fotos=await photos(folder,o,samples,sources);
   }else{
     sources.push({role:'PlanKit-Projekt (nicht im Projektordner gespeichert)',name:'Projektstand beim Erstellen',stand:stand(Date.now()),sha:await sha(new TextEncoder().encode(JSON.stringify(project)))});

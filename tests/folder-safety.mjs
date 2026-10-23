@@ -20,7 +20,7 @@ try{
  async function check(name,fn){await fn();console.log(`OK ${name}`);}
  await check('Office safety: verified saves, unique backups and same-content timestamps',async()=>{
   const got=await page.evaluate(async()=>{const m=await import('/folder.mjs'),f=await make(),a='{"synthetic":1}',b='{"synthetic":2}',c='{"synthetic":3}';let rev=(await m.saveFolderProject(f,a,null)).revision;await m.writeProjectCopy(f,'Wiederherstellung',b);rev=(await m.saveFolderProject(f,b,rev)).revision;rev=(await m.saveFolderProject(f,c,rev)).revision;const files=await names(f),copies=await Promise.all(files.filter(n=>n.includes('(vorher ')).map(n=>read(f,n)));return {text:await read(f),files,copies,revision:rev,actual:await m.fileRevision(await m.fileInfo(f.plaene,m.projectFileName(f)))};});
-  assert.equal(got.text,'{"synthetic":3}');assert.deepEqual(got.copies.sort(),['{"synthetic":1}','{"synthetic":2}']);assert.equal(got.files.filter(n=>n.includes('Wiederherstellung')).length,0);assert.equal(new Set(got.files).size,3);assert.equal(got.revision,got.actual);
+  assert.equal(got.text,'{"synthetic":3}');assert.deepEqual(got.copies.sort(),['{"synthetic":1}','{"synthetic":2}']);assert.equal(got.files.filter(n=>n.includes('Wiederherstellung')).length,1);assert.equal(got.files.filter(n=>n.includes('Speicherkandidat')).length,3);assert.equal(new Set(got.files).size,7);assert.equal(got.revision,got.actual);
  });
  await check('Office safety: changed bytes, replacement, deletion and unexpected creation conflict',async()=>{
   const got=await page.evaluate(async()=>{const m=await import('/folder.mjs'),result=[];
@@ -33,16 +33,16 @@ try{
  await check('Office safety: backup/write/close failures preserve main and recovery',async()=>{
   const got=await page.evaluate(async()=>{const m=await import('/folder.mjs'),out=[];
    for(const kind of ['backup','recovery','write','close']){const f=await make(),rev=(await m.saveFolderProject(f,'old',null)).revision;
-    const wrapped=wrap(f,async(name,op)=>{if((kind==='backup'&&name.includes('(vorher '))||(kind==='recovery'&&name.includes('(Wiederherstellung '))||(name===m.projectFileName(f)&&op===kind))throw Error(`Synthetic ${kind} failure`);});
-    let failed=false;try{await m.saveFolderProject(wrapped,'new',rev);}catch{failed=true;}const files=await names(f),recovery=files.filter(n=>n.includes('(Wiederherstellung '));out.push({kind,failed,main:await read(f),recoveries:await Promise.all(recovery.map(n=>read(f,n)))});
+    const wrapped=wrap(f,async(name,op)=>{if((kind==='backup'&&name.includes('(vorher '))||(kind==='recovery'&&name.includes('(Speicherkandidat '))||(name===m.projectFileName(f)&&op===kind))throw Error(`Synthetic ${kind} failure`);});
+    let failed=false;try{await m.saveFolderProject(wrapped,'new',rev);}catch{failed=true;}const files=await names(f),recovery=files.filter(n=>n.includes('(Speicherkandidat '));out.push({kind,failed,main:await read(f),recoveries:await Promise.all(recovery.map(n=>read(f,n)))});
    }return out;
-  });for(const r of got){assert.equal(r.failed,true,r.kind);assert.equal(r.main,'old',r.kind);if(['write','close'].includes(r.kind))assert.deepEqual(r.recoveries,['new']);}
+  });for(const r of got){assert.equal(r.failed,true,r.kind);assert.equal(r.main,'old',r.kind);if(['write','close'].includes(r.kind))assert.ok(r.recoveries.includes('new'));}
  });
  await check('Office safety: final conflict check preserves a concurrent external edit',async()=>{
   const got=await page.evaluate(async()=>{const m=await import('/folder.mjs'),f=await make(),rev=(await m.saveFolderProject(f,'old',null)).revision;let once=false;
-   const wrapped=wrap(f,async(name,op)=>{if(!once&&name.includes('(Wiederherstellung ')&&op==='close'){once=true;await m.writeFile(f.plaene,m.projectFileName(f),'external');}});
-   let conflict=false;try{await m.saveFolderProject(wrapped,'mine',rev);}catch(e){conflict=e instanceof m.FolderConflict;}return {conflict,text:await read(f),copies:await Promise.all((await names(f)).filter(n=>n.includes('(vorher ')||n.includes('(Wiederherstellung ')).map(n=>read(f,n)))};
-  });assert.equal(got.conflict,true);assert.equal(got.text,'external');assert.deepEqual(got.copies.sort(),['mine','old']);
+   const wrapped=wrap(f,async(name,op)=>{if(!once&&name.includes('(Speicherkandidat ')&&op==='close'){once=true;await m.writeFile(f.plaene,m.projectFileName(f),'external');}});
+   let conflict=false;try{await m.saveFolderProject(wrapped,'mine',rev);}catch(e){conflict=e instanceof m.FolderConflict;}return {conflict,text:await read(f),copies:await Promise.all((await names(f)).filter(n=>n.includes('(vorher ')||n.includes('(Speicherkandidat ')).map(n=>read(f,n)))};
+  });assert.equal(got.conflict,true);assert.equal(got.text,'external');assert.deepEqual([...new Set(got.copies)].sort(),['mine','old']);
  });
  await check('Office safety: lost permission stops all filesystem changes',async()=>{
   const got=await page.evaluate(async()=>{const m=await import('/folder.mjs'),f=await make();const rev=(await m.saveFolderProject(f,'old',null)).revision,count=(await names(f)).length;let failed=false;
@@ -66,7 +66,7 @@ try{
   assert.equal(got.count,10);assert.equal(got.main,'v14');assert.ok(got.copy);assert.equal(got.recovery,0);
   assert.ok(got.texts.includes('v13'),'newest backup kept');assert.ok(!got.texts.includes('v0'),'oldest backup pruned');
  });
- await check('Office safety: backup names use local time; old UTC names are sorted by their real time',async()=>{
+ await check('Office safety: backup names use local time; unique old UTC backups survive cleanup',async()=>{
   const got=await page.evaluate(async()=>{const m=await import('/folder.mjs'),f=await make();let rev=null;
    rev=(await m.saveFolderProject(f,'a',rev)).revision;rev=(await m.saveFolderProject(f,'b',rev)).revision;
    const now=new Date(),z=n=>String(n).padStart(2,'0'),backups=(await names(f)).filter(n=>n.includes('(vorher '));
@@ -77,11 +77,11 @@ try{
    return {first:backups[0],today:`${now.getFullYear()}-${z(now.getMonth()+1)}-${z(now.getDate())}`,hour:z(now.getHours()),texts:await Promise.all(after.map(n=>read(f,n))),
     utc:m.stampTime('2026-10-16T19-37-16-853Z-x'),local:m.stampTime('2026-10-16 21-37-16-853 abcd1234)')};
   });
-  assert.match(got.first,new RegExp(`\\(vorher ${got.today} \\d{2}-\\d{2}-\\d{2}-\\d{3} [0-9a-f]{8}\\)\\.probenplan$`),got.first);
+  assert.match(got.first,new RegExp(`\\(vorher ${got.today} \\d{2}-\\d{2}-\\d{2}-\\d{3} [0-9a-f-]{36}\\)\\.probenplan$`),got.first);
   assert.ok(got.first.includes(`${got.today} ${got.hour}-`)||got.first.includes(`${got.today} `),'Ortszeit im Namen');
   assert.equal(got.utc,Date.UTC(2026,9,16,19,37,16,853));assert.equal(got.local,new Date(2026,9,16,21,37,16,853).getTime());
   assert.ok(got.texts.includes('a')&&got.texts.includes('b'),'neue Sicherungen bleiben, auch neben 12 älteren im UTC-Format');
-  assert.ok(!got.texts.includes('alt0'),'älteste UTC-Sicherung wird aufgeräumt');
+  assert.ok(got.texts.includes('alt0'),'einzigartige alte UTC-Sicherung darf nicht gelöscht werden');
  });
  await context.close();
 }finally{await browser.close();await new Promise(r=>server.close(r));}
