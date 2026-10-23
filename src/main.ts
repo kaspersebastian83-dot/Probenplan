@@ -16,7 +16,7 @@ import {annexFileName,createAnnex,saveAnnex,ANNEX_DIR} from './annex-run';
 import {COMPANY,PAPERS,renderSheet,sheetLayout,type Paper} from './sheet';
 import {buildPdf,canvasRGB,type PdfPage} from './pdfwrite';
 import {ASPECT_NAMES,initialQuad,outsideCount,perspectiveProject,quadProblem,targetSize,warpImage,type Aspect,type Quad} from './perspective';
-import {extendSketch,trimSketch,addDoor,addRoom,cloneSketch,doorAt,emptySketch,hit,meters,moveRoom,removeRoom,resizeCanvas,resizeRoom,roomFrom,sketchPlan,sketchSVG,type Sketch,type SketchRoom} from './sketch';
+import {extendSketch,trimSketch,addOpening,addRoom,addText,addWall,cloneSketch,emptySketch,hit,meters,moveRoom,moveText,moveWall,openingAt,removeRoom,removeWall,resizeCanvas,resizeRoom,roomFrom,setOpeningWidth,setWallLength,sketchPlan,sketchSVG,wallFrom,wallLength,TEXT_SIZES,type Sketch,type SketchKind,type SketchRoom,type SketchText,type SketchWall} from './sketch';
 import {alignProject,cropProject,fineAngle,MAX_ANGLE,planMatrix,preparation,rotateProject} from './preparation';
 import type {LocalPDF} from './pdf';
 import type {Plan,Rect} from './model';
@@ -83,7 +83,7 @@ document.querySelector('#help-dialog')!.insertAdjacentHTML('beforeend','<h3>Labo
 input('file').accept='.zip,.svg,.png,.jpg,.jpeg,.pdf,.heic,.heif,application/pdf,image/png,image/jpeg';
 $('plan-name').textContent='PDF, Polycam-ZIP, SVG, PNG oder JPG';
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Beschriftung</h3><p>Liste → „Beschriftung“, je Plan: <b>Schilder automatisch platzieren</b> – die Probenstelle bleibt exakt, das Schild weicht Text, Linien und anderen Schildern aus (mit Hinweislinie). Ein von Hand gezogenes Schild bleibt fest; „Schilder neu anordnen“ gibt es wieder frei. <b>Messwerte am Plan</b> – in der Ergebniskarte ein Wertkästchen je Probe (Wert wie im Prüfbericht, Einheit, Kategorie), auch in der Exportkarte schaltbar.</p>');
-document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Skizze (kein Plan vorhanden)</h3><p>Startseite „Kein Plan? Skizze zeichnen“ oder unten „＋ Skizze“ für ein weiteres Geschoss. <b>Raum</b>: von Ecke zu Ecke aufziehen (Raster 10 cm, Räume rasten an Wänden ein), danach Name, Breite und Tiefe in Metern eintippen. <b>Tür</b>: auf eine Wand tippen (0,90 m, Aufschlag in den angetippten Raum; Breite und Aufschlag änderbar). <b>Auswählen</b>: Raum ziehen, Ecke unten rechts ändert die Größe, Entf löscht. „Skizze fertig“ schneidet die Zeichenfläche auf die Räume zu; der Maßstab ist automatisch gesetzt. „Skizze“ links bearbeitet sie weiter; Proben bleiben an ihrer Stelle.</p>');
+document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Skizze (kein Plan vorhanden)</h3><p>Startseite „Kein Plan? Skizze zeichnen“ oder unten „＋ Skizze“ für ein weiteres Geschoss. <b>Raum</b>: von Ecke zu Ecke aufziehen (Raster 10 cm, Räume rasten an Wänden ein), danach Name, Breite und Tiefe in Metern eintippen. <b>Wand</b>: frei ziehen, auch schräg (15°-Schritte rasten ein, Länge eintippbar). <b>Tür</b>/<b>Fenster</b>: auf eine Wand tippen (Tür 0,90 m mit Aufschlag, Fenster 1,20 m). <b>Text</b>: antippen und eintippen, z. B. „Treppe“. <b>Auswählen</b>: Räume, Wände, Texte ziehen, Ecke unten rechts ändert die Raumgröße, Entf löscht. „Skizze fertig“ schneidet die Zeichenfläche auf die Räume zu; der Maßstab ist automatisch gesetzt. „Skizze“ links bearbeitet sie weiter; Proben bleiben an ihrer Stelle.</p>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Entzerren (Fluchtplan fotografiert)</h3><p>„Entzerren“ (W) links in der Leiste: die vier Ecken des Plans im Foto antippen oder ziehen – 1 oben links, 2 oben rechts, 3 unten rechts, 4 unten links. Die Lupe zeigt die Ecke vergrößert. Seitenverhältnis „wie im Foto“ oder DIN quer/hoch (Fluchtpläne sind meist A3/A4). „Entzerren“ rechnet ein gerades Bild; Proben und Flächen werden mitgerechnet. Ein vorhandener Maßstab und die Nordrichtung werden dabei entfernt und sind neu zu setzen. Rückgängig stellt das Foto wieder her; die Fotodatei selbst bleibt unverändert.</p>');
 document.getElementById('app-version')!.textContent='v1.21.0';
 document.querySelector('#help-dialog h2')!.insertAdjacentHTML('afterend','<h3>Neu in PlanKit 1.16.1 · 20.10.2026</h3><p>Projektzentrale und Spektron-Leiste übergeben Projekte jetzt über #projekt im Fragment. Sonderzeichen bleiben erhalten; alte ?projekt-Links funktionieren weiterhin und werden nach dem Laden bereinigt. Projektwechsel laden auch bereits geöffnete App-Fenster neu; eine Warnung vor ungesicherten Eingaben kann den Wechsel abbrechen. Die Anlagenaktion aktion=anlage wird ebenfalls im Fragment übergeben. Installiertes PlanKit nach einer Online-Aktualisierung vollständig schließen und erneut öffnen.</p>');
@@ -113,7 +113,8 @@ let aligning:{start:number;delta:number;drag:{id:number;prev:number}|null;edge:P
 /** Entzerren: vier Ecken im angezeigten Plan; erst „Entzerren“ ändert das Projekt (ein Rückgängig-Schritt). Auch hier ist cropping gesetzt. */
 let warping:{q:Quad;drag:{id:number;i:number}|null;busy:boolean}|null=null;
 /** Skizze: Arbeitskopie s; Änderungen werden je abgeschlossener Aktion als ein Rückgängig-Schritt übernommen. Auch hier ist cropping gesetzt. */
-let sketching:{s:Sketch;tool:'room'|'door'|'select';sel:{type:'room'|'door';id:string}|null;drag:{id:number;kind:'draw'|'move'|'resize'|'pan';start:Point;screen:{x:number;y:number};room?:SketchRoom;cam?:typeof camera;moved:boolean}|null;draft:SketchRoom|null}|null=null;
+type SketchTool='room'|'wall'|'door'|'window'|'text'|'select';
+let sketching:{s:Sketch;tool:SketchTool;sel:{type:SketchKind;id:string}|null;drag:{id:number;kind:'draw'|'move'|'resize'|'pan';start:Point;screen:{x:number;y:number};room?:SketchRoom;wall?:SketchWall;text?:SketchText;cam?:typeof camera;moved:boolean}|null;draft:SketchRoom|null;draftWall:SketchWall|null}|null=null;
 let camera={x:0,y:0,width:1000,height:1000},fitWidth=1000,saveRevision=0,exportURL='';
 let saveQueue:Promise<void>=Promise.resolve();
 let toastTimer=0,savedToastRevision:number|null=null;
@@ -330,76 +331,98 @@ window.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&!(t instanceof HTMLButtonElement)){e.preventDefault();$('warp-confirm').click();}
 });
 /* ---------- Skizze (ab 1.21) ----------
-   Kein Plan vorhanden: Räume als Rechtecke mit Maßen (Raster 10 cm, Räume rasten aneinander ein), Türen als Lücken mit Aufschlag.
-   Ergebnis ist ein normaler SVG-Plan mit Maßstab; die Skizze bleibt am Plan und ist jederzeit weiter bearbeitbar. */
-$('stage').insertAdjacentHTML('beforeend',`<div id="sketch-actions" hidden><div class="align-row"><span class="sketch-tools" role="group" aria-label="Werkzeug"><button data-sketch-tool="room" aria-pressed="true">▭ Raum</button><button data-sketch-tool="door" aria-pressed="false">◠ Tür</button><button data-sketch-tool="select" aria-pressed="false">↖ Auswählen</button></span><span id="sketch-hint" class="tiny"></span><button id="sketch-done" class="primary">Skizze fertig ✓</button></div>
+   Kein Plan vorhanden: Räume als Rechtecke mit Maßen (Raster 10 cm, Einrasten an Wänden), freie auch schräge Wände,
+   Türen und Fenster auf jeder Wand, freier Text. Ergebnis ist ein normaler SVG-Plan mit Maßstab; die Skizze bleibt am Plan. */
+const SKETCH_TOOLS:[SketchTool,string][]=[['room','▭ Raum'],['wall','╱ Wand'],['door','◠ Tür'],['window','▭▭ Fenster'],['text','T Text'],['select','↖ Auswählen']];
+$('stage').insertAdjacentHTML('beforeend',`<div id="sketch-actions" hidden><div class="align-row"><span class="sketch-tools" role="group" aria-label="Werkzeug">${SKETCH_TOOLS.map(([t,l])=>`<button data-sketch-tool="${t}" aria-pressed="${t==='room'}">${l}</button>`).join('')}</span><button id="sketch-done" class="primary">Skizze fertig ✓</button></div>
+<p id="sketch-hint" class="tiny"></p>
 <div class="align-row" id="sketch-room-fields" hidden><label>Name<input id="sketch-name" maxlength="60"></label><label>Breite<input id="sketch-w" inputmode="decimal" size="5"> m</label><label>Tiefe<input id="sketch-h" inputmode="decimal" size="5"> m</label><button id="sketch-room-delete" class="danger">Raum löschen</button></div>
-<div class="align-row" id="sketch-door-fields" hidden><label>Türbreite<input id="sketch-dw" inputmode="decimal" size="5"> m</label><button id="sketch-door-flip">Aufschlag wechseln</button><button id="sketch-door-delete" class="danger">Tür löschen</button></div>
+<div class="align-row" id="sketch-wall-fields" hidden><label>Wandlänge<input id="sketch-wl" inputmode="decimal" size="5"> m</label><span class="tiny" id="sketch-wall-angle"></span><button id="sketch-wall-delete" class="danger">Wand löschen</button></div>
+<div class="align-row" id="sketch-opening-fields" hidden><label><span id="sketch-ow-label">Breite</span><input id="sketch-ow" inputmode="decimal" size="5"> m</label><button id="sketch-door-flip">Aufschlag wechseln</button><button id="sketch-opening-delete" class="danger">Löschen</button></div>
+<div class="align-row" id="sketch-text-fields" hidden><label>Text<input id="sketch-text" maxlength="80"></label><label>Größe<select id="sketch-text-size">${TEXT_SIZES.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label><button id="sketch-text-delete" class="danger">Text löschen</button></div>
 <div class="align-row" id="sketch-canvas-fields"><label>Zeichenfläche<input id="sketch-cw" inputmode="decimal" size="5"> ×<input id="sketch-ch" inputmode="decimal" size="5"> m</label><span class="tiny" id="sketch-count"></span></div></div>`);
 const metersIn=(id:string)=>Number(input(id).value.replace(/\s/g,'').replace(',','.'))*100;
 function fitBelow(panel:string){if(!project)return;const r=svg.getBoundingClientRect(),top=$(panel).offsetHeight+70,availH=Math.max(120,r.height-top-24),W=project.plan.width,H=project.plan.height;
   const k=Math.max(W/(r.width*.92),H/(availH*.92));camera={x:W/2-r.width*k/2,y:-(top*k)-(availH*k-H)/2,width:r.width*k,height:r.height*k};updateCamera();}
 /** Vorschau der Arbeitskopie im Planbild (ohne Projektänderung). */
-function previewSketch(){if(!sketching)return;const svgText=sketchSVG(sketching.s);image.setAttribute('href','data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svgText));}
+function previewSketch(){if(!sketching)return;image.setAttribute('href','data:image/svg+xml;charset=utf-8,'+encodeURIComponent(sketchSVG(sketching.s)));}
 /** Arbeitskopie übernehmen: ein Rückgängig-Schritt, Plan neu aus der Skizze (Maßstab bleibt). */
 function commitSketch(){if(!project||!sketching)return;const s=cloneSketch(sketching.s);mutate(p=>{p.plan=sketchPlan(s,p.plan);});sketching.s=cloneSketch(project.plan.sketch!);renderSketch();}
+const pick=<T extends {id:string}>(list:T[],type:SketchKind)=>sketching?.sel?.type===type?list.find(x=>x.id===sketching!.sel!.id):undefined;
+const selRoom=()=>pick(sketching?.s.rooms||[],'room'),selWall=()=>pick(sketching?.s.walls||[],'wall'),selOpening=()=>pick(sketching?.s.openings||[],'opening'),selText=()=>pick(sketching?.s.texts||[],'text');
+const HINTS:Record<SketchTool,string>={room:'Raum aufziehen – Ecke zu Ecke. Räume rasten aneinander ein (Raster 10 cm).',wall:'Wand ziehen – von Punkt zu Punkt, auch schräg. Enden rasten an Ecken ein, Richtungen nahe 15°-Schritten werden genau ausgerichtet.',door:'Auf eine Wand tippen: Tür 0,90 m, Aufschlag zur angetippten Seite.',window:'Auf eine Wand tippen: Fenster 1,20 m.',text:'Antippen setzt einen Text, z. B. „Treppe“ oder „Garage“.',select:'Antippen wählt aus; Raum, Wand oder Text ziehen verschiebt (Raum: Ecke unten rechts = Größe). Leere Fläche ziehen: Ansicht bewegen. Entf löscht.'};
 function renderSketch(){
   const on=!!sketching&&!!project;$('sketch-actions').hidden=!on;$('stage').classList.toggle('sketching',on);if(!on){sketchLayer.replaceChildren();return;}
   const sk=sketching!,s=sk.s,k=camera.width/Math.max(1,svg.clientWidth);
   let g='';for(let x=0;x<=s.width;x+=100)g+=`M${x} 0V${s.height}`;for(let y=0;y<=s.height;y+=100)g+=`M0 ${y}H${s.width}`;
   let out=`<path d="${g}" stroke="#9fb6cf" stroke-opacity=".45" stroke-width="${k}"/><rect width="${s.width}" height="${s.height}" fill="none" stroke="#3f74b5" stroke-width="${k*1.5}" stroke-dasharray="${k*8} ${k*5}"/>`;
-  const dims=(r:SketchRoom,color:string)=>`<text x="${r.x+r.w/2}" y="${r.y-k*8}" text-anchor="middle" font-family="Arial" font-weight="700" font-size="${k*13}" fill="${color}" stroke="#fff" stroke-width="${k*3}" paint-order="stroke">${meters(r.w)} m</text><text x="${r.x+r.w+k*8}" y="${r.y+r.h/2}" font-family="Arial" font-weight="700" font-size="${k*13}" fill="${color}" stroke="#fff" stroke-width="${k*3}" paint-order="stroke">${meters(r.h)} m</text>`;
-  const room=sk.sel?.type==='room'?s.rooms.find(r=>r.id===sk.sel!.id):undefined,door=sk.sel?.type==='door'?s.doors.find(d=>d.id===sk.sel!.id):undefined;
+  const label=(x:number,y:number,t:string,color:string,anchor='middle')=>`<text x="${x}" y="${y}" text-anchor="${anchor}" font-family="Arial" font-weight="700" font-size="${k*13}" fill="${color}" stroke="#fff" stroke-width="${k*3}" paint-order="stroke">${t}</text>`;
+  const dims=(r:SketchRoom,color:string)=>label(r.x+r.w/2,r.y-k*8,`${meters(r.w)} m`,color)+label(r.x+r.w+k*8,r.y+r.h/2,`${meters(r.h)} m`,color,'start');
+  const wallDims=(w:SketchWall,color:string)=>label((w.x1+w.x2)/2,(w.y1+w.y2)/2-k*12,`${meters(wallLength(w))} m`,color);
+  const room=selRoom(),wall=selWall(),op=selOpening(),text=selText();
   if(room)out+=`<rect x="${room.x}" y="${room.y}" width="${room.w}" height="${room.h}" fill="rgba(63,116,181,.08)" stroke="#3f74b5" stroke-width="${k*3}"/>${dims(room,'#2c5a93')}<rect x="${room.x+room.w-k*9}" y="${room.y+room.h-k*9}" width="${k*18}" height="${k*18}" fill="#fff" stroke="#3f74b5" stroke-width="${k*3}"/>`;
-  if(door){const h=door.dir==='h';out+=`<rect x="${h?door.x-door.w/2:door.x-k*10}" y="${h?door.y-k*10:door.y-door.w/2}" width="${h?door.w:k*20}" height="${h?k*20:door.w}" fill="rgba(63,116,181,.18)" stroke="#3f74b5" stroke-width="${k*2.5}"/>`;}
+  if(wall)out+=`<line x1="${wall.x1}" y1="${wall.y1}" x2="${wall.x2}" y2="${wall.y2}" stroke="#3f74b5" stroke-opacity=".5" stroke-width="${Math.max(k*10,18)}" stroke-linecap="round"/>${wallDims(wall,'#2c5a93')}`;
+  if(op)out+=`<g transform="translate(${op.x} ${op.y}) rotate(${op.a})"><rect x="${-op.w/2}" y="${-k*10}" width="${op.w}" height="${k*20}" fill="rgba(63,116,181,.18)" stroke="#3f74b5" stroke-width="${k*2.5}"/></g>`;
+  if(text){const hw=Math.max(20,text.size*.3*text.text.length);out+=`<rect x="${text.x-hw}" y="${text.y-text.size*.7}" width="${hw*2}" height="${text.size*1.4}" fill="rgba(63,116,181,.1)" stroke="#3f74b5" stroke-width="${k*2}" stroke-dasharray="${k*5} ${k*3}"/>`;}
   if(sk.draft)out+=`<rect x="${sk.draft.x}" y="${sk.draft.y}" width="${sk.draft.w}" height="${sk.draft.h}" fill="rgba(232,145,45,.1)" stroke="#e8912d" stroke-width="${k*3}" stroke-dasharray="${k*9} ${k*5}"/>${dims(sk.draft,'#b8650f')}`;
+  if(sk.draftWall){const w=sk.draftWall;out+=`<line x1="${w.x1}" y1="${w.y1}" x2="${w.x2}" y2="${w.y2}" stroke="#e8912d" stroke-width="12" stroke-linecap="square" stroke-opacity=".8"/>${wallDims(w,'#b8650f')}`;}
   sketchLayer.innerHTML=out;
   document.querySelectorAll<HTMLButtonElement>('[data-sketch-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.sketchTool===sk.tool)));
-  $('sketch-hint').textContent=sk.tool==='room'?'Raum aufziehen – Ecke zu Ecke. Räume rasten aneinander ein (Raster 10 cm).':sk.tool==='door'?'Auf eine Wand tippen: Tür 0,90 m, Aufschlag in den angetippten Raum.':'Raum antippen und ziehen (Ecke unten rechts: Größe). Leere Fläche ziehen: Ansicht bewegen.';
-  $('sketch-room-fields').hidden=!room;$('sketch-door-fields').hidden=!door;$('sketch-canvas-fields').hidden=!!room||!!door;
+  $('sketch-hint').textContent=HINTS[sk.tool];
+  $('sketch-room-fields').hidden=!room;$('sketch-wall-fields').hidden=!wall;$('sketch-opening-fields').hidden=!op;$('sketch-text-fields').hidden=!text;$('sketch-canvas-fields').hidden=!!(room||wall||op||text);
   const set=(id:string,v:string)=>{if(document.activeElement!==input(id))input(id).value=v;};
   if(room){set('sketch-name',room.name);set('sketch-w',meters(room.w));set('sketch-h',meters(room.h));}
-  if(door)set('sketch-dw',meters(door.w));
-  set('sketch-cw',meters(s.width));set('sketch-ch',meters(s.height));$('sketch-count').textContent=`${s.rooms.length} Raum${s.rooms.length===1?'':'e'} · ${s.doors.length} Tür${s.doors.length===1?'':'en'}`;
+  if(wall){set('sketch-wl',meters(wallLength(wall)));const a=((Math.atan2(wall.y2-wall.y1,wall.x2-wall.x1)*180/Math.PI)%180+180)%180;$('sketch-wall-angle').textContent=`Richtung ${a.toLocaleString('de-DE',{maximumFractionDigits:1})}°`;}
+  if(op){set('sketch-ow',meters(op.w));$('sketch-ow-label').textContent=op.kind==='door'?'Türbreite':'Fensterbreite';$('sketch-door-flip').hidden=op.kind!=='door';}
+  if(text){set('sketch-text',text.text);$<HTMLSelectElement>('sketch-text-size').value=String(TEXT_SIZES.reduce((b,[v])=>Math.abs(v-text.size)<Math.abs(b-text.size)?v:b,30));}
+  set('sketch-cw',meters(s.width));set('sketch-ch',meters(s.height));
+  const doors=s.openings.filter(o=>o.kind==='door').length,windows=s.openings.length-doors;
+  $('sketch-count').textContent=`${s.rooms.length} Raum${s.rooms.length===1?'':'e'} · ${s.walls.length} Wand${s.walls.length===1?'':'e'} · ${doors} Tür${doors===1?'':'en'} · ${windows} Fenster · ${s.texts.length} Text${s.texts.length===1?'':'e'}`;
   $('mode-hint').textContent='Skizze';
 }
-function startSketch(){if(!project?.plan.sketch||busy||cropping||!requireFinished())return;sketching={s:extendSketch(project.plan.sketch),tool:project.plan.sketch.rooms.length?'select':'room',sel:null,drag:null,draft:null};cropping=true;selected=null;selectedArea=null;$('toast').hidden=true;setMode('navigate');$('stage').dataset.mode='sketch';render();renderSketch();fitBelow('sketch-actions');renderSketch();}
+function startSketch(){if(!project?.plan.sketch||busy||cropping||!requireFinished())return;sketching={s:extendSketch(project.plan.sketch),tool:project.plan.sketch.rooms.length||project.plan.sketch.walls.length?'select':'room',sel:null,drag:null,draft:null,draftWall:null};cropping=true;selected=null;selectedArea=null;$('toast').hidden=true;setMode('navigate');$('stage').dataset.mode='sketch';render();renderSketch();fitBelow('sketch-actions');renderSketch();}
 function endSketch(){if(!sketching)return;
-  // Zeichenfläche auf die Räume zuschneiden (1 m Rand); Proben und Flächen wandern mit – ein Rückgängig-Schritt, nur wenn sich etwas ändert.
+  // Zeichenfläche auf den Inhalt zuschneiden (1 m Rand); Proben und Flächen wandern mit – ein Rückgängig-Schritt, nur wenn sich etwas ändert.
   const {sketch,dx,dy}=trimSketch(sketching.s);if(project?.plan.sketch&&(dx||dy||sketch.width!==project.plan.width||sketch.height!==project.plan.height))mutate(p=>{p.plan=sketchPlan(sketch,p.plan);for(const m of p.markers){m.x-=dx;m.y-=dy;m.lx-=dx;m.ly-=dy;}for(const a of p.areas||[])a.points=a.points.map(q=>({x:q.x-dx,y:q.y-dy}));});
   sketching=null;cropping=false;setMode('navigate');renderSketch();render();fit();}
 async function newSketch(asSheet:boolean){
   if(busy||cropping||!requireFinished())return;const plan=sketchPlan(emptySketch());plan.name='Skizze';
   if(asSheet&&project){if(sheetCount(project)>=MAX_SHEETS){toast(`Höchstens ${MAX_SHEETS} Pläne pro Projekt.`,true);return;}mutate(p=>addSheet(p,plan));}
   else{if(!await allowReplace())return;await install(createProject(plan));}
-  startSketch();toast('Raum aufziehen: von Ecke zu Ecke ziehen. Maße lassen sich danach eintippen.');
+  startSketch();
 }
 $('welcome-sketch').onclick=()=>void newSketch(false);
 $('sheet-sketch').onclick=()=>void newSketch(true);
 $('sketch-edit').onclick=startSketch;
-$('sketch-done').onclick=()=>{const n=sketching?.s.rooms.length||0;endSketch();toast(n?'Skizze fertig. Jetzt Proben setzen (P). „Skizze“ links bearbeitet sie weiter.':'Die Skizze ist noch leer. „Skizze“ links öffnet sie wieder.');};
-document.querySelectorAll<HTMLButtonElement>('[data-sketch-tool]').forEach(b=>b.onclick=()=>{if(!sketching)return;sketching.tool=b.dataset.sketchTool as 'room'|'door'|'select';sketching.draft=null;renderSketch();});
-const selRoom=()=>sketching?.sel?.type==='room'?sketching.s.rooms.find(r=>r.id===sketching!.sel!.id):undefined;
-const selDoor=()=>sketching?.sel?.type==='door'?sketching.s.doors.find(d=>d.id===sketching!.sel!.id):undefined;
-const sketchTry=(fn:()=>void)=>{try{fn();previewSketch();commitSketch();}catch(e){if(sketching&&project?.plan.sketch)sketching.s=cloneSketch(project.plan.sketch);previewSketch();renderSketch();toast(e instanceof Error?e.message:String(e),true);}};
+$('sketch-done').onclick=()=>{const s=sketching?.s,n=s?s.rooms.length+s.walls.length:0;endSketch();toast(n?'Skizze fertig. Jetzt Proben setzen (P). „Skizze“ links bearbeitet sie weiter.':'Die Skizze ist noch leer. „Skizze“ links öffnet sie wieder.');};
+document.querySelectorAll<HTMLButtonElement>('[data-sketch-tool]').forEach(b=>b.onclick=()=>{if(!sketching)return;sketching.tool=b.dataset.sketchTool as SketchTool;sketching.draft=null;sketching.draftWall=null;renderSketch();});
+const sketchTry=(fn:()=>void)=>{try{fn();previewSketch();commitSketch();}catch(e){if(sketching&&project?.plan.sketch)sketching.s=extendSketch(project.plan.sketch);previewSketch();renderSketch();toast(e instanceof Error?e.message:String(e),true);}};
+const focusField=(id:string)=>setTimeout(()=>{input(id).focus();input(id).select();},0);
 input('sketch-name').onchange=()=>{const r=selRoom(),v=input('sketch-name').value.replace(/\s+/g,' ').trim().slice(0,60);if(r&&v&&v!==r.name)sketchTry(()=>{r.name=v;});else renderSketch();};
 const roomSize=()=>{const r=selRoom();if(r)sketchTry(()=>resizeRoom(sketching!.s,r.id,metersIn('sketch-w'),metersIn('sketch-h')));};
 input('sketch-w').onchange=roomSize;input('sketch-h').onchange=roomSize;
-input('sketch-dw').onchange=()=>{const d=selDoor();if(d)sketchTry(()=>{const w=metersIn('sketch-dw');if(!Number.isFinite(w)||w<40||w>400)throw Error('Türbreite zwischen 0,40 und 4,00 m.');d.w=Math.round(w/10)*10;});};
-$('sketch-door-flip').onclick=()=>{const d=selDoor();if(d)sketchTry(()=>{d.side=d.side===1?-1:1;});};
-$('sketch-room-delete').onclick=()=>{const r=selRoom();if(r){sketching!.sel=null;sketchTry(()=>removeRoom(sketching!.s,r.id));}};
-$('sketch-door-delete').onclick=()=>{const d=selDoor();if(d){sketching!.sel=null;sketchTry(()=>{sketching!.s.doors=sketching!.s.doors.filter(x=>x.id!==d.id);});}};
+input('sketch-wl').onchange=()=>{const w=selWall();if(w)sketchTry(()=>setWallLength(sketching!.s,w.id,metersIn('sketch-wl')));};
+input('sketch-ow').onchange=()=>{const o=selOpening();if(o)sketchTry(()=>setOpeningWidth(sketching!.s,o.id,metersIn('sketch-ow')));};
+$('sketch-door-flip').onclick=()=>{const o=selOpening();if(o)sketchTry(()=>{o.side=o.side===1?-1:1;});};
+input('sketch-text').onchange=()=>{const t=selText(),v=input('sketch-text').value.replace(/\s+/g,' ').trim().slice(0,80);if(t&&v&&v!==t.text)sketchTry(()=>{t.text=v;});else renderSketch();};
+$<HTMLSelectElement>('sketch-text-size').onchange=()=>{const t=selText();if(t)sketchTry(()=>{t.size=Number($<HTMLSelectElement>('sketch-text-size').value);});};
+const removeSel=()=>{const sk=sketching;if(!sk?.sel)return;const {type,id}=sk.sel;sk.sel=null;sketchTry(()=>{
+  if(type==='room')removeRoom(sk.s,id);else if(type==='wall')removeWall(sk.s,id);else if(type==='opening')sk.s.openings=sk.s.openings.filter(o=>o.id!==id);else sk.s.texts=sk.s.texts.filter(t=>t.id!==id);});};
+for(const id of ['sketch-room-delete','sketch-wall-delete','sketch-opening-delete','sketch-text-delete'])$(id).onclick=removeSel;
 const canvasSize=()=>{if(sketching)sketchTry(()=>resizeCanvas(sketching!.s,metersIn('sketch-cw'),metersIn('sketch-ch')));};
 input('sketch-cw').onchange=canvasSize;input('sketch-ch').onchange=canvasSize;
 svg.addEventListener('pointerdown',e=>{
   if(!sketching||!project||e.button>0)return;e.preventDefault();e.stopPropagation();const sk=sketching,pt=point(e),k=camera.width/Math.max(1,svg.clientWidth);
   const base={id:e.pointerId,start:pt,screen:{x:e.clientX,y:e.clientY},moved:false};
-  if(sk.tool==='room'){sk.drag={...base,kind:'draw'};}
-  else if(sk.tool==='door'){const d=doorAt(sk.s,pt,Math.max(40,k*18));if(!d){toast('Bitte auf eine Wand tippen.',true);return;}sketchTry(()=>{addDoor(sk.s,d);sk.sel={type:'door',id:d.id};});return;}
+  if(sk.tool==='room'||sk.tool==='wall'){sk.drag={...base,kind:'draw'};}
+  else if(sk.tool==='door'||sk.tool==='window'){const o=openingAt(sk.s,pt,sk.tool,Math.max(40,k*18));if(!o){toast('Bitte auf eine Wand tippen.',true);return;}sketchTry(()=>{addOpening(sk.s,o);sk.sel={type:'opening',id:o.id};});return;}
+  else if(sk.tool==='text'){if(pt.x<0||pt.y<0||pt.x>sk.s.width||pt.y>sk.s.height)return;let t:SketchText|null=null;sketchTry(()=>{t=addText(sk.s,pt);sk.sel={type:'text',id:t.id};sk.tool='select';});if(t)focusField('sketch-text');return;}
   else{const r=selRoom();
     if(r&&Math.abs(pt.x-(r.x+r.w))<k*14&&Math.abs(pt.y-(r.y+r.h))<k*14)sk.drag={...base,kind:'resize',room:{...r}};
     else{const h=hit(sk.s,pt,Math.max(15,k*10));sk.sel=h;
-      if(h?.type==='room'){const room=sk.s.rooms.find(x=>x.id===h.id)!;sk.drag={...base,kind:'move',room:{...room}};}
+      if(h?.type==='room')sk.drag={...base,kind:'move',room:{...sk.s.rooms.find(x=>x.id===h.id)!}};
+      else if(h?.type==='wall')sk.drag={...base,kind:'move',wall:{...sk.s.walls.find(x=>x.id===h.id)!}};
+      else if(h?.type==='text')sk.drag={...base,kind:'move',text:{...sk.s.texts.find(x=>x.id===h.id)!}};
       else if(!h)sk.drag={...base,kind:'pan',cam:{...camera}};}
     renderSketch();}
   svg.setPointerCapture(e.pointerId);
@@ -408,22 +431,24 @@ svg.addEventListener('pointermove',e=>{
   const sk=sketching;if(!sk?.drag||sk.drag.id!==e.pointerId||!project)return;e.stopPropagation();const d=sk.drag;
   if(Math.hypot(e.clientX-d.screen.x,e.clientY-d.screen.y)>4)d.moved=true;if(!d.moved)return;
   if(d.kind==='pan'){const rect=svg.getBoundingClientRect();camera={...d.cam!,x:d.cam!.x-(e.clientX-d.screen.x)/rect.width*d.cam!.width,y:d.cam!.y-(e.clientY-d.screen.y)/rect.height*d.cam!.height};updateCamera();return;}
-  const pt=point(e);
-  if(d.kind==='draw'){sk.draft=roomFrom(sk.s,d.start,pt);renderSketch();return;}
-  if(d.kind==='move'&&d.room){moveRoom(sk.s,d.room.id,pt.x-d.start.x,pt.y-d.start.y,d.room);}
-  if(d.kind==='resize'&&d.room){try{resizeRoom(sk.s,d.room.id,d.room.w+pt.x-d.start.x,d.room.h+pt.y-d.start.y);}catch{/* weiterziehen */}}
+  const pt=point(e),dx=pt.x-d.start.x,dy=pt.y-d.start.y;
+  if(d.kind==='draw'){if(sk.tool==='wall')sk.draftWall=wallFrom(sk.s,d.start,pt);else sk.draft=roomFrom(sk.s,d.start,pt);renderSketch();return;}
+  if(d.kind==='move'){if(d.room)moveRoom(sk.s,d.room.id,dx,dy,d.room);else if(d.wall)moveWall(sk.s,d.wall.id,dx,dy,d.wall);else if(d.text)moveText(sk.s,d.text.id,dx,dy,d.text);}
+  if(d.kind==='resize'&&d.room){try{resizeRoom(sk.s,d.room.id,d.room.w+dx,d.room.h+dy);}catch{/* weiterziehen */}}
   previewSketch();renderSketch();
 },{capture:true});
 const sketchDrop=(e:PointerEvent)=>{
   const sk=sketching;if(!sk?.drag||sk.drag.id!==e.pointerId)return;const d=sk.drag;sk.drag=null;
-  if(d.kind==='draw'){const r=sk.draft;sk.draft=null;if(r&&d.moved){sketchTry(()=>{addRoom(sk.s,r);sk.sel={type:'room',id:r.id};sk.tool='select';});setTimeout(()=>{input('sketch-name').focus();input('sketch-name').select();},0);}else renderSketch();return;}
+  if(d.kind==='draw'){
+    if(sk.tool==='wall'){const w=sk.draftWall;sk.draftWall=null;if(w&&d.moved){sketchTry(()=>{addWall(sk.s,w);sk.sel={type:'wall',id:w.id};});}else renderSketch();return;}
+    const r=sk.draft;sk.draft=null;if(r&&d.moved){sketchTry(()=>{addRoom(sk.s,r);sk.sel={type:'room',id:r.id};sk.tool='select';});focusField('sketch-name');}else renderSketch();return;}
   if((d.kind==='move'||d.kind==='resize')&&d.moved)sketchTry(()=>{});else renderSketch();
 };
-svg.addEventListener('pointerup',sketchDrop,{capture:true});svg.addEventListener('pointercancel',e=>{if(sketching?.drag?.id===e.pointerId){sketching.drag=null;sketching.draft=null;if(project?.plan.sketch)sketching.s=cloneSketch(project.plan.sketch);previewSketch();renderSketch();}},{capture:true});
+svg.addEventListener('pointerup',sketchDrop,{capture:true});svg.addEventListener('pointercancel',e=>{if(sketching?.drag?.id===e.pointerId){sketching.drag=null;sketching.draft=null;sketching.draftWall=null;if(project?.plan.sketch)sketching.s=extendSketch(project.plan.sketch);previewSketch();renderSketch();}},{capture:true});
 window.addEventListener('keydown',e=>{
   if(!sketching||e.ctrlKey||e.metaKey||e.altKey)return;const t=e.target;if(t instanceof Element&&t.closest('input,textarea,select'))return;
-  if(e.key==='Escape'){e.preventDefault();if(sketching.draft||sketching.sel){sketching.draft=null;sketching.sel=null;renderSketch();}else $('sketch-done').click();}
-  else if((e.key==='Delete'||e.key==='Backspace')&&sketching.sel){e.preventDefault();(sketching.sel.type==='room'?$('sketch-room-delete'):$('sketch-door-delete')).click();}
+  if(e.key==='Escape'){e.preventDefault();if(sketching.draft||sketching.draftWall||sketching.sel){sketching.draft=null;sketching.draftWall=null;sketching.sel=null;renderSketch();}else $('sketch-done').click();}
+  else if((e.key==='Delete'||e.key==='Backspace')&&sketching.sel){e.preventDefault();removeSel();}
 });
 function render(){
   const p=project;labUI?.render(p); $('welcome').hidden=!!p;$('mode-hint').hidden=!p;if(!p){renderSheets();renderResults();updateSizeUI();updateLabelUI();updateScaleUI();}
@@ -511,7 +536,7 @@ $('recenter').onclick=()=>{const m=selectedMarker();if(m)mutate(()=>{m.lx=m.x;m.
 function restored(old:Project['plan'],floor:number|undefined){if(!project)return;changed();if(old.data!==project.plan.data||old.width!==project.plan.width||old.height!==project.plan.height||floor!==project.active)fit();}
 function undoable(){return !cropping||(!!sketching&&!sketching.drag);}
 /** Rückgängig während der Skizze: Arbeitskopie neu aus dem Projekt; ohne Skizze (z. B. Plan entfernt) endet der Skizzenmodus. */
-function resyncSketch(){if(!sketching)return;if(project?.plan.sketch){sketching.s=extendSketch(project.plan.sketch);sketching.sel=null;sketching.draft=null;renderSketch();}else endSketch();}
+function resyncSketch(){if(!sketching)return;if(project?.plan.sketch){sketching.s=extendSketch(project.plan.sketch);sketching.sel=null;sketching.draft=null;sketching.draftWall=null;renderSketch();}else endSketch();}
 function undo(){if(project&&undoable()&&requireFinished()){const old=project.plan,floor=project.active;project=history.undo(project);restored(old,floor);resyncSketch();}}function redo(){if(project&&undoable()&&requireFinished()){const old=project.plan,floor=project.active;project=history.redo(project);restored(old,floor);resyncSketch();}}
 $('undo').onclick=undo;$('redo').onclick=redo;
 window.addEventListener('keydown',e=>{

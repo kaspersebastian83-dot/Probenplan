@@ -285,3 +285,5 @@ dialog.export-card label.export-check input{width:auto;margin:0}
 #sketch-actions{padding:6px 10px;gap:5px}
 #sketch-actions button{min-height:30px;padding:3px 10px;font-size:12px}
 #sketch-actions #sketch-hint{flex:1;min-width:160px}
+#sketch-actions #sketch-hint{margin:0;color:var(--kit-muted)}
+#sketch-actions select{min-height:30px}

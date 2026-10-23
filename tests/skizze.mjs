@@ -18,7 +18,7 @@ for(const engine of engines){
   await check(`${engine}: „Kein Plan? Skizze zeichnen“ öffnet eine leere Skizze mit Maßstab`,async()=>{
    await page.locator('#welcome-sketch').click();await page.locator('#sketch-actions').waitFor();
    assert.equal(await page.locator('[data-sketch-tool="room"]').getAttribute('aria-pressed'),'true');
-   const s=await savedProject(page);assert.deepEqual(s.plan.sketch,{width:2500,height:1800,rooms:[],doors:[]});assert.deepEqual(s.plan.calibration,{units:100,meters:1});assert.equal(s.plan.vector,true);
+   const s=await savedProject(page);assert.deepEqual(s.plan.sketch,{width:2500,height:1800,rooms:[],walls:[],openings:[],texts:[]});assert.deepEqual(s.plan.calibration,{units:100,meters:1});assert.equal(s.plan.vector,true);
   });
   await check(`${engine}: Raum aufziehen (Raster 10 cm), Name eintippen; zweiter Raum rastet an der Wand ein`,async()=>{
    await drag(page,[103,98],[521,488]);
@@ -36,11 +36,28 @@ for(const engine of engines){
   });
   await check(`${engine}: Tür auf die gemeinsame Wand, Aufschlag wechseln, löschen und Rückgängig`,async()=>{
    await blur(page);await page.locator('[data-sketch-tool="door"]').click();await tapPlan(page,515,300);
-   let s=(await savedProject(page)).plan.sketch;assert.equal(s.doors.length,1);assert.deepEqual([s.doors[0].x,s.doors[0].dir,s.doors[0].w],[520,'v',90]);
-   if(process.env.SHOT){await page.locator('[data-sketch-tool="select"]').click();await tapPlan(page,300,200);await page.waitForTimeout(200);await page.screenshot({path:process.env.SHOT+'-1.png'});const d=(await savedProject(page)).plan.sketch.doors[0];await tapPlan(page,d.x,d.y);}
-   const side=s.doors[0].side;await page.locator('#sketch-door-flip').click();s=(await savedProject(page)).plan.sketch;assert.equal(s.doors[0].side,-side);
-   await blur(page);await page.keyboard.press('Delete');assert.equal((await savedProject(page)).plan.sketch.doors.length,0);
-   await page.keyboard.press('Control+z');assert.equal((await savedProject(page)).plan.sketch.doors.length,1,'Rückgängig auch im Skizzenmodus');
+   let s=(await savedProject(page)).plan.sketch;assert.equal(s.openings.length,1);assert.deepEqual([s.openings[0].kind,s.openings[0].x,s.openings[0].a,s.openings[0].w],['door',520,90,90]);
+   if(process.env.SHOT){await page.locator('[data-sketch-tool="select"]').click();await tapPlan(page,300,200);await page.waitForTimeout(200);await page.screenshot({path:process.env.SHOT+'-1.png'});const d=(await savedProject(page)).plan.sketch.openings[0];await tapPlan(page,d.x,d.y);}
+   const side=s.openings[0].side;await page.locator('#sketch-door-flip').click();s=(await savedProject(page)).plan.sketch;assert.equal(s.openings[0].side,-side);
+   await blur(page);await page.keyboard.press('Delete');assert.equal((await savedProject(page)).plan.sketch.openings.length,0);
+   await page.keyboard.press('Control+z');assert.equal((await savedProject(page)).plan.sketch.openings.length,1,'Rückgängig auch im Skizzenmodus');
+  });
+  await check(`${engine}: schräge Wand (rastet auf 30° ein), Länge eintippen; Fenster auf der Außenwand; Text „Treppe“`,async()=>{
+   await page.locator('[data-sketch-tool="wall"]').click();await drag(page,[102,603],[497,836]);
+   let s=(await savedProject(page)).plan.sketch,w=s.walls[0];assert.equal(s.walls.length,1);assert.deepEqual([w.x1,w.y1],[100,600]);
+   assert.ok(Math.abs(Math.atan2(w.y2-w.y1,w.x2-w.x1)*180/Math.PI-30)<.01,'30°');const len=Math.hypot(w.x2-w.x1,w.y2-w.y1);assert.ok(Math.abs(len/10-Math.round(len/10))<.05&&len>440&&len<490,`Länge ${len} in 10-cm-Schritten`);
+   assert.equal(await page.locator('#sketch-wl').inputValue(),(Math.round(len)/100).toLocaleString('de-DE',{minimumFractionDigits:2}));await page.locator('#sketch-wl').fill('5,00');await page.locator('#sketch-wl').press('Enter');
+   w=(await savedProject(page)).plan.sketch.walls[0];assert.ok(Math.abs(Math.hypot(w.x2-w.x1,w.y2-w.y1)-500)<.5);
+   await blur(page);await page.locator('[data-sketch-tool="window"]').click();await tapPlan(page,300,486);
+   s=(await savedProject(page)).plan.sketch;const win=s.openings.find(o=>o.kind==='window');assert.deepEqual([win.x,win.y,win.a,win.w],[300,490,0,120]);
+   assert.equal(await page.locator('#sketch-ow-label').textContent(),'Fensterbreite');assert.equal(await page.locator('#sketch-door-flip').isVisible(),false);
+   // Fenster auf der schrägen Wand: Mitte der Wand antippen
+   w=(await savedProject(page)).plan.sketch.walls[0];await blur(page);await page.locator('[data-sketch-tool="window"]').click();await tapPlan(page,(w.x1+w.x2)/2,(w.y1+w.y2)/2);
+   s=(await savedProject(page)).plan.sketch;assert.ok(s.openings.some(o=>o.kind==='window'&&Math.abs(o.a-30)<.01),'Fenster auf der schrägen Wand');
+   await blur(page);await page.locator('[data-sketch-tool="text"]').click();await tapPlan(page,650,700);
+   await page.waitForFunction(()=>document.activeElement?.id==='sketch-text',null,{timeout:2000});
+   await page.locator('#sketch-text').fill('Treppe');await page.locator('#sketch-text').press('Enter');await page.locator('#sketch-text-size').selectOption('45');
+   s=(await savedProject(page)).plan.sketch;assert.deepEqual(s.texts.map(t=>[t.text,t.x,t.y,t.size]),[['Treppe',650,700,45]]);
   });
   await check(`${engine}: Skizze fertig – Proben setzen wie auf jedem Plan; Drehen/Zuschnitt gesperrt`,async()=>{
    await page.locator('#sketch-done').click();assert.equal(await page.locator('#sketch-actions').isVisible(),false);
@@ -48,17 +65,17 @@ for(const engine of engines){
    const s=await savedProject(page);assert.equal(s.markers.length,1);assert.ok(Math.abs(s.markers[0].x-300)<3&&Math.abs(s.markers[0].y-300)<3);
    assert.equal(await page.locator('#rotate-right').isDisabled(),true);assert.equal(await page.locator('#warp-start').isDisabled(),true);
    assert.equal(await page.locator('#sketch-edit').isVisible(),true);
-   assert.deepEqual([s.plan.width,s.plan.height],[880,590],'Zeichenfläche auf die Räume zugeschnitten (1 m Rand)');
+   assert.deepEqual([s.plan.width,s.plan.height],[880,950],'Zeichenfläche auf den Inhalt zugeschnitten (1 m Rand)');
    if(process.env.SHOT){await page.waitForTimeout(500);await page.screenshot({path:process.env.SHOT+'-2.png'});}
    // Planbild enthält Raumnamen und Fläche
-   const svgText=await page.evaluate(d=>new TextDecoder().decode(Uint8Array.from(atob(d.split(',')[1]),c=>c.charCodeAt(0))),s.plan.data);assert.match(svgText,/Wohnen/);assert.match(svgText,/Küche/);assert.match(svgText,/16,4 m²/);
+   const svgText=await page.evaluate(d=>new TextDecoder().decode(Uint8Array.from(atob(d.split(',')[1]),c=>c.charCodeAt(0))),s.plan.data);assert.match(svgText,/Wohnen/);assert.match(svgText,/Küche/);assert.match(svgText,/Treppe/);assert.match(svgText,/rotate\(30\)/);assert.match(svgText,/16,4 m²/);
   });
   await check(`${engine}: später weiter bearbeiten – Raum verschieben, Proben bleiben an ihrer Stelle`,async()=>{
    await page.locator('#sketch-edit').click();await page.locator('#sketch-actions').waitFor();
    assert.equal(await page.locator('[data-sketch-tool="select"]').getAttribute('aria-pressed'),'true');
    await drag(page,[650,250],[650,350]);   // Küche 1 m nach unten
    const s=await savedProject(page);assert.equal(s.plan.sketch.rooms[1].y,200);assert.ok(Math.abs(s.markers[0].x-300)<3&&Math.abs(s.markers[0].y-300)<3);
-   assert.deepEqual(s.plan.sketch.doors.map(d=>[d.x,d.y]),[[520,400]],'Tür auf der Küchenwand wandert mit');
+   assert.deepEqual(s.plan.sketch.openings.filter(o=>o.kind==='door').map(d=>[d.x,d.y]),[[520,400]],'Tür auf der Küchenwand wandert mit');
   });
   await check(`${engine}: Maßstab im Export (PDF A4 mit genormtem Maßstab)`,async()=>{
    await page.locator('#sketch-done').click();await page.locator('#export-open').click();await page.locator('#export').waitFor();
@@ -75,7 +92,7 @@ for(const engine of engines){
   });
   await check(`${engine}: „＋ Skizze“ legt einen weiteren Plan an`,async()=>{
    await page.locator('#sheet-sketch').click();await page.locator('#sketch-actions').waitFor();
-   const s=await savedProject(page);assert.equal(s.sheets.length,2);assert.deepEqual(s.plan.sketch.rooms,[]);
+   const s=await savedProject(page);assert.equal(s.sheets.length,2);assert.deepEqual(s.plan.sketch.rooms,[]);assert.deepEqual(s.plan.sketch.walls,[]);
    await page.locator('#sketch-done').click();
   });
   assert.deepEqual(errors,[]);
