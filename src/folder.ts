@@ -2,7 +2,7 @@
 // Gemeinsame Absprache mit Projektzentrale und FotoKit (dort identisch halten):
 //  • IndexedDB „mosaik-suite“ v1, Store „kv“, Schlüssel „archiv“ → Handle des Ordners „Mosaik Archivordner“
 //    (alle Apps unter kaspersebastian83-dot.github.io teilen diese Datenbank)
-//  • Projektordner „<JJ>.<Nummer> <Schadenort>“, Pläne im Unterordner „Pläne“, Laborberichte in „Laborergebnisse“
+//  • Projektordner „<JJ>.<Nummer> <Schadenort> <Kürzel>“, Pläne im Unterordner „Pläne“, Laborberichte in „Laborergebnisse“
 //  • _Projekt.json im Projektordner: gemeinsame Projektdaten – PlanKit liest sie nur.
 type Mode={mode:'read'|'readwrite'};
 type Handle=FileSystemHandle&{queryPermission?:(m:Mode)=>Promise<PermissionState>;requestPermission?:(m:Mode)=>Promise<PermissionState>};
@@ -12,7 +12,41 @@ export interface FolderFile {name:string;handle:FileSystemFileHandle;lastModifie
 export const PLAENE='Pläne',LABOR='Laborergebnisse',AUFTRAEGE='Laboraufträge',PJ_FILE='_Projekt.json';
 export const supported=()=>'showDirectoryPicker' in window;
 
-export function parseProjName(name:string){const m=/^(\d{2})\.(\d{2,6})(?:[\s_-]+(.*))?$/.exec(String(name).normalize('NFC').trim());return m?{nr:`${m[1]}.${m[2]}`,ort:(m[3]||'').trim()}:null;}
+/* SPEKTRON-ORDNERNAME v1 – wie in Projektzentrale, FotoKit, LabelKit und BelegKit (dort identisch gehalten).
+   Liest „JJ.Nummer Ort Kürzel“ von hinten: Am Ende wird ein Kürzel der Mitarbeiterliste gesucht (bis zu drei Wörter, längster
+   Treffer zuerst; ohne Groß-/Kleinschreibung, Leerzeichen und Punkte). Alles davor ist der Ort. Ohne Liste wird nichts abgetrennt. */
+export interface Person{ordnerKuerzel:string;appKuerzel?:string;name?:string;aktiv?:boolean}
+const maNorm=(s:unknown)=>String(s??'').normalize('NFC').toLowerCase().replace(/[\s.]+/g,'');
+let personen:Person[]|null=null;
+export function setPersonen(p:Person[]|null){personen=p;}
+export function leseProjektordner(name:string,liste:Person[]|null=personen){
+ const m=/^(\d{2})\.(\d{2,6})(?:[\s_-]+(.*))?$/.exec(String(name).normalize('NFC').trim());if(!m)return null;
+ const rest=(m[3]||'').trim(),r={nr:`${m[1]}.${m[2]}`,ort:rest,kuerzel:'',hinweis:''};
+ if(!Array.isArray(liste)||!liste.length)return r;
+ const woerter=[...rest.matchAll(/[^\s_]+/g)];
+ for(let n=Math.min(3,woerter.length);n>=1;n--){
+  const ende=maNorm(woerter.slice(-n).map(w=>w[0]).join(''));
+  const p=liste.find(x=>x&&maNorm(x.ordnerKuerzel)===ende);
+  if(!p)continue;
+  r.kuerzel=String(p.ordnerKuerzel).trim();r.ort=rest.slice(0,woerter[woerter.length-n].index).replace(/[\s_-]+$/,'');
+  if(!r.ort)r.hinweis='Im Ordnernamen fehlt der Ort.';
+  return r;
+ }
+ r.hinweis=rest?'Kein bekanntes Kürzel am Ende des Ordnernamens.':'Im Ordnernamen fehlen Ort und Kürzel.';
+ return r;
+}
+export function parseProjName(name:string){const r=leseProjektordner(name);return r?{nr:r.nr,ort:r.ort}:null;}
+/** Mitarbeiterliste der Projektzentrale (<Archivordner>/_Spektron-Mitarbeiter.json) – PlanKit liest sie nur. */
+export const MA_FILE='_Spektron-Mitarbeiter.json';
+export async function personenLaden(){
+ setPersonen(null);
+ try{
+  const root=await archiv() as (Dir&{queryPermission?:(m:Mode)=>Promise<PermissionState>})|null;
+  if(!root||(root.queryPermission&&await root.queryPermission({mode:'read'})!=='granted'))return;
+  const o=JSON.parse(await (await (await root.getFileHandle(MA_FILE)).getFile()).text());
+  if(o&&o.format==='spektron-mitarbeiter'&&Array.isArray(o.personen))setPersonen(o.personen.filter((p:Person)=>p&&typeof p.ordnerKuerzel==='string'&&p.ordnerKuerzel.trim()));
+ }catch{/* keine Liste: Ordnername wie bisher */}
+}
 export const projectFileName=(f:ProjectFolder)=>`Probenplan ${f.name}.probenplan`;
 export const safeName=(s:string)=>s.replace(/[<>:"/\\|?*]/g,'_').trim();
 
@@ -36,6 +70,7 @@ export async function readProjectData(f:ProjectFolder):Promise<Record<string,unk
 
 /** Projektordner öffnen; legt „Pläne“ bei Bedarf an (create). */
 export async function openFolder(dir:Dir,create:boolean):Promise<ProjectFolder|'no-plaene'>{
+  await personenLaden();
   const p=parseProjName(dir.name);if(!p)throw Error(`„${dir.name}“ ist kein Projektordner (erwartet z. B. „26.0123 Köln“).`);
   let plaene=await findSubdir(dir,PLAENE);if(!plaene){if(!create)return 'no-plaene';plaene=await dir.getDirectoryHandle(PLAENE,{create:true}) as Dir;}
   return {dir,name:dir.name,nr:p.nr,ort:p.ort,plaene};
