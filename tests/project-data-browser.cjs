@@ -97,6 +97,8 @@ let browser,server;
  await scenario('A: Lesefehler erhält ALT mit dauerhaft sichtbarer Warnung',async t=>{
   await t.open('A');t.put('A',pj('NEU'));t.faults[names.A]={name:'NetworkError'};await t.refresh();
   assert.equal((await t.status()).data.objekt,'ALT');assert.equal((await t.status()).stale,true);assert.equal((await t.status()).status,'network');assert.match(await t.page.locator(t.warning).textContent(),/möglicherweise veraltet/);
+  // The suite bar refreshes asynchronously after the reader button is enabled.
+  await t.page.waitForFunction(()=>/ALT.*möglicherweise veraltet/.test(document.querySelector('#mosaikLeiste .ml-obj')?.textContent||''),undefined,{timeout:5000});
   assert.match(await t.page.locator('#mosaikLeiste .ml-obj').textContent(),/ALT.*möglicherweise veraltet/);
   if(!plan){await t.page.evaluate(()=>fbVorbelegen(true));assert.doesNotMatch(await t.page.locator('#flash').textContent().catch(()=>''),/übernommen ✓/);}
  });
