@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.21.0 – 23. Oktober 2026
+
+- **Skizze, wenn kein Plan vorliegt**: Startseite „Kein Plan? Skizze zeichnen“ bzw. unten „＋ Skizze“ für ein weiteres Geschoss. Räume als Rechtecke aufziehen (Raster 10 cm, Räume rasten an vorhandenen Wänden ein), Name, Breite und Tiefe in Metern eintippen; Türen per Tipp auf eine Wand (0,90 m, Aufschlag wechselbar). Räume verschieben und in der Größe ändern, löschen mit Entf; Rückgängig auch während des Zeichnens. „Skizze fertig“ schneidet die Zeichenfläche auf die Räume zu (1 m Rand). Ergebnis ist ein normaler Vektorplan mit Raumnamen, Fläche in m² und automatisch gesetztem Maßstab – maßstäbliches PDF, Proben, Beschriftung und Anlage funktionieren wie bei jedem Plan. „Skizze“ links bearbeitet sie später weiter; Proben bleiben an ihrer Stelle. Drehen, Zuschneiden, Ausrichten und Entzerren sind bei Skizzen gesperrt.
+- „Speichern“ bleibt während des Skizzierens möglich.
+
 ## 1.20.0 – 23. Oktober 2026
 
 - **Entzerren** (W, links in der Leiste): schräg fotografierte Pläne – etwa der Fluchtplan im Treppenhaus – über vier Ecken gerade rechnen. Ecken antippen oder ziehen, die Lupe zeigt die Ecke vergrößert; die Ansicht lässt um alle Ecken Platz. Seitenverhältnis wie im Foto (geschätzt) oder DIN quer/hoch. Ergebnis ist ein gerades Rasterbild (höchstens 4.600 px bzw. 16 Megapixel); Proben, Beschriftungen und Flächen werden mitgerechnet. Ein vorhandener Maßstab und die Nordrichtung werden entfernt (neu messen bzw. setzen). Rückgängig stellt das Foto wieder her; die Fotodatei selbst bleibt unverändert, im Projektordner zusätzlich als „(vorher …)“-Kopie des Projekts.

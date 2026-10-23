@@ -268,3 +268,20 @@ dialog.export-card label.export-check input{width:auto;margin:0}
 #stage.warping #drawing{cursor:crosshair}
 #warp-actions .warp-buttons{display:flex;gap:8px}
 #stage[data-mode=warp] #mode-hint{visibility:hidden}
+
+/* Skizze */
+.welcome-sketch{margin-top:8px;background:transparent;border:1px dashed var(--kit-accent);color:var(--kit-accent)}
+#sketch-actions{position:absolute;top:56px;left:50%;transform:translateX(-50%);margin:0;z-index:3;background:#fff;border:1px solid var(--kit-line2);border-radius:8px;box-shadow:0 2px 8px rgba(40,72,116,.15);padding:8px 12px;display:flex;flex-direction:column;gap:6px;width:min(760px,calc(100% - 24px))}
+#sketch-actions[hidden],#sketch-actions [hidden]{display:none!important}
+#sketch-actions .align-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#sketch-actions label{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600}
+#sketch-actions input{min-height:30px;padding:3px 6px}
+#sketch-actions #sketch-name{width:140px}
+#sketch-actions .sketch-tools{display:flex;gap:4px}
+#sketch-actions .sketch-tools button[aria-pressed=true]{background:var(--kit-accent);color:#fff;border-color:var(--kit-accent)}
+#sketch-actions #sketch-done{margin-left:auto}
+#sketch-hint{color:var(--kit-muted)}
+#stage.sketching #drawing{cursor:crosshair}
+#sketch-actions{padding:6px 10px;gap:5px}
+#sketch-actions button{min-height:30px;padding:3px 10px;font-size:12px}
+#sketch-actions #sketch-hint{flex:1;min-width:160px}
