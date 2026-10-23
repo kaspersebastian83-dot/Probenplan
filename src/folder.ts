@@ -25,7 +25,14 @@ export async function findSubdir(dir:Dir,name:string):Promise<Dir|null>{try{retu
 export async function listFiles(dir:Dir,pattern:RegExp):Promise<FolderFile[]>{const out:FolderFile[]=[];for await(const h of dir.values())if(h.kind==='file'&&pattern.test(h.name)){const f=await (h as FileSystemFileHandle).getFile();out.push({name:h.name,handle:h as FileSystemFileHandle,lastModified:f.lastModified});}return out.sort((a,b)=>b.lastModified-a.lastModified);}
 export async function fileInfo(dir:Dir,name:string){try{const h=await dir.getFileHandle(name);return await h.getFile();}catch(e){if((e as DOMException).name==='NotFoundError')return null;throw e;}}
 export async function writeFile(dir:Dir,name:string,data:Blob|string){const h=await dir.getFileHandle(name,{create:true}),w=await h.createWritable();try{await w.write(data);await w.close();}catch(e){await w.abort().catch(()=>{});throw e;}return (await h.getFile()).lastModified;}
-export async function readProjectData(f:ProjectFolder):Promise<Record<string,unknown>>{try{const file=await fileInfo(f.dir,PJ_FILE);const text=file?await file.text():'';return text.trim()?JSON.parse(text):{};}catch{return {};}}
+/** Read errors must propagate; an empty object is only valid JSON or a verified missing file. */
+export async function readProjectData(f:ProjectFolder):Promise<Record<string,unknown>>{
+ const file=await fileInfo(f.dir,PJ_FILE);
+ if(!file){for await(const h of f.dir.values())if(h.name===PJ_FILE)throw Error('Die vorhandene _Projekt.json ist nicht lesbar.');return {};}
+ const data:unknown=JSON.parse(await file.text());
+ if(!data||typeof data!=='object'||Array.isArray(data))throw Error('Ungültige gemeinsame Projektdaten.');
+ return data as Record<string,unknown>;
+}
 
 /** Projektordner öffnen; legt „Pläne“ bei Bedarf an (create). */
 export async function openFolder(dir:Dir,create:boolean):Promise<ProjectFolder|'no-plaene'>{
