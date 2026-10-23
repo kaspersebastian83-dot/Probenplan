@@ -4,6 +4,7 @@
 // „Aktualisieren“ um Labordaten und Messwerte ergänzt.
 import {blankReport,validDate,type LabReport} from './labreport';
 import type {LabSample} from './model';
+import {parseProjName} from './folder';
 
 type Probe={_nr?:unknown;chloridNr?:unknown;id?:unknown;matrix?:string;datum?:string;z2?:string;z3?:string;z4?:string;cm2?:string|number;tiefe?:string;bkBez?:string;bkVon?:string|number;bkBis?:string|number;bkGesamt?:string|number;bkRueck?:string};
 const LISTS:[string,string][]=[['proben','PAK'],['chloridProben','Chlorid'],['asbestProben','Asbest'],['sonstigeProben','Sonstige']];
@@ -15,11 +16,16 @@ function description(p:Probe){
 }
 function isoDate(v:unknown){const s=str(v);if(validDate(s))return s;const m=/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(s);if(m){const iso=`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;if(validDate(iso))return iso;}return '';}
 
-/** LabelKit-Projektdatei → Prüfliste (ohne Messwerte). */
-export function labelkitReport(text:string,quelle:string,project:string):LabReport{
+/** LabelKit-Projektdatei → Prüfliste (ohne Messwerte). null bezeichnet ausdrücklich einen freien Plan ohne Projektzuordnung. */
+export function labelkitReport(text:string,quelle:string,project:string|null,confirmMissingProject?:(message:string)=>boolean):LabReport{
   let data:Record<string,unknown>;try{data=JSON.parse(text);}catch{throw Error(`„${quelle}“ ist keine gültige LabelKit-Projektdatei.`);}
   if(!data||typeof data!=='object'||!LISTS.some(([k])=>Array.isArray(data[k])))throw Error(`„${quelle}“ enthält keine Proben aus LabelKit.`);
-  const report=blankReport();report.quelle=quelle;report.labor='LabelKit (Probenerfassung)';report.bericht='';report.auftragsreferenz=project;report.sources={};
+  const target=project===null?undefined:parseProjName(project)?.nr;
+  const nr=String((data.projekt as {nr?:unknown}|null)?.nr??'').trim();
+  if(project!==null&&!target)throw Error('LabelKit-Import blockiert: Die Projektnummer des aktiven Projekts ist nicht erkennbar. Bitte den passenden Projektordner öffnen.');
+  if(target&&nr&&nr!==target)throw Error(`Projektzuordnung blockiert: „${quelle}“ gehört zu Projekt ${nr}, das aktive Projekt zu ${target}. Bitte die Datei und den Projektordner prüfen und das passende Projekt öffnen.`);
+  if(!nr&&!confirmMissingProject?.(`„${quelle}“ enthält keine Projektnummer (ältere Datei). ${target?`Die Zugehörigkeit zu Projekt ${target}`:'Die Zugehörigkeit zum geöffneten freien Plan'} kann nicht automatisch geprüft werden.\n\nHaben Sie die Datei geprüft und gehört sie zu diesem Projekt? Nur dann mit OK übernehmen.`))throw Error('LabelKit-Import abgebrochen: Die Datei ohne Projektnummer wurde nicht ausdrücklich dem aktiven Projekt zugeordnet.');
+  const report=blankReport();report.quelle=quelle;report.labor='LabelKit (Probenerfassung)';report.bericht='';report.auftragsreferenz=nr||target||'';report.sources={};
   const seen=new Set<number>();
   for(const [key,type] of LISTS)for(const raw of (Array.isArray(data[key])?data[key] as Probe[]:[])){
     if(!raw||typeof raw!=='object')continue;const n=number(raw);
