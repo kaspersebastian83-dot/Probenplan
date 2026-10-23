@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.18.0 – 23. Oktober 2026
+
+- Projektordner „26.0123 Köln Nad“: Mit der Mitarbeiterliste der Projektzentrale (im Archivordner) steht der Ort ohne Kürzel – in der Projektanzeige und in der Word-Anlage Probenahme („Projekt … · Ort“). PlanKit liest die Liste nur; ohne Liste unverändert.
+
 ## 1.17.0 – 23. Oktober 2026
 
 - Die Spektron-Leiste oben zeigt „Nr. Ort · zuständige Person“: Liegt im Archivordner die Mitarbeiterliste der Projektzentrale, wird das Kürzel am Ende des Projektordners erkannt und mit Namen angezeigt; eine in der Projektzentrale abweichend gewählte Person hat Vorrang.
