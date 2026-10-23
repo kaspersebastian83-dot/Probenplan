@@ -35,7 +35,7 @@ export interface Area { id:string; label:string; name:string; color:string; opac
 export interface Preparation { sourceWidth:number; sourceHeight:number; rotation:0|90|180|270; crop:Rect; angle?:number }
 /** Maßstab je Plan: eine gemessene Strecke in Planeinheiten und ihre wahre Länge in Metern. Drehen/Zuschneiden ändern die Einheit nicht. */
 export interface Calibration { units:number; meters:number }
-export interface Plan { name: string; width: number; height: number; data: string; vector: boolean; markerScale?:number; calibration?:Calibration; north?:number; preparation?:Preparation; pdf?:{page:number; totalPages:number; renderLongSide:number} }
+export interface Plan { name: string; width: number; height: number; data: string; vector: boolean; markerScale?:number; autoLabels?:false; valueLabels?:true; calibration?:Calibration; north?:number; preparation?:Preparation; pdf?:{page:number; totalPages:number; renderLongSide:number} }
 // Mehrere Pläne (Geschosse) ab Format 5: Der aktive Plan steht wie bisher in plan/markers/areas,
 // in sheets[active] nur Kennung und Name. Alle anderen Pläne liegen vollständig in sheets.
 export interface Sheet { id:string; name:string; plan?:Plan; markers?:Marker[]; areas?:Area[] }
@@ -79,7 +79,7 @@ export function markerSize(p: Project) { return Math.max(p.plan.width,p.plan.hei
 export function labelRadius(p: Project,m:Marker) { return markerSize(p)*Math.max(1,m.label.length*.34); }
 export function bounds(p:Project) {
   let x=0,y=0,right=p.plan.width,bottom=p.plan.height; const r=markerSize(p);
-  for(const m of p.markers){const rx=(m.kind==='fire'?r*1.4:labelRadius(p,m)*(shapeOf(m)==='diamond'?1.2:1))+r*.3;x=Math.min(x,m.x-r,m.lx-rx);y=Math.min(y,m.y-r,m.ly-r*1.5);right=Math.max(right,m.x+r,m.lx+rx);bottom=Math.max(bottom,m.y+r,m.ly+r*1.5);}
+  for(const m of p.markers){const box=(m as Marker&{box?:{w:number;h:number}}).box;if(box){x=Math.min(x,m.x-r,m.lx-box.w/2-r*.3);y=Math.min(y,m.y-r,m.ly-box.h/2-r*.3);right=Math.max(right,m.x+r,m.lx+box.w/2+r*.3);bottom=Math.max(bottom,m.y+r,m.ly+box.h/2+r*.3);continue;}const rx=(m.kind==='fire'?r*1.4:labelRadius(p,m)*(shapeOf(m)==='diamond'?1.2:1))+r*.3;x=Math.min(x,m.x-r,m.lx-rx);y=Math.min(y,m.y-r,m.ly-r*1.5);right=Math.max(right,m.x+r,m.lx+rx);bottom=Math.max(bottom,m.y+r,m.ly+r*1.5);}
   return {x,y,width:right-x,height:bottom-y};
 }
 /** fill: Füllfarbe für die Ergebniskarte (sonst weiß). */

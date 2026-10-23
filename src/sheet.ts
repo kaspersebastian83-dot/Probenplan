@@ -1,3 +1,4 @@
+import {labeled} from './labels';
 // Druckblatt A4/A3: Plan in genormtem Maßstab, Legende, Nordpfeil, Maßstabsleiste und Schriftfeld.
 // Alle Maße in Millimetern; gerendert wird mit fester Auflösung, sodass 1 mm auf dem Blatt exakt stimmt.
 import {floorName,metersPerUnit,northAngle,starPath,FIRE_RED,type Project} from './model';
@@ -36,6 +37,7 @@ function legendHeight(p:Project,rated:Rated|null|undefined,width:number,fs:numbe
 function hasLegendEntries(p:Project,rated?:Rated|null){return legendLayout(p,1000,10,rated).entries.length>0;}
 /** Wählt Ausrichtung und Anordnung mit dem größten genormten Maßstab (bzw. der größten Darstellung ohne Kalibrierung). */
 export function sheetLayout(p:Project,paper:Paper,rated?:Rated|null):SheetLayout{
+  p=labeled(p,rated);
   const b=contentBounds(p),mpu=metersPerUnit(p.plan),fs=font(paper),tw=title(paper).width;
   const candidates:SheetLayout[]=[];
   // Reihenfolge = Vorrang bei gleichem Maßstab: quer mit Seitenleiste, hoch mit Fußleiste.
@@ -75,6 +77,7 @@ const de=(n:number)=>n.toLocaleString('de-DE',{maximumFractionDigits:2});
 export interface SheetInfo {objekt:string;page:number;pages:number}
 /** Rendert ein Blatt als Canvas in dpi; gibt das Canvas zurück (Aufrufer gibt Speicher frei). */
 export async function renderSheet(p:Project,layout:SheetLayout,rated:Rated|null|undefined,info:SheetInfo,dpi:number){
+  p=labeled(p,rated);
   const k=dpi/25.4,canvas=document.createElement('canvas');canvas.width=Math.round(layout.width*k);canvas.height=Math.round(layout.height*k);
   const ctx=canvas.getContext('2d');if(!ctx)throw Error('Kein Bildspeicher verfügbar.');
   const L=layout,fs=font(L.paper),ink='#1d2a33',muted='#5d6b66',line=(w:number)=>{ctx.lineWidth=w*k;ctx.strokeStyle=ink;};
