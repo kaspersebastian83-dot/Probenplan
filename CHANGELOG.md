@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.20.0 – 23. Oktober 2026
+
+- **Entzerren** (W, links in der Leiste): schräg fotografierte Pläne – etwa der Fluchtplan im Treppenhaus – über vier Ecken gerade rechnen. Ecken antippen oder ziehen, die Lupe zeigt die Ecke vergrößert; die Ansicht lässt um alle Ecken Platz. Seitenverhältnis wie im Foto (geschätzt) oder DIN quer/hoch. Ergebnis ist ein gerades Rasterbild (höchstens 4.600 px bzw. 16 Megapixel); Proben, Beschriftungen und Flächen werden mitgerechnet. Ein vorhandener Maßstab und die Nordrichtung werden entfernt (neu messen bzw. setzen). Rückgängig stellt das Foto wieder her; die Fotodatei selbst bleibt unverändert, im Projektordner zusätzlich als „(vorher …)“-Kopie des Projekts.
+
 ## 1.19.0 – 23. Oktober 2026
 
 - **Schilder automatisch platzieren** (Liste → „Beschriftung“, je Plan, Standard an): Die Probenstelle bleibt exakt, nur das Schild weicht Raumnamen, Linien, Schraffur und anderen Schildern aus – mit kurzer Hinweislinie und weißem Rand. Freie Proben behalten ihr Schild am Punkt. Die berechnete Lage wird nicht gespeichert; ein von Hand gezogenes Schild bleibt, wo es ist. „Schilder neu anordnen“ gibt von Hand versetzte Schilder dieses Plans wieder frei (rückgängig machbar). Bildschirm, PNG/JPG, PDF und Anlage zeigen dieselbe Anordnung.
