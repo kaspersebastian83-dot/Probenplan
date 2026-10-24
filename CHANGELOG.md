@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.31.0 – 24. Oktober 2026
+
+- Eigene Bewertungsskalen gelten fürs ganze Büro: wie in FotoKit 1.15 liegen sie im Archivordner in `_Spektron-Skalen.json` und werden beim Öffnen eines Projekts geholt; Ändern oder Löschen einer Skala wirkt bei allen. Beim ersten Mal werden die eigenen Skalen dieses Browsers übernommen. Ohne Archivordner bleibt alles wie bisher im Browser. Projekte behalten ihre eigene Kopie der Skala; VdS-Referenz unverändert.
+- Neuer Test „skalen-archiv“ (gleicher Test wie in FotoKit).
+
 ## 1.30.0 – 24. Oktober 2026
 
 - Ergebniskarte mit Werten aus einem vorläufigen Prüfbericht: „VORLÄUFIG“ in Rot im Schriftfeld (PDF, Bild und Lageplan der Word-Anlage); ist in der Legende Platz frei, steht dort zusätzlich der Hinweis mit Berichtsnummer. Aufteilung und Maßstab des Blatts ändern sich dadurch nicht.
