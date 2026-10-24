@@ -287,3 +287,7 @@ dialog.export-card label.export-check input{width:auto;margin:0}
 #sketch-actions #sketch-hint{flex:1;min-width:160px}
 #sketch-actions #sketch-hint{margin:0;color:var(--kit-muted)}
 #sketch-actions select{min-height:30px}
+#trial-section .check-row{display:flex;align-items:center;gap:8px;font-weight:600;margin:8px 0 2px}
+#trial-section .check-row input{width:auto;margin:0;accent-color:var(--kit-accent)}
+#trial-section .tiny{margin:0 0 4px 0}
+#trial-section #trial-surface-note{margin-left:24px}

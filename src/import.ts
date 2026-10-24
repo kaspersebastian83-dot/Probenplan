@@ -4,7 +4,7 @@ import type {LabData} from './model';
 import {copyOrigin,validOrigin} from './lab-provenance';
 import DOMPurify from 'dompurify';
 import { unzipSync } from 'fflate';
-import { MARKER_SCALE, type Plan, type Project, type Preparation, type Sheet, type ResultSettings, type Scale, validLabel, SHAPES, MAX_SHEETS, cleanSheetName, allMarkers, allAreas } from './model';
+import { MARKER_SCALE, type Plan, type Project, type Preparation, type Sheet, type ResultSettings, type Scale, validLabel, SHAPES, MAX_SHEETS, cleanSheetName, allMarkers, allAreas ,SURFACES,TRIALS,type Trials} from './model';
 import {MAX_AREAS,MAX_POINTS,PALETTE,cleanName,polygonError} from './areas';
 import {MAX_ANGLE,wholeSize} from './preparation';
 const MAX=60*1024*1024;
@@ -78,6 +78,7 @@ export async function validateProject(value:unknown):Promise<Project>{
   const p=(fine?{...raw,version:raw.sheets!==undefined?5:4}:raw) as Project;
   const result=await validateFormat(p,fine);
   if(fine)result.version=6;
+  if(raw.trials!==undefined){const t=raw.trials;if(!t||typeof t!=='object'||Array.isArray(t)||Object.entries(t).some(([k,v])=>!TRIALS.includes(k as keyof Trials)||v!==true))throw Error('Ungültige Testfunktionen in der Projektdatei.');if(Object.keys(t).length)result.trials={...t};}
   return result;
 }
 async function validateFormat(p:Project,fine:boolean):Promise<Project>{
@@ -133,7 +134,7 @@ async function validateSingle(p:Project,fine=false):Promise<Project>{
   if(p.plan.north!==undefined){const n=p.plan.north;if(typeof n!=='number'||!Number.isFinite(n)||n<0||n>=360)throw Error('Ungültige Nordrichtung in der Projektdatei.');plan.north=n;}
   const ids=new Set<string>();const labels=new Set<string>();
   for(const m of p.markers){
-    if(!m||!['sample','fire'].includes(m.kind)||typeof m.id!=='string'||!/^[\w-]{1,80}$/.test(m.id)||ids.has(m.id)||typeof m.label!=='string'||!validLabel({...p,markers:[],areas:[],pending:[]},m.label,m.id)||labels.has(m.label.toLocaleUpperCase())||typeof m.note!=='string'||m.note.length>500||![m.x,m.y,m.lx,m.ly].every(n=>Number.isFinite(n)&&Math.abs(n)<1_000_000)||(m.shape!==undefined&&!SHAPES.includes(m.shape))||(m.typ!==undefined&&(typeof m.typ!=='string'||m.typ.length>40)))throw Error('Ungültige oder doppelte Markierungen in der Projektdatei.');
+    if(!m||!['sample','fire'].includes(m.kind)||typeof m.id!=='string'||!/^[\w-]{1,80}$/.test(m.id)||ids.has(m.id)||typeof m.label!=='string'||!validLabel({...p,markers:[],areas:[],pending:[]},m.label,m.id)||labels.has(m.label.toLocaleUpperCase())||typeof m.note!=='string'||m.note.length>500||![m.x,m.y,m.lx,m.ly].every(n=>Number.isFinite(n)&&Math.abs(n)<1_000_000)||(m.shape!==undefined&&!SHAPES.includes(m.shape))||(m.typ!==undefined&&(typeof m.typ!=='string'||m.typ.length>40))||(m.surface!==undefined&&(m.kind!=='sample'||!SURFACES.includes(m.surface))))throw Error('Ungültige oder doppelte Markierungen in der Projektdatei.');
     ids.add(m.id);labels.add(m.label.toLocaleUpperCase());
   }
   if(![p.nextSample,p.nextFire].every(n=>Number.isSafeInteger(n)&&n>=1&&n<1e9))throw Error('Ungültige Startnummer.');
@@ -150,7 +151,7 @@ async function validateSingle(p:Project,fine=false):Promise<Project>{
   for(const m of p.markers)if(m.lab!==undefined&&!validLab(m.lab))throw Error('Ungültige Labordaten an einer Markierung.');
   if(p.pending!==undefined){if(!Array.isArray(p.pending)||p.pending.length>1000)throw Error('Ungültige Liste offener Proben.');for(const row of p.pending){if(!validLab(row)||!/^P[1-9]\d{0,8}$/.test(row.label)||labels.has(row.label.toUpperCase()))throw Error('Ungültige oder doppelte offene Probe.');labels.add(row.label.toUpperCase());}}
   for(const row of [...p.markers.flatMap(m=>m.lab?[m.lab]:[]),...(p.pending||[])])if(row.reportId!==undefined){const r=reports.get(row.reportId);if(!r||(row.bericht!==undefined&&row.bericht!==r.bericht))throw Error('Laborprobe verweist auf eine fehlende oder widersprüchliche Bericht-Herkunft.');}
-  return {format:'probenplan',version:p.version>=3?p.version:plan.pdf||plan.preparation?2:p.version,plan,markers:p.markers.map(m=>({id:m.id,kind:m.kind,label:m.label,note:m.note,x:m.x,y:m.y,lx:m.lx,ly:m.ly,...(m.lab?{lab:copyLab(m.lab)}:{}),...(m.kind==='sample'&&m.shape&&m.shape!=='circle'?{shape:m.shape}:{}),...(m.kind==='sample'&&m.typ?{typ:m.typ}:{})})),nextSample:p.nextSample,nextFire:p.nextFire,report:p.report,date:p.date,...(p.areas!==undefined?{areas:p.areas!.map(a=>({id:a.id,label:a.label,name:cleanName(a.name),color:a.color,opacity:a.opacity,points:a.points.map(pt=>({x:Math.max(0,Math.min(plan.width,pt.x)),y:Math.max(0,Math.min(plan.height,pt.y))}))})),nextArea:p.nextArea}:{}),...(p.pending!==undefined?{pending:p.pending.map(r=>({label:r.label,...copyLab(r),...(typeof r.typ==='string'&&r.typ&&r.typ.length<=40?{typ:r.typ}:{}),...(r.shape&&SHAPES.includes(r.shape)?{shape:r.shape}:{})}))}:{}),...(p.labReports!==undefined?{labReports:p.labReports.map(copyOrigin)}:{}),...(p.results!==undefined?{results:validResults(p.results)}:{})};
+  return {format:'probenplan',version:p.version>=3?p.version:plan.pdf||plan.preparation?2:p.version,plan,markers:p.markers.map(m=>({id:m.id,kind:m.kind,label:m.label,note:m.note,x:m.x,y:m.y,lx:m.lx,ly:m.ly,...(m.lab?{lab:copyLab(m.lab)}:{}),...(m.kind==='sample'&&m.shape&&m.shape!=='circle'?{shape:m.shape}:{}),...(m.kind==='sample'&&m.typ?{typ:m.typ}:{}),...(m.surface?{surface:m.surface}:{})})),nextSample:p.nextSample,nextFire:p.nextFire,report:p.report,date:p.date,...(p.areas!==undefined?{areas:p.areas!.map(a=>({id:a.id,label:a.label,name:cleanName(a.name),color:a.color,opacity:a.opacity,points:a.points.map(pt=>({x:Math.max(0,Math.min(plan.width,pt.x)),y:Math.max(0,Math.min(plan.height,pt.y))}))})),nextArea:p.nextArea}:{}),...(p.pending!==undefined?{pending:p.pending.map(r=>({label:r.label,...copyLab(r),...(typeof r.typ==='string'&&r.typ&&r.typ.length<=40?{typ:r.typ}:{}),...(r.shape&&SHAPES.includes(r.shape)?{shape:r.shape}:{})}))}:{}),...(p.labReports!==undefined?{labReports:p.labReports.map(copyOrigin)}:{}),...(p.results!==undefined?{results:validResults(p.results)}:{})};
 }
 export function validResults(value:unknown):ResultSettings{
   const r=value as ResultSettings;if(!r||typeof r!=='object'||typeof r.parameter!=='string'||r.parameter.length>160||!r.scales||typeof r.scales!=='object'||Array.isArray(r.scales)||Object.keys(r.scales).length>100)throw Error('Ungültige Einstellungen der Ergebniskarte.');
