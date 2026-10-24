@@ -5,7 +5,7 @@ import {floorName,metersPerUnit,northAngle,starPath,FIRE_RED,type Project} from 
 import {contentBounds,drawLegend,drawPlanContent,legendLayout,wrap} from './export';
 import {loadImage} from './import';
 import type {Rated} from './results';
-import {vorlaeufigeBerichte,vorlaeufigText} from './lab-provenance';
+import {vorlaeufigeBerichteAufPlan,vorlaeufigText} from './lab-provenance';
 // Als data:-URL eingebettet: das Blatt lädt beim Export nichts nach (offline sicher, unabhängig vom Service Worker).
 import logoUrl from './assets/firmenlogo.png?inline';
 
@@ -36,7 +36,8 @@ function legendHeight(p:Project,rated:Rated|null|undefined,width:number,fs:numbe
   return 2*fs*1.7+fs*1.8+(l.entries.length?l.height/10:0)+2;
 }
 /** Ergebniskarte mit Werten aus einem vorläufigen Prüfbericht: Hinweistext für Legende und Schriftfeld, sonst ''. */
-export const vorlaeufigHinweis=(p:Project,rated:Rated|null|undefined)=>rated?vorlaeufigText(vorlaeufigeBerichte(p)):'';
+// Nur Werte, die dieses Blatt zeigt (Proben des Geschosses mit dem dargestellten Parameter)
+export const vorlaeufigHinweis=(p:Project,rated:Rated|null|undefined)=>rated?vorlaeufigText(vorlaeufigeBerichteAufPlan(p,p.results?.parameter||'')):'';
 const VORLAEUFIG_ROT='#B3261E';
 function hasLegendEntries(p:Project,rated?:Rated|null){return legendLayout(p,1000,10,rated).entries.length>0;}
 /** Wählt Ausrichtung und Anordnung mit dem größten genormten Maßstab (bzw. der größten Darstellung ohne Kalibrierung). */

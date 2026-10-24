@@ -11,6 +11,12 @@ export function vorlaeufigeBerichte(p:Project):LabOrigin[]{
  const used=new Set<string>();for(const m of allMarkers(p))if(m.lab?.reportId)used.add(m.lab.reportId);for(const r of p.pending||[])if(r.reportId)used.add(r.reportId);
  return (p.labReports||[]).filter(r=>r.vorlaeufig&&used.has(r.id));
 }
+/** Vorläufige Berichte nur für die Werte, die eine Planseite zeigt: Proben dieser Seite (p.markers) mit Wert für den dargestellten Parameter.
+ *  Nicht platzierte Proben, andere Geschosse und andere Parameter zählen hier nicht. */
+export function vorlaeufigeBerichteAufPlan(p:Project,parameter:string):LabOrigin[]{
+ const used=new Set<string>();for(const m of p.markers||[])if(m.lab?.reportId&&(!parameter||(m.lab.werte||[]).some(w=>w.p===parameter)))used.add(m.lab.reportId);
+ return (p.labReports||[]).filter(r=>r.vorlaeufig&&used.has(r.id));
+}
 export const vorlaeufigText=(rs:LabOrigin[])=>rs.length?`Werte aus vorläufigem Prüfbericht ${rs.map(r=>r.bericht||'(ohne Nummer)').join(', ')} – sie können sich mit dem endgültigen Bericht ändern.`:'';
 export function validOrigin(value:unknown):value is LabOrigin{
  const r=value as LabOrigin;if(!r||typeof r!=='object'||!text(r.id,80)||!idPattern.test(r.id)||!text(r.bericht,160)||!text(r.labor,500)||!text(r.auftragsreferenz,2000)||(r.batch!==undefined&&!text(r.batch,160))||(r.vorlaeufig!==undefined&&r.vorlaeufig!==true)||!r.sources||typeof r.sources!=='object'||Array.isArray(r.sources))return false;

@@ -3,6 +3,7 @@
 ## 1.30.0 – 24. Oktober 2026
 
 - Ergebniskarte mit Werten aus einem vorläufigen Prüfbericht: „VORLÄUFIG“ in Rot im Schriftfeld (PDF, Bild und Lageplan der Word-Anlage); ist in der Legende Platz frei, steht dort zusätzlich der Hinweis mit Berichtsnummer. Aufteilung und Maßstab des Blatts ändern sich dadurch nicht.
+- Gilt je Blatt nur für die dort gezeigten Werte: Proben dieses Geschosses mit dem dargestellten Parameter. Eine vorläufige Probe auf einem anderen Geschoss, noch nicht platziert oder mit einem anderen Parameter macht ein Blatt mit endgültigen Werten nicht „vorläufig“.
 - Word-Anlage Probenahme: derselbe Hinweis unter dem Lageplan (als Ergebniskarte) und unter dem Probenverzeichnis; das Prüfprotokoll nennt ihn wie bisher.
 - Neuer Test „vorlaeufig“.
 - Tests stabiler: Touch-/Stiftplatzierung wartet, bis die neue Probe gespeichert ist; Flächenauswahl nach dem Neuladen wird bei Bedarf wiederholt.

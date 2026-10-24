@@ -3,7 +3,7 @@
 // in „Mitteilungen“ speichern (mit Zeile im „_Anlagen-Protokoll.txt“, wie die Anlagen aus der Projektzentrale).
 import {build} from './docx';
 import {annexBlocks,annexChecks,bohrkernNummern,collectSamples,photoLabels,scaleNotes,type AnnexCheck,type AnnexImage,type AnnexPhoto,type AnnexPlanPage,type AnnexSample,type AnnexSource} from './annex';
-import {renderSheet,sheetLayout} from './sheet';
+import {renderSheet,sheetLayout,vorlaeufigHinweis} from './sheet';
 import {drawPlanContent} from './export';
 import {clone,floorName,markerSize,sheetCount,sheetProject,type Project} from './model';
 import {hasValues,prepare,rateMarkers} from './results';
@@ -28,7 +28,7 @@ async function planPages(p:Project,o:AnnexOptions):Promise<AnnexPlanPage[]>{
   const n=sheetCount(p),out:AnnexPlanPage[]=[];
   for(let i=0;i<n;i++){o.progress?.(`Plan ${i+1} von ${n} wird gezeichnet …`);
     const view=clone(sheetProject(p,i)),rated=o.results?rateMarkers(view):null,layout=sheetLayout(view,'anlage',rated);let canvas:HTMLCanvasElement|null=null;
-    try{canvas=await renderSheet(view,layout,rated,{objekt:o.objekt,page:i+1,pages:n},200);out.push({floor:floorName(p,i),image:await canvasBytes(canvas,'image/png'),widthMm:layout.width,heightMm:layout.height,ratio:layout.ratio,results:!!rated});}
+    try{canvas=await renderSheet(view,layout,rated,{objekt:o.objekt,page:i+1,pages:n},200);out.push({floor:floorName(p,i),image:await canvasBytes(canvas,'image/png'),widthMm:layout.width,heightMm:layout.height,ratio:layout.ratio,results:!!rated,vorlaeufig:vorlaeufigHinweis(view,rated)});}
     finally{release(canvas);}
   }
   return out;

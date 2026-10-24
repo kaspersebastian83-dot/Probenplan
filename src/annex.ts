@@ -10,7 +10,9 @@ import {STIL,type Block,type Cell,type Row} from './docx';
 export interface AnnexImage {data:Uint8Array;ext:'png'|'jpeg';widthPx:number;heightPx:number}
 export type PhotoStatus='ok'|'changed'|'nohash'|'missing';
 export interface AnnexPhoto {file:string;desc:string;section:string;taken:string;sha:string;status:PhotoStatus;labels:string[];probe?:string;image?:AnnexImage}
-export interface AnnexPlanPage {floor:string;image:AnnexImage;widthMm:number;heightMm:number;ratio:number|null;results:boolean}
+export interface AnnexPlanPage {floor:string;image:AnnexImage;widthMm:number;heightMm:number;ratio:number|null;results:boolean;
+  /** Hinweis, wenn Werte auf dieser Planseite aus einem vorläufigen Prüfbericht stammen */
+  vorlaeufig?:string}
 export interface AnnexSource {role:string;name:string;stand:string;sha:string}
 export interface AnnexSample {label:string;floor:string;placed:boolean;desc:string;note:string;art:string;datum:string;labNr:string;ref:string;bericht:string;labor:string;werte:Wert[];value?:Wert;rating:string;excerpt?:AnnexImage}
 export interface AnnexCheck {text:string;ok:boolean;detail?:string}
@@ -133,7 +135,7 @@ export function annexBlocks(a:AnnexInput):Block[]{
     b.push(head(`1. Lageplan der Probenahmestellen${pl.floor?` – ${pl.floor}`:''}${a.plans.length>1?` (${i+1}/${a.plans.length})`:''}`));
     b.push({t:'image',data:pl.image.data,ext:pl.image.ext,widthMm:pl.widthMm,heightMm:pl.heightMm,alt:`Lageplan ${pl.floor}`,after:40});
     b.push(small(`${pl.results?`Ergebniskarte: Proben eingefärbt nach ${param||'Messwert'} (Legende im Plan).`:'Probenplan.'} ${pl.ratio?`Maßstab 1:${pl.ratio.toLocaleString('de-DE')} – beim Drucken „Tatsächliche Größe“ (100 %) wählen.`:'Ohne Maßstab (Plan nicht kalibriert).'}`,{align:'center'}));
-    if(pl.results&&a.vorlaeufig)b.push(small(a.vorlaeufig,{align:'center',color:'B3261E'}));
+    if(pl.results&&pl.vorlaeufig)b.push(small(pl.vorlaeufig,{align:'center',color:'B3261E'}));
   });
 
   // 3 · Probenverzeichnis
