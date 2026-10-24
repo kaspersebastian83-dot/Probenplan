@@ -3,7 +3,7 @@
 // Genau diese Referenz steht später im Laborbericht – beim Import des Berichts werden die Proben daher per
 // „Aktualisieren“ um Labordaten und Messwerte ergänzt.
 import {blankReport,validDate,type LabReport} from './labreport';
-import type {LabSample} from './model';
+import {SURFACE_FROM_LABELKIT,type LabSample} from './model';
 import {parseProjName} from './folder';
 
 type Probe={_nr?:unknown;chloridNr?:unknown;id?:unknown;matrix?:string;datum?:string;z2?:string;z3?:string;z4?:string;cm2?:string|number;tiefe?:string;bkBez?:string;bkVon?:string|number;bkBis?:string|number;bkGesamt?:string|number;bkRueck?:string};
@@ -33,6 +33,7 @@ export function labelkitReport(text:string,quelle:string,project:string|null,con
     if(seen.has(n)){report.warnings.push(`Probe ${n} ist in LabelKit doppelt vergeben (${type}) und wurde übersprungen.`);continue;}seen.add(n);
     const row:LabSample={label:`P${n}`,typ:type,ref:`Probe ${n}`,desc:description(raw).slice(0,500),art:`${type}${str(raw.matrix)?` · ${str(raw.matrix)}`:''}`.slice(0,160)};
     const datum=isoDate(raw.datum);if(datum)row.datum=datum;
+    const surface=SURFACE_FROM_LABELKIT[str(raw.z4)];if(surface)row.surface=surface;
     report.rows.push(row);
   }
   report.rows.sort((a,b)=>Number(a.label.slice(1))-Number(b.label.slice(1)));report.expected=report.rows.length;

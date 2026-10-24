@@ -10,7 +10,7 @@ export interface Category {name:string;from:number;color:string}
 export interface Scale {name:string;cats:Category[]}
 export interface ResultSettings {usage?:'residential'|'industrial';parameter:string;scales:Record<string,Scale>}
 /** typ: Probenart aus LabelKit (PAK, Chlorid, Asbest, Sonstige) – bleibt erhalten, wenn der Laborbericht die Probe ergänzt. */
-export interface LabSample extends LabData {label:string;typ?:string;shape?:Shape}
+export interface LabSample extends LabData {label:string;typ?:string;shape?:Shape;surface?:Surface}
 /** Form der Probenahmestelle (Kreis ist Standard und wird nicht gespeichert); typ = Probenart aus LabelKit für die Legende. */
 export type Shape = 'circle' | 'square' | 'diamond';
 export const SHAPES:readonly Shape[]=['circle','square','diamond'];
@@ -22,10 +22,12 @@ export function typeFromArt(art?:string):{typ:string;shape:Shape}|null{const a=(
 export function shapeForType(typ?:string):Shape{return TYPES.find(t=>t[1]===typ)?.[2]||'circle';}
 /** Form einer Laborprobe vor dem Platzieren: im Prüfdialog gewählt, sonst aus der Probenart. */
 export function pendingShape(r:{shape?:Shape;typ?:string;art?:string}):Shape{return r.shape||shapeForType(r.typ||typeFromArt(r.art)?.typ);}
-/** Probenfläche (Testfunktion ab 1.22): wo die Probe genommen wurde. */
+/** Oberflächenart der Probe (ab 1.23 Standard, Namen wie in LabelKit): ceiling = Untersicht, wall = Ansicht, floor = Aufsicht. */
 export type Surface='ceiling'|'wall'|'floor'|'other';
 export const SURFACES:readonly Surface[]=['ceiling','wall','floor','other'];
-export const SURFACE_NAMES:Record<Surface,string>={ceiling:'Decke',wall:'Wand',floor:'Boden',other:'Sonstige'};
+export const SURFACE_NAMES:Record<Surface,string>={ceiling:'Untersicht',wall:'Ansicht',floor:'Aufsicht',other:'Sonstige'};
+/** Oberflächenart aus LabelKit (Spalte „Oberflächenart“) → Balken am Probenpunkt. */
+export const SURFACE_FROM_LABELKIT:Record<string,Surface>={Untersicht:'ceiling',Ansicht:'wall',Aufsicht:'floor'};
 /** Testfunktionen je Projekt (zum Ausprobieren): nur eingeschaltete stehen im Projekt. Ausgeschaltet bleiben eingegebene Daten erhalten. */
 export interface Trials {surface?:true}
 export const TRIALS:readonly (keyof Trials)[]=['surface'];

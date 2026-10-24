@@ -10,6 +10,8 @@ registerHooks({
  load(url,context,next){if(url.endsWith('.ts'))return{format:'module',source:stripTypeScriptTypes(readFileSync(fileURLToPath(url),'utf8'),{mode:'transform'}),shortCircuit:true};return next(url,context);}
 });
 const {labelkitReport}=await import('../src/labelkit.ts');
+const {applyLabImport}=await import('../src/lab-provenance.ts');
+const {setNutzung,usageFromNutzung,prepare,vdsScale}=await import('../src/results.ts');
 const project='26.0101 Muster',quelle='26.0999_Daten.json';
 const data=nr=>({version:'4.30.10',projekt:{nr},proben:[{id:1,_nr:1,z2:'FREMDES PROJEKT',datum:'2026-10-21',matrix:'Wischprobe',cm2:'100'}]});
 let checks=0;
@@ -92,5 +94,27 @@ for(const [nr,approval,accepted,prompts] of [['26.0999',true,false,0],['26.0101'
  if(nr==='26.0999')assert.match(result.errors[0],/26\.0999.*26\.0101/);
  checks++;console.log(`OK F1 Klickhandler: ${nr||'ohne Nummer'}, OK=${approval}, Prüftabelle=${accepted}`);
 }
+check('Oberflächenart aus LabelKit wird zur Fläche am Probenpunkt',()=>{
+ const input={...data('26.0101'),proben:[{id:1,_nr:1,z2:'EG',z4:'Aufsicht'},{id:2,_nr:2,z2:'EG',z4:'Ansicht'},{id:3,_nr:3,z2:'EG',z4:'Untersicht'},{id:4,_nr:4,z2:'EG',z4:''},{id:5,_nr:5,z2:'EG',z4:'irgendwas'}]};
+ const rows=labelkitReport(JSON.stringify(input),quelle,project).rows;
+ assert.deepEqual(rows.map(r=>r.surface),['floor','wall','ceiling',undefined,undefined]);
+});
+check('erneuter LabelKit-Import füllt nur leere Oberflächenart; Eingabe in PlanKit bleibt',()=>{
+ const report=labelkitReport(JSON.stringify({...data('26.0101'),proben:[{id:1,_nr:1,z2:'EG',z4:'Aufsicht'},{id:2,_nr:2,z2:'EG',z4:'Aufsicht'}]}),quelle,project);
+ const marker=(label,extra={})=>({id:label,kind:'sample',label,note:'',x:1,y:1,lx:1,ly:1,...extra});
+ const p={format:'probenplan',version:4,plan:{width:10,height:10},markers:[marker('P1',{surface:'wall'}),marker('P2')],nextSample:3,nextFire:1,report:'',date:'',pending:[]};
+ const next=applyLabImport(p,report,new Map(report.rows.map(r=>[r,'update'])));
+ assert.deepEqual(next.markers.map(m=>m.surface),['wall','floor']);
+ assert.ok(next.markers.every(m=>!('surface' in (m.lab||{}))),'Oberflächenart gehört an den Marker, nicht zu den Labordaten');
+});
+check('Nutzung aus den Projektdaten wählt die VdS-Referenz nur beim ersten Anlegen vor',()=>{
+ for(const [n,u] of [['Wohnen','residential'],['Büro','residential'],['Öffentlich','residential'],['Gesundheit & Labor','residential'],['Gewerbe/Industrie','industrial'],['Landwirtschaft','industrial'],['',undefined],['Raumstation',undefined]])assert.equal(usageFromNutzung(n),u,n);
+ const SUM='Summe 16 EPA-PAK exkl. BG',withValue=()=>({format:'probenplan',version:4,plan:{width:10,height:10},markers:[{id:'a',kind:'sample',label:'P1',note:'',x:1,y:1,lx:1,ly:1,lab:{ref:'Probe 1',desc:'',werte:[{p:SUM,r:'12',u:'µg/m²'}]}}],nextSample:2,nextFire:1,report:'',date:''});
+ setNutzung('Gewerbe/Industrie');const a=withValue();prepare(a);assert.equal(a.results.usage,'industrial');
+ setNutzung('Wohnen');prepare(a);assert.equal(a.results.usage,'industrial','eine bestehende Wahl bleibt');
+ const b=withValue();b.results={parameter:SUM,scales:{}};prepare(b);assert.equal(b.results.usage,undefined,'„Eigene Skala“ bleibt eigene Skala');
+ setNutzung('Gesundheit & Labor');assert.match(vdsScale(SUM,'µg/m²','residential').name,/Gesundheit & Labor, Referenz < 10 µg\/m²/);assert.equal(vdsScale(SUM,'µg/m²','residential').cats[1].from,10);
+ setNutzung('');assert.match(vdsScale(SUM,'µg/m²','residential').name,/Wohn-\/Büroräume/);
+});
 const switched=await ui('26.0101',true,true);assert.equal(switched.shown.length,0);assert.match(switched.errors[0],/gewechselt/);checks++;
 console.log(`OK F1: ${checks} Parser- und Klickhandler-Prüfungen`);
