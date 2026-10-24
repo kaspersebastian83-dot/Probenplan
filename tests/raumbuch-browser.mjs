@@ -42,7 +42,12 @@ for(const engine of engines){
    assert.match(await page.locator('#raumbuch-hints').innerText(),/2 auffällige Räume ohne Maßnahme/);
   });
   await check(`${engine}: Maßnahme, Raum ohne Probe mit Status, doppelter Raum abgewiesen`,async()=>{
-   const m=page.locator('#raumbuch-rows [data-f="massnahme"]').first();await m.fill('Reinigung, Kontrollmessung');await m.press('Tab');
+   const m=page.locator('#raumbuch-rows [data-f="massnahme"]').first();await m.click();await page.keyboard.type('Reinigung');
+   // Neuzeichnen im Hintergrund während des Tippens (wie nach einer Sicherung): Text, Fokus und Cursor bleiben, nichts geht verloren
+   await page.evaluate(()=>{const c=document.getElementById('auto-labels');for(let i=0;i<2;i++){c.checked=!c.checked;c.dispatchEvent(new Event('change'));}});
+   // Die Tabelle kann mehrfach neu gezeichnet werden (Schilder werden nachberechnet) – geprüft wird der Zustand danach, ohne Elementverweis
+   await page.waitForTimeout(800);await page.waitForFunction(()=>{const a=document.activeElement;return a?.dataset?.f==='massnahme'&&a.value==='Reinigung'&&a.closest('#raumbuch-rows');},null,{timeout:5000});
+   await page.keyboard.type(', Kontrollmessung');await page.keyboard.press('Tab');
    await page.locator('#raumbuch-add-floor').fill('EG');await page.locator('#raumbuch-add-name').fill('HWR');await page.locator('#raumbuch-add button').click();
    await page.locator('#raumbuch-rows td.raum',{hasText:'HWR'}).waitFor();
    const hwr=page.locator('#raumbuch-rows tr',{hasText:'HWR'});assert.match(await hwr.innerText(),/Sichtprüfung unauffällig/);
