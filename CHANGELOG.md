@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.28.2 – 24. Oktober 2026
+
+- Behoben: Raumbuch – wurde die Tabelle während des Tippens im Hintergrund neu gezeichnet (z. B. nach einer Sicherung oder Neuberechnung der Schilder), ging der gerade getippte Text in „Maßnahme“/„Bemerkung“ verloren. Jetzt bleiben Text, Fokus und Cursor erhalten, und der Text wird beim Verlassen des Felds gespeichert.
+- Tests stabiler: Tastatur- und Flächentests warten, bis die Auswahl gezeichnet ist; neuer Testfall für das Neuzeichnen während des Tippens.
+
 ## 1.28.1 – 24. Oktober 2026
 
 - Leiste oben in allen Apps wieder identisch (FotoKit-Projektzuordnung und offenes Menü wie in FotoKit, aktuelle Projektdaten wie in LabelKit/PlanKit); Speicherkandidaten und Kopien von PlanKit zählen nicht als Plan.

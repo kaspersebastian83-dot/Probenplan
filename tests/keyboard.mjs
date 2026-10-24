@@ -12,7 +12,7 @@ for(const engine of ['chromium','webkit']){
   const original=await state(page);
   for(const [id,selector,inspector] of [['sample','[data-select="sample"]','#inspector'],['fire','[data-select="fire"]','#inspector'],['area','[data-area-select="area"]','#area-inspector']]){
    for(const key of ['Delete','Backspace']){
-    await page.locator(selector).click();await page.keyboard.press(key);
+    await page.locator(selector).click();await page.locator(inspector).waitFor();await page.keyboard.press(key);   // erst drücken, wenn die Auswahl gezeichnet ist
     const deleted=await state(page);assert.equal((id==='area'?deleted.areas:deleted.markers).some(o=>o.id===id),false);assert.equal(await page.locator(inspector).isVisible(),false);
     await page.locator('#undo').click();assert.deepEqual(await state(page),original,`${engine}: vollständiges Undo ${id}/${key}`);
     await page.locator('#redo').click();assert.deepEqual(await state(page),deleted);
