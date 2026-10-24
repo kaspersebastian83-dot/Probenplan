@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.23.0 – 24. Oktober 2026
+
+- **Oberflächenart** statt Testfunktion „Probenfläche“: Aufsicht, Ansicht oder Untersicht je Probe kommt beim „Proben übernehmen“ aus LabelKit (Spalte „Oberflächenart“); fehlt sie dort, unter „Markierungen“ wählbar. Eine Eingabe in PlanKit bleibt auch bei erneutem Import. Immer sichtbar: Balken unten (Aufsicht), links (Ansicht) oder oben (Untersicht), im Wertkästchen und in der Legende. Ältere Projektdateien mit der Testfunktion bleiben lesbar.
+- **Nutzung aus der Projektzentrale**: Beim ersten Anlegen der Ergebniskarte wählt PlanKit die VdS-2357-Referenz nach der Nutzung in `_Projekt.json` vor (Gewerbe/Industrie und Landwirtschaft → Industrie, sonst Wohn-/Büroräume). Eine in PlanKit gewählte Referenz bleibt. Bei „Gesundheit & Labor“ nennt die Legende „Gesundheit & Labor, Referenz < 10 µg/m²“. Unter der Auswahl steht die Nutzung laut Projektdaten.
+
 ## 1.22.1 – 24. Oktober 2026
 
 - **Aufgeräumt:** Im Ordner „Pläne“ bleiben von den automatischen Kopien („(vorher …)“ und „(Speicherkandidat …)“) nur noch die 5 neuesten je Art; ältere werden beim nächsten Speichern entfernt. Wiederherstellungsdateien und manuelle Kopien bleiben unberührt.

@@ -46,6 +46,13 @@ export const belowLimit=(raw:string)=>labQualifier(raw)==='below';
 export const BELOW_LIMIT='#749bb5';
 export const NOT_DETECTED='#8b83a8';
 export const NOT_DETERMINED='#9d8975';
+/** Nutzung aus _Projekt.json (Feld der Projektzentrale). Wählt beim ersten Anlegen der Ergebniskarte die VdS-Referenz vor
+ *  und benennt die Skala; eine später in PlanKit gewählte Referenz bleibt. Unbekannte Werte wählen nichts vor. */
+let nutzung='';
+export function setNutzung(value:unknown){nutzung=typeof value==='string'?value.trim():'';}
+export const getNutzung=()=>nutzung;
+const RESIDENTIAL=['Wohnen','Büro','Öffentlich','Gesundheit & Labor'],INDUSTRIAL=['Gewerbe/Industrie','Landwirtschaft'];
+export function usageFromNutzung(value=nutzung):ResultSettings['usage']{return RESIDENTIAL.includes(value)?'residential':INDUSTRIAL.includes(value)?'industrial':undefined;}
 /** VdS 2357 background references; only Σ16 EPA-PAK in surface units.
  * Source: LANUV, Bericht Steinhagen 15.02.2023, p. 7 (see README). */
 export function vdsScale(parameter:string,unit:string,usage:ResultSettings['usage']):Scale|undefined{
@@ -53,7 +60,8 @@ export function vdsScale(parameter:string,unit:string,usage:ResultSettings['usag
  const u=unit.replace(/μ/g,'µ').replace(/²/g,'2').replace(/\s+/g,'').toLowerCase();
  const factor=({'µg/m2':1,'µg/100cm2':.01,'mg/m2':.001,'ng/m2':1000} as Record<string,number>)[u];if(!factor)return;
  const limit=(usage==='residential'?10:100)*factor;
- return {name:`VdS 2357 · ${usage==='residential'?'Wohn-/Büroräume':'Industrie'} · Hintergrundreferenz`,cats:[{name:'unter Referenzwert',from:0,color:'#4caf50'},{name:'Referenzwert erreicht/überschritten',from:limit,color:'#e0453a'}]};
+ const label=usage==='industrial'?'Industrie':nutzung==='Gesundheit & Labor'?'Gesundheit & Labor, Referenz < 10 µg/m²':'Wohn-/Büroräume';
+ return {name:`VdS 2357 · ${label} · Hintergrundreferenz`,cats:[{name:'unter Referenzwert',from:0,color:'#4caf50'},{name:'Referenzwert erreicht/überschritten',from:limit,color:'#e0453a'}]};
 }
 export function shortParameter(p:string){return p.replace(/^Summe 16 EPA-PAK.*$/i,'Σ16 EPA-PAK').replace(/^Benzo\[a\]pyren$/i,'BaP');}
 
@@ -77,7 +85,9 @@ export function fromShared(key:string):Scale|null{
 /** Einstellungen ergänzen: Standardparameter und fehlende Skalen aus FotoKit. Gibt true zurück, wenn sich etwas geändert hat. */
 export function prepare(p:Project):boolean{
   const list=parameters(p);if(!list.length)return false;let changed=false;
+  const fresh=!p.results;
   if(!p.results||!list.includes(p.results.parameter)){p.results={...p.results,parameter:defaultParameter(list),scales:p.results?.scales||{}};changed=true;}
+  if(fresh){const usage=usageFromNutzung();if(usage)p.results.usage=usage;}
   for(const unit of units(p,p.results.parameter)){const key=scaleKey(p.results.parameter,unit);if(!p.results.scales[key]){const s=fromShared(key);if(s){p.results.scales[key]=s;changed=true;}}}
   return changed;
 }

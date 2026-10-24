@@ -1,5 +1,5 @@
-// Testfunktion Probenfläche (ab 1.22): je Projekt ein-/ausschaltbar; Decke/Wand/Boden je Probe; Balken am Schild,
-// Wertkästchen, Projektdatei mit Validierung; ausgeschaltet bleiben Angaben erhalten, werden aber nicht gezeigt.
+// Oberflächenart (ab 1.23 Standard, vorher Testfunktion „Probenfläche“): Aufsicht/Ansicht/Untersicht je Probe, aus LabelKit oder
+// von Hand; Balken am Schild, Wertkästchen, Projektdatei mit Validierung; ältere Dateien mit trials.surface bleiben lesbar.
 import {chromium,webkit,savedProject,downloadedProject} from './runtime.mjs';
 import {labRows,labXML} from './lab-fixtures.mjs';
 import assert from 'node:assert/strict';
@@ -27,36 +27,35 @@ for(const engine of engines){
   await page.keyboard.press('Escape');
   const pick=async i=>{await blur(page);await page.keyboard.press('e');const p=await toScreen(page,...pts[i]);await page.mouse.click(p.x,p.y);await page.locator('#inspector').waitFor();};
 
-  await check(`${engine}: Standard aus – kein Feld „Probenfläche“, nichts im Projekt`,async()=>{
-   assert.equal(await page.locator('#trial-surface').isChecked(),false);await pick(0);assert.equal(await page.locator('#surface-row').isVisible(),false);
-   assert.equal((await savedProject(page)).trials,undefined);
+  await check(`${engine}: Standard – Feld „Oberflächenart“ sichtbar, ohne Eingabe nichts im Projekt`,async()=>{
+   await pick(0);assert.equal(await page.locator('#surface-row').isVisible(),true);
+   const s=await savedProject(page);assert.equal(s.trials,undefined);assert.ok(s.markers.every(m=>!m.surface));assert.equal((await bars(page)).length,0);
   });
-  await check(`${engine}: einschalten, Decke/Wand/Boden wählen – Balken oben, links, unten`,async()=>{
-   await page.locator('#trial-surface').check();assert.deepEqual((await savedProject(page)).trials,{surface:true});
+  await check(`${engine}: Untersicht/Ansicht/Aufsicht wählen – Balken oben, links, unten`,async()=>{
    for(const [i,v] of [[0,'ceiling'],[1,'wall'],[2,'floor']]){await pick(i);await page.locator('#surface').selectOption(v);}
    const s=await savedProject(page);assert.deepEqual(s.markers.map(m=>m.surface),['ceiling','wall','floor']);
    const b=await bars(page);assert.equal(b.length,3);
    const [ce,wa,fl]=pts.map(([x,y])=>b.find(r=>Math.hypot(r.x-x,r.y-y)<80));
-   assert.ok(ce&&ce.y<pts[0][1]&&ce.w>ce.h,'Decke: waagerechter Balken oben');assert.ok(wa&&wa.x<pts[1][0]&&wa.h>wa.w,'Wand: senkrechter Balken links');assert.ok(fl&&fl.y>pts[2][1]&&fl.w>fl.h,'Boden: waagerechter Balken unten');
+   assert.ok(ce&&ce.y<pts[0][1]&&ce.w>ce.h,'Untersicht: waagerechter Balken oben');assert.ok(wa&&wa.x<pts[1][0]&&wa.h>wa.w,'Ansicht: senkrechter Balken links');assert.ok(fl&&fl.y>pts[2][1]&&fl.w>fl.h,'Aufsicht: waagerechter Balken unten');
   });
-  await check(`${engine}: Wertkästchen nennt die Fläche`,async()=>{
+  await check(`${engine}: Wertkästchen nennt die Oberflächenart`,async()=>{
    await blur(page);await page.keyboard.press('v');await page.locator('#value-labels').check();await page.locator('#results-toggle').click();
-   await page.locator('#marks text',{hasText:'Decke · hoch'}).waitFor();assert.ok((await page.locator('#marks').textContent()).includes('Wand · gering'));
+   await page.locator('#marks text',{hasText:'Untersicht · hoch'}).waitFor();assert.ok((await page.locator('#marks').textContent()).includes('Ansicht · gering'));
    if(process.env.SHOT){await page.waitForTimeout(400);await page.screenshot({path:process.env.SHOT+'-1.png'});
     await page.locator('#export-open').click();await page.locator('#export').waitFor();await page.locator('#view').selectOption('results');
     const dl=page.waitForEvent('download');await page.locator('#export').click();const d=await dl;await d.saveAs(process.env.SHOT+'-2.png');await page.locator('#export-dialog .close').click();}
    await page.locator('#results-toggle').click();await page.locator('#value-labels').uncheck();
   });
-  await check(`${engine}: ausschalten – Balken und Feld weg, Angaben bleiben; Rückgängig`,async()=>{
-   await page.locator('#trial-surface').uncheck();assert.equal((await bars(page)).length,0);
-   const s=await savedProject(page);assert.equal(s.trials,undefined);assert.deepEqual(s.markers.map(m=>m.surface),['ceiling','wall','floor']);
-   await pick(0);assert.equal(await page.locator('#surface-row').isVisible(),false);
-   await blur(page);await page.keyboard.press('Control+z');assert.deepEqual((await savedProject(page)).trials,{surface:true});assert.equal((await bars(page)).length,3);
+  await check(`${engine}: Probe aus LabelKit bringt ihre Oberflächenart mit`,async()=>{
+   const lk={version:'4.33.0',projekt:{nr:'26.0123'},proben:[{id:9,_nr:9,z2:'EG Flur',z4:'Ansicht',matrix:'Wischprobe',cm2:'600',datum:'2026-10-23'}]};
+   await page.locator('#lab-files').setInputFiles([{name:'26.0123_Daten.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(lk))}]);await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});
+   await page.locator('[data-pending]').first().click();const p=await toScreen(page,900,600);await page.mouse.click(p.x,p.y);await page.keyboard.press('Escape');
+   const m=(await savedProject(page)).markers.find(x=>x.label==='P9');assert.equal(m?.surface,'wall');assert.equal((await bars(page)).length,4);
   });
-  await check(`${engine}: Projektdatei behält Testfunktion und Flächen; ungültige Werte abgewiesen`,async()=>{
-   const file=await downloadedProject(page);assert.deepEqual(file.trials,{surface:true});
+  await check(`${engine}: ältere Projektdatei mit Testfunktion bleibt lesbar; ungültige Werte abgewiesen`,async()=>{
+   const file=await downloadedProject(page);file.trials={surface:true};
    await page.locator('#project-file').setInputFiles({name:'x.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(file))});await page.locator('#replace-yes').click();
-   await page.locator('#welcome').waitFor({state:'hidden'});assert.equal(await page.locator('#trial-surface').isChecked(),true);assert.equal((await bars(page)).length,3);
+   await page.locator('#welcome').waitFor({state:'hidden'});assert.equal((await bars(page)).length,4);
    for(const bad of [(f=>{f.markers[0].surface='decke';return f;})(structuredClone(file)),(f=>{f.trials={surface:true,raketen:true};return f;})(structuredClone(file))]){
     await page.locator('#project-file').setInputFiles({name:'bad.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(bad))});
     await page.locator('#toast.error').waitFor();await page.locator('#toast').evaluate(t=>{t.hidden=true;t.className='';});}
