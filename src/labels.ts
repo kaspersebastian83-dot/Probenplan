@@ -3,7 +3,7 @@
    • Messwerte am Plan – in der Ergebniskarte ein Wertkästchen je Probe (Wert wie im Prüfbericht, Einheit, Kategorie).
    Beides je Plan ein-/ausschaltbar. Die berechneten Positionen werden nie gespeichert: Gespeichert wird nur, was der Nutzer
    von Hand verschiebt (Marker.lx/ly). Bildschirm, PNG/JPG, PDF und Anlage verwenden dieselbe Rechnung. */
-import {escape,labelRadius,markerSize,markerSVG,shapeOf,type Marker,type Plan,type Project} from './model';
+import {escape,labelRadius,markerSize,markerSVG,shapeOf,trialOn,SURFACE_NAMES,type Marker,type Plan,type Project,type Surface} from './model';
 import {qualifierGroups,valueOf,UNRATED,type Rated} from './results';
 import {loadImage} from './import';
 import {planMatrix,preparation} from './preparation';
@@ -67,9 +67,9 @@ function categoryOf(rated:Rated,label:string){
 export function textOn(color:string){const n=parseInt(color.slice(1),16);if(!Number.isFinite(n))return '#1d2a33';const r=n>>16,g=n>>8&255,b=n&255,l=(r*299+g*587+b*114)/1000;if(l<150)return color;const f=150/l;return `#${[r,g,b].map(v=>Math.round(v*f).toString(16).padStart(2,'0')).join('')}`;}
 function box(p:Project,m:Marker,rated:Rated):ValueBox|undefined{
   const w=valueOf(m,rated.parameter);if(!w||m.kind!=='sample')return undefined;
-  const fs=markerSize(p)*.9,cat=categoryOf(rated,m.label),color=rated.fill.get(m.id)||UNRATED;
-  const line1=fs*(.66*m.label.length+.6*w.r.length+.46*w.u.length+1.4),line2=fs*.75*.56*(cat||'ohne Bewertung').length;
-  return {value:w.r,unit:w.u,cat:cat||'ohne Bewertung',color,fs,w:Math.max(line1,line2)+fs*1.5,h:fs*2.75};
+  const fs=markerSize(p)*.9,surf=trialOn(p,'surface')&&m.surface?SURFACE_NAMES[m.surface]+' · ':'',cat=surf+(categoryOf(rated,m.label)||'ohne Bewertung'),color=rated.fill.get(m.id)||UNRATED;
+  const line1=fs*(.66*m.label.length+.6*w.r.length+.46*w.u.length+1.4),line2=fs*.75*.56*cat.length;
+  return {value:w.r,unit:w.u,cat,color,fs,w:Math.max(line1,line2)+fs*1.5,h:fs*2.75};
 }
 
 /* ---------- Platzierung ---------- */
@@ -97,8 +97,8 @@ let cache:{key:string;out:Shown[]}|null=null;
 export function labeled(p:Project,rated?:Rated|null):Project{
   const auto=autoLabels(p.plan),values=!!rated&&valueLabels(p.plan);
   if(!auto&&!values)return p;
-  const key=[auto,values,markerSize(p),inkReady(p.plan)?inkKey(p.plan):'-',p.plan.width,p.plan.height,rated?.parameter||'',
-    ...p.markers.map(m=>`${m.id}|${m.label}|${m.x}|${m.y}|${m.lx}|${m.ly}|${m.shape||''}|${m.kind}|${values?`${rated!.fill.get(m.id)}|${valueOf(m,rated!.parameter)?.r||''}|${categoryOf(rated!,m.label)}`:''}`)].join(';');
+  const key=[auto,values,trialOn(p,'surface'),markerSize(p),inkReady(p.plan)?inkKey(p.plan):'-',p.plan.width,p.plan.height,rated?.parameter||'',
+    ...p.markers.map(m=>`${m.id}|${m.label}|${m.x}|${m.y}|${m.lx}|${m.ly}|${m.shape||''}|${m.kind}|${m.surface||''}|${values?`${rated!.fill.get(m.id)}|${valueOf(m,rated!.parameter)?.r||''}|${categoryOf(rated!,m.label)}`:''}`)].join(';');
   if(cache?.key===key)return {...p,markers:cache.out};
   const out=place(p,auto,values?rated!:null,inks.get(inkKey(p.plan))||null);
   cache={key,out};return {...p,markers:out};
@@ -107,7 +107,7 @@ function place(p:Project,auto:boolean,rated:Rated|null,ink:Ink|null):Shown[]{
   const r=markerSize(p),shown:Shown[]=p.markers.map(m=>{const b=rated?box(p,m,rated):undefined;return b?{...m,box:b}:{...m};});
   const rects=new Map<string,R>(),leaders:number[][]=[];
   const rectAt=(m:Shown,x:number,y:number):R=>{const {hw,hh}=half(p,m);return {x0:x-hw,y0:y-hh,x1:x+hw,y1:y+hh};};
-  const points=shown.map(m=>({id:m.id,x:m.x,y:m.y,rad:m.kind==='fire'?r*1.4:r*.55}));
+  const points=shown.map(m=>({id:m.id,x:m.x,y:m.y,rad:m.kind==='fire'?r*1.4:m.surface&&trialOn(p,'surface')?r*1.05:r*.55}));   // Flächenbalken braucht Platz
   // Feste Schilder zuerst: von Hand versetzte, Brandherde, und alles ohne Automatik
   const free:Shown[]=[];
   for(const m of shown){
@@ -168,8 +168,21 @@ export function shownSVG(p:Project,m:Shown,selected=false,minSize=0,fill?:string
     return `<g data-id="${m.id}">${selected?`<rect x="${m.lx-m.box.w/2-r*.35}" y="${m.ly-m.box.h/2-r*.35}" width="${m.box.w+r*.7}" height="${m.box.h+r*.7}" rx="${r*.4}" fill="none" stroke="#e0ae42" stroke-width="${r*.2}" stroke-dasharray="${r*.3} ${r*.2}"/>`:''}`
       +`<path d="M${m.x} ${m.y} L${m.lx} ${m.ly}" stroke="#ffffff" stroke-width="${r*.32}" pointer-events="none"/><path d="M${m.x} ${m.y} L${m.lx} ${m.ly}" stroke="${c}" stroke-width="${r*.13}" pointer-events="none"/>`
       +boxSVG(m)
-      +`<g data-drag="point"><circle cx="${m.x}" cy="${m.y}" r="${Math.max(r*.85,minSize*1.85)}" fill="transparent"/><circle cx="${m.x}" cy="${m.y}" r="${pr}" fill="${c}" stroke="#ffffff" stroke-width="${pr*.35}" paint-order="stroke"/></g></g>`;
+      +`<g data-drag="point"><circle cx="${m.x}" cy="${m.y}" r="${Math.max(r*.85,minSize*1.85)}" fill="transparent"/><circle cx="${m.x}" cy="${m.y}" r="${pr}" fill="${c}" stroke="#ffffff" stroke-width="${pr*.35}" paint-order="stroke"/></g>${pointBar(p,m,pr,c)}</g>`;
   }
   const halo=m.auto||autoLabels(p.plan)?(()=>{const {hw,hh}=half(p,m),k=m.kind==='fire'?.9:1;return `<rect x="${m.lx-hw*k-r*.12}" y="${m.ly-hh*k-r*.12}" width="${(hw*k+r*.12)*2}" height="${(hh*k+r*.12)*2}" rx="${Math.min(hw,hh)}" fill="#ffffff" fill-opacity=".85" pointer-events="none"/>`;})():'';
-  return (m.kind==='fire'?'':halo)+markerSVG(p,m,selected,minSize,fill);
+  return (m.kind==='fire'?'':halo)+markerSVG(p,m,selected,minSize,fill)+surfaceBar(p,m,minSize,fill);
+}
+/** Probenfläche an der Probenstelle (Wertkästchen): Balken oben/links/unten am farbigen Punkt. */
+function pointBar(p:Project,m:Shown,pr:number,c:string){
+  if(m.kind!=='sample'||!m.surface||m.surface==='other'||!trialOn(p,'surface'))return '';
+  const t=pr*.5,box:Record<Exclude<Surface,'other'>,[number,number,number,number]>={ceiling:[m.x-pr,m.y-pr-t*1.6,pr*2,t],floor:[m.x-pr,m.y+pr+t*.6,pr*2,t],wall:[m.x-pr-t*1.6,m.y-pr,t,pr*2]};
+  const [x,y,w,h]=box[m.surface];return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${t*.3}" fill="${c}" stroke="#ffffff" stroke-width="${t*.4}" paint-order="stroke" pointer-events="none"/>`;
+}
+/** Probenfläche am Schild: Balken oben (Decke), links (Wand), unten (Boden). Nur mit eingeschalteter Testfunktion. */
+function surfaceBar(p:Project,m:Shown,minSize=0,fill?:string){
+  if(m.kind!=='sample'||!m.surface||m.surface==='other'||!trialOn(p,'surface'))return '';
+  const r=Math.max(markerSize(p),minSize),k=r/markerSize(p),{hw,hh}=half(p,m),w=hw*k,h=hh*k,t=r*.3,c=fill||'#17665e';
+  const box:Record<Exclude<Surface,'other'>,[number,number,number,number]>={ceiling:[m.lx-w*.75,m.ly-h-t*1.1,w*1.5,t],floor:[m.lx-w*.75,m.ly+h+t*.1,w*1.5,t],wall:[m.lx-w-t*1.1,m.ly-h*.75,t,h*1.5]};
+  const [x,y,bw,bh]=box[m.surface];return `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="${t*.3}" fill="${c}" stroke="#ffffff" stroke-width="${t*.35}" paint-order="stroke" pointer-events="none"/>`;
 }

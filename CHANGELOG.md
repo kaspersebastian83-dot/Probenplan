@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.22.0 – 24. Oktober 2026
+
+- **Testfunktionen** (Liste → „Testfunktionen“): neue Ideen zum Ausprobieren im echten Projekt, je Projekt ein- und ausschaltbar (rückgängig machbar). Ausgeschaltet bleiben eingegebene Angaben erhalten, werden aber weder angezeigt noch exportiert.
+- Erste Testfunktion **Probenfläche**: je Probe Decke, Wand, Boden oder Sonstige (unter „Markierungen“). Am Schild bzw. an der Probenstelle ein Balken oben (Decke), links (Wand) oder unten (Boden) – auch schwarzweiß lesbar; im Wertkästchen der Ergebniskarte („Decke · hoch“) und in der Legende („Probenfläche: Decke: P1 …“). Projektdatei: `trials` am Projekt, `surface` an der Probe; ältere Versionen ignorieren beides.
+
 ## 1.21.0 – 23. Oktober 2026
 
 - **Skizze, wenn kein Plan vorliegt**: Startseite „Kein Plan? Skizze zeichnen“ bzw. unten „＋ Skizze“ für ein weiteres Geschoss. Räume als Rechtecke aufziehen (Raster 10 cm, Räume rasten an vorhandenen Wänden ein), Name, Breite und Tiefe in Metern eintippen; freie Wände, auch schräg (Richtungen nahe 15°-Schritten werden genau ausgerichtet, Länge eintippbar); Türen (0,90 m, Aufschlag wechselbar) und Fenster (1,20 m) per Tipp auf jede Wand, auch auf schräge; freier Text wie „Treppe“ in drei Größen. Räume, Wände und Texte verschieben, Räume in der Größe ändern, löschen mit Entf; Rückgängig auch während des Zeichnens. „Skizze fertig“ schneidet die Zeichenfläche auf den Inhalt zu (1 m Rand). Ergebnis ist ein normaler Vektorplan mit Raumnamen, Fläche in m² und automatisch gesetztem Maßstab – maßstäbliches PDF, Proben, Beschriftung und Anlage funktionieren wie bei jedem Plan. „Skizze“ links bearbeitet sie später weiter; Proben bleiben an ihrer Stelle. Drehen, Zuschneiden, Ausrichten und Entzerren sind bei Skizzen gesperrt.

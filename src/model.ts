@@ -15,13 +15,21 @@ export interface LabSample extends LabData {label:string;typ?:string;shape?:Shap
 export type Shape = 'circle' | 'square' | 'diamond';
 export const SHAPES:readonly Shape[]=['circle','square','diamond'];
 export const SHAPE_NAMES:Record<Shape,string>={circle:'Kreis',square:'Quadrat',diamond:'Raute'};
-export interface Marker { id: string; kind: Kind; label: string; note: string; x: number; y: number; lx: number; ly: number; lab?:LabData; shape?:Shape; typ?:string }
+export interface Marker { id: string; kind: Kind; label: string; note: string; x: number; y: number; lx: number; ly: number; lab?:LabData; shape?:Shape; typ?:string; surface?:Surface }
 /** LabelKit-Probenart („PAK · Wischprobe“) → Typ und Standardform: PAK Kreis, Chlorid Quadrat, Asbest Raute, Sonstige Kreis. */
 const TYPES:[RegExp,string,Shape][]=[[/^pak\b/i,'PAK','circle'],[/^chlorid\b/i,'Chlorid','square'],[/^asbest\b/i,'Asbest','diamond'],[/^sonstige\b/i,'Sonstige','circle']];
 export function typeFromArt(art?:string):{typ:string;shape:Shape}|null{const a=(art||'').trim();for(const [re,typ,shape] of TYPES)if(re.test(a))return {typ,shape};return null;}
 export function shapeForType(typ?:string):Shape{return TYPES.find(t=>t[1]===typ)?.[2]||'circle';}
 /** Form einer Laborprobe vor dem Platzieren: im Prüfdialog gewählt, sonst aus der Probenart. */
 export function pendingShape(r:{shape?:Shape;typ?:string;art?:string}):Shape{return r.shape||shapeForType(r.typ||typeFromArt(r.art)?.typ);}
+/** Probenfläche (Testfunktion ab 1.22): wo die Probe genommen wurde. */
+export type Surface='ceiling'|'wall'|'floor'|'other';
+export const SURFACES:readonly Surface[]=['ceiling','wall','floor','other'];
+export const SURFACE_NAMES:Record<Surface,string>={ceiling:'Decke',wall:'Wand',floor:'Boden',other:'Sonstige'};
+/** Testfunktionen je Projekt (zum Ausprobieren): nur eingeschaltete stehen im Projekt. Ausgeschaltet bleiben eingegebene Daten erhalten. */
+export interface Trials {surface?:true}
+export const TRIALS:readonly (keyof Trials)[]=['surface'];
+export const trialOn=(p:{trials?:Trials},k:keyof Trials)=>!!p.trials?.[k];
 export const SHAPE_SYMBOL:Record<Shape,string>={circle:'○',square:'□',diamond:'◇'};
 export const TYPE_ORDER=TYPES.map(t=>t[1]);
 export function shapeOf(m:Marker):Shape{return m.shape||typeFromArt(m.lab?.art)?.shape||'circle';}
@@ -42,7 +50,7 @@ export interface Plan { name: string; width: number; height: number; data: strin
 export interface Sheet { id:string; name:string; plan?:Plan; markers?:Marker[]; areas?:Area[] }
 // Format 6: wie 5, zusätzlich Feinausrichtung (Preparation.angle). Ältere PlanKit-Versionen lehnen es ab, statt den Winkel still zu übergehen.
 export type Version = 1|2|3|4|5|6;
-export interface Project { format: 'probenplan'; version: Version; plan: Plan; markers: Marker[]; nextSample: number; nextFire: number; report: string; date: string; areas?:Area[]; nextArea?:number; pending?:LabSample[]; labReports?:LabOrigin[]; sheets?:Sheet[]; active?:number; results?:ResultSettings }
+export interface Project { format: 'probenplan'; version: Version; plan: Plan; markers: Marker[]; nextSample: number; nextFire: number; report: string; date: string; areas?:Area[]; nextArea?:number; pending?:LabSample[]; labReports?:LabOrigin[]; sheets?:Sheet[]; active?:number; results?:ResultSettings; trials?:Trials }
 const clonePlan=(plan:Plan):Plan=>({...plan,...(plan.sketch?{sketch:structuredClone(plan.sketch)}:{}),...(plan.calibration?{calibration:{...plan.calibration}}:{}),...(plan.preparation?{preparation:structuredClone(plan.preparation)}:{}),...(plan.pdf?{pdf:{...plan.pdf}}:{})});
 const cloneMarkers=(markers:Marker[])=>markers.map(m=>({...m,...(m.lab?{lab:{...m.lab}}:{})}));
 const cloneAreas=(areas:Area[])=>areas.map(a=>({...a,points:a.points.map(pt=>({...pt}))}));

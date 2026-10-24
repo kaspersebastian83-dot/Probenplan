@@ -1,5 +1,5 @@
 import {labeled,shownSVG,ensureInk} from './labels';
-import {bounds, floorName, markerSize, shapeOf, typeOf, starPath, FIRE_RED, SHAPES, SHAPE_NAMES, TYPE_ORDER, type Project, type Shape} from './model';
+import {bounds, floorName, markerSize, shapeOf, typeOf, starPath, trialOn, FIRE_RED, SHAPES, SHAPE_NAMES, SURFACE_NAMES, TYPE_ORDER, type Project, type Shape, type Surface} from './model';
 import {loadImage} from './import';
 import {planMatrix,preparation} from './preparation';
 import {areaAnchor,areaCategories,areaSVG,palette} from './areas';
@@ -9,7 +9,7 @@ export function wrap(ctx:CanvasRenderingContext2D,text:string,width:number){
   for(const word of text.split(/\s+/)){if(line&&ctx.measureText(`${line} ${word}`).width<=width){line+=` ${word}`;continue;}if(line){lines.push(line);line='';}for(const char of word){if(line&&ctx.measureText(line+char).width>width){lines.push(line);line='';}line+=char;}}
   if(line)lines.push(line);return lines;
 }
-interface LegendVariant {color:string;opacity:number;outline:string;dash:readonly number[];round:boolean;text:string;shape?:Shape|'star'}
+interface LegendVariant {color:string;opacity:number;outline:string;dash:readonly number[];round:boolean;text:string;shape?:Shape|'star';surface?:Surface}
 /** Legende der Formen: mehrere Formen im Plan → je Form die Probenarten (aus LabelKit). Probe/Brandherd stehen fest in der Fußzeile. */
 const DEFAULT_TYPE:Record<Shape,string>={circle:'PAK',square:'Chlorid',diamond:'Asbest'};
 export function markerLegend(p:Project):{name:string;variants:LegendVariant[]}|null{
@@ -30,6 +30,8 @@ function legendBlocks(p:Project,rated?:Rated|null){
     if(rated.unrated.length)blocks.push({name:'Ohne Bewertung',variants:[{color:UNRATED,opacity:1,outline:'#1d2a33',dash:[],round:true,text:`${rated.unrated.join(', ')} – kein Wert für ${shortParameter(rated.parameter)} oder keine anwendbare Skala / Zahl nicht eindeutig`}]});
   }
   const ml=markerLegend(p);if(ml)blocks.push(ml);
+  if(trialOn(p,'surface')){const used=(['ceiling','wall','floor'] as Surface[]).map(s=>({s,labels:p.markers.filter(m=>m.kind==='sample'&&m.surface===s).map(m=>m.label)})).filter(x=>x.labels.length);
+    if(used.length)blocks.push({name:'Probenfläche',variants:used.map(x=>({color:'#5b6773',opacity:1,outline:'#5b6773',dash:[],round:true,surface:x.s,text:`${SURFACE_NAMES[x.s]}: ${x.labels.sort((a,b)=>a.localeCompare(b,'de',{numeric:true})).join(', ')}`}))});}
   for(const c of areaCategories(p.areas||[]))blocks.push({name:c.name,variants:c.variants.map(v=>{const pal=palette(v.color);return {color:v.color,opacity:v.opacity,outline:pal.outline,dash:pal.dash,round:false,text:`${v.labels.join(', ')} · ${Math.round(v.opacity*100)} %`};})});
   return blocks;
 }
@@ -69,7 +71,9 @@ export function drawLegend(ctx:CanvasRenderingContext2D,legend:LegendLayout,x:nu
   if(title){ctx.fillStyle='#263b35';ctx.font=`bold ${fs*1.15}px Arial`;ctx.fillText(legend.title,x,y+fs*1.2);}
   for(const c of entries){ctx.fillStyle='#263b35';ctx.font=`bold ${fs}px Arial`;c.lines.forEach((line,i)=>ctx.fillText(line,x,y+c.top+i*fs*1.35));
     for(const v of c.variants){const top=y+v.top-fs*.8,w=fs*2.2,h=fs*.9;ctx.fillStyle=v.color;ctx.globalAlpha=v.opacity;ctx.strokeStyle=v.outline;ctx.lineWidth=fs*.08;
-      if(v.shape){const cx=x+w/2,cy=top+h/2,R=h*.62;ctx.lineWidth=fs*.1;ctx.beginPath();
+      if(v.surface){const cx=x+w/2,cy=top+h/2,R=h*.5,t=R*.45;ctx.beginPath();ctx.arc(cx,cy,R,0,2*Math.PI);ctx.fill();
+        if(v.surface==='ceiling')ctx.fillRect(cx-R,cy-R-t*1.6,2*R,t);else if(v.surface==='floor')ctx.fillRect(cx-R,cy+R+t*.6,2*R,t);else if(v.surface==='wall')ctx.fillRect(cx-R-t*1.6,cy-R,t,2*R);}
+      else if(v.shape){const cx=x+w/2,cy=top+h/2,R=h*.62;ctx.lineWidth=fs*.1;ctx.beginPath();
         if(v.shape==='star')ctx.fill(new Path2D(starPath(cx,cy,R*1.25)));
         else{if(v.shape==='circle')ctx.arc(cx,cy,R,0,2*Math.PI);else if(v.shape==='square')ctx.rect(cx-R,cy-R,2*R,2*R);else{ctx.moveTo(cx,cy-R*1.25);ctx.lineTo(cx+R*1.25,cy);ctx.lineTo(cx,cy+R*1.25);ctx.lineTo(cx-R*1.25,cy);ctx.closePath();}ctx.fill();ctx.stroke();}
         ctx.globalAlpha=1;}
