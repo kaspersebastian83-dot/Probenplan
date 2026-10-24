@@ -2,7 +2,7 @@
 // verkleinern, Prüfsummen der Quelldateien berechnen, Word-Datei bauen und – im Projektordner – nie überschreibend
 // in „Mitteilungen“ speichern (mit Zeile im „_Anlagen-Protokoll.txt“, wie die Anlagen aus der Projektzentrale).
 import {build} from './docx';
-import {annexBlocks,annexChecks,collectSamples,photoLabels,scaleNotes,type AnnexCheck,type AnnexImage,type AnnexPhoto,type AnnexPlanPage,type AnnexSample,type AnnexSource} from './annex';
+import {annexBlocks,annexChecks,bohrkernNummern,collectSamples,photoLabels,scaleNotes,type AnnexCheck,type AnnexImage,type AnnexPhoto,type AnnexPlanPage,type AnnexSample,type AnnexSource} from './annex';
 import {renderSheet,sheetLayout} from './sheet';
 import {drawPlanContent} from './export';
 import {clone,floorName,markerSize,sheetCount,sheetProject,type Project} from './model';
@@ -51,7 +51,7 @@ async function excerpts(p:Project,o:AnnexOptions,samples:AnnexSample[]){
 
 interface FotoKitImage {beschreibung?:string;abschnitt?:string;probe?:string;drehung?:number;aussortiert?:boolean;original?:{name?:string;aufnahme?:string};sha256?:{wert?:string}}
 /** Fotos mit Probe-Nr. aus FotoKit: Datei lesen, Prüfsumme neu berechnen und mit FotoKit vergleichen, für die Anlage verkleinern. */
-async function photos(f:ProjectFolder,o:AnnexOptions,samples:AnnexSample[],sources:AnnexSource[]):Promise<AnnexPhoto[]|null>{
+async function photos(f:ProjectFolder,o:AnnexOptions,samples:AnnexSample[],sources:AnnexSource[],bk?:Map<string,string[]>):Promise<AnnexPhoto[]|null>{
   const dir=await findSubdir(f.dir,FOTOS);if(!dir)return null;
   const json=await fileInfo(dir,FOTOKIT_FILE);if(!json)return null;
   let data:{bilder?:Record<string,FotoKitImage>;reihenfolge?:string[]};try{data=JSON.parse(await json.text());}catch{throw Error(`„${FOTOS}/${FOTOKIT_FILE}“ ist nicht lesbar.`);}
@@ -62,8 +62,8 @@ async function photos(f:ProjectFolder,o:AnnexOptions,samples:AnnexSample[],sourc
   const labels=new Set(samples.map(s=>s.label)),shownPer=new Map<string,number>(),out:AnnexPhoto[]=[];
   for(const [i,[name,v]] of entries.entries()){
     o.progress?.(`Foto ${i+1} von ${entries.length} wird geprüft …`);
-    const ls=photoLabels(String(v.probe)),file=await fileInfo(dir,name),stored=String(v.sha256?.wert||'').toLowerCase();
-    const photo:AnnexPhoto={file:name,desc:String(v.beschreibung||'').trim(),section:String(v.abschnitt||'').trim(),taken:String(v.original?.aufnahme||'').trim(),sha:'',status:'missing',labels:ls};
+    const ls=photoLabels(String(v.probe),bk),file=await fileInfo(dir,name),stored=String(v.sha256?.wert||'').toLowerCase();
+    const photo:AnnexPhoto={file:name,desc:String(v.beschreibung||'').trim(),section:String(v.abschnitt||'').trim(),taken:String(v.original?.aufnahme||'').trim(),sha:'',status:'missing',labels:ls,probe:String(v.probe).trim()};
     if(file){photo.sha=(await fileRevision(file))||'';photo.status=!stored?'nohash':stored===photo.sha?'ok':'changed';
       const wanted=ls.some(l=>labels.has(l)&&(shownPer.get(l)||0)<o.maxPhotos);
       if(wanted&&o.maxPhotos>0){try{photo.image=await shrink(file,Number(v.drehung)||0);ls.forEach(l=>shownPer.set(l,(shownPer.get(l)||0)+1));}catch{/* nicht lesbares Bildformat (z. B. HEIC): nur in der Liste */}}}
@@ -108,11 +108,13 @@ export async function createAnnex(p:Project,folder:ProjectFolder|null,o:AnnexOpt
     for(const r of project.labReports||[])for(const name of [r.sources.xml,r.sources.pdf].filter((x):x is string=>!!x))
       await hashSource(lab,LABOR,name,`Laborbericht ${r.bericht||''} ${r.labor?`(${r.labor})`:''}`.replace(/\s+/g,' ').trim(),sources,missing);
     const auftraege=await findSubdir(folder.dir,AUFTRAEGE),daten=auftraege?(await listFiles(auftraege,/_Daten\.json$/i))[0]:undefined;
-    if(daten){const file=await daten.handle.getFile();sources.push({role:'Probenerfassung LabelKit (neueste Datei)',name:`${AUFTRAEGE}/${daten.name}`,stand:stand(file.lastModified),sha:await sha(await file.arrayBuffer())});}
+    let bk:Map<string,string[]>|undefined;
+    if(daten){const file=await daten.handle.getFile(),bytes=await file.arrayBuffer();sources.push({role:'Probenerfassung LabelKit (neueste Datei)',name:`${AUFTRAEGE}/${daten.name}`,stand:stand(file.lastModified),sha:await sha(bytes)});
+      try{bk=bohrkernNummern(JSON.parse(new TextDecoder().decode(bytes)));}catch{/* unlesbar: Bohrkern-IDs auf Fotos bleiben unzugeordnet (Prüfprotokoll nennt sie) */}}
     const pj=o.projectDataSource===undefined?await fileInfo(folder.dir,'_Projekt.json'):o.projectDataSource;
     if(pj)sources.push({role:o.projectDataStale?'Projektdaten (möglicherweise veraltet; Verwendung bestätigt)':'Projektdaten (Projektzentrale)',name:'_Projekt.json',stand:stand(pj.lastModified),sha:await sha(await pj.arrayBuffer())});
     if(o.projectDataStale)extra.push({text:'Gemeinsame Projektdaten möglicherweise veraltet',ok:false,detail:'Die erneute Aktualisierung war nicht erfolgreich. Verwendung für diese Anlage ausdrücklich bestätigt.'});
-    fotos=await photos(folder,o,samples,sources);
+    fotos=await photos(folder,o,samples,sources,bk);
   }else{
     sources.push({role:'PlanKit-Projekt (nicht im Projektordner gespeichert)',name:'Projektstand beim Erstellen',stand:stand(Date.now()),sha:await sha(new TextEncoder().encode(JSON.stringify(project)))});
   }
