@@ -25,11 +25,13 @@ export function applyLabImport(project:Project,report:LabReport,choices:Readonly
   const choice=choices.get(input),hit=[...allMarkers(next),...allAreas(next),...next.pending].find(r=>r.label.toUpperCase()===input.label.toUpperCase());
   if(choice==='skip')continue;
   if(hit&&choice!=='update'&&choice!=='next')throw Error(`${input.label}: Herkunftskonflikt bitte ausdrücklich auflösen.`);
-  const row:LabSample={label:input.label,ref:input.ref,desc:input.desc,...(input.art!==undefined?{art:input.art}:{}),...(input.labNr!==undefined?{labNr:input.labNr}:{}),...(input.datum!==undefined?{datum:input.datum}:{}),...(input.werte?{werte:input.werte.map(w=>({...w}))}:{}),bericht:origin.bericht,reportId:origin.id,...(input.typ?{typ:input.typ}:{}),...(input.shape?{shape:input.shape}:{}),...(input.surface?{surface:input.surface}:{})};
+  const row:LabSample={label:input.label,ref:input.ref,desc:input.desc,...(input.art!==undefined?{art:input.art}:{}),...(input.labNr!==undefined?{labNr:input.labNr}:{}),...(input.datum!==undefined?{datum:input.datum}:{}),...(input.werte?{werte:input.werte.map(w=>({...w}))}:{}),bericht:origin.bericht,reportId:origin.id,...(input.typ?{typ:input.typ}:{}),...(input.shape?{shape:input.shape}:{}),...(input.surface?{surface:input.surface}:{}),...(input.raum?{raum:input.raum}:{})};
   if(choice==='update'){
    if(!hit||('kind' in hit&&hit.kind!=='sample')||'points' in hit)throw Error(`${input.label}: Nur Laborproben oder Probenmarker können ersetzt werden.`);
    // Probenart aus LabelKit (Form/Legende) bleibt erhalten, auch wenn der Laborbericht eine andere Probenart nennt
-   const {label,typ,shape,surface,...lab}=row;
+   const {label,typ,shape,surface,raum,...lab}=row;
+   // Raum aus LabelKit füllt nur einen leeren Marker; eine Eingabe in PlanKit bleibt.
+   if('kind' in hit&&raum&&!hit.raum)hit.raum=raum;
    // Oberflächenart aus LabelKit füllt nur einen leeren Marker; eine Eingabe in PlanKit bleibt.
    if('kind' in hit&&surface&&!hit.surface)hit.surface=surface;
    if('kind' in hit&&shape){if(shape==='circle')delete hit.shape;else hit.shape=shape;}

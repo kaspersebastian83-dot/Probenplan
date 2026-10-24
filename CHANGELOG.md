@@ -1,5 +1,12 @@
 # Änderungen
 
+## 1.24.0 – 24. Oktober 2026
+
+- **Raumbuch** (Liste → „Raumbuch bearbeiten …“): eine Zeile je Raum und Geschoss mit Befund (Proben mit Messwert und Oberflächenart, Brandherd) und Bewertung nach der Skala der Ergebniskarte – beides wird aus den Proben berechnet und nie gespeichert. Eingaben je Raum: Maßnahme (mit Vorschlägen aus den zuletzt benutzten) und Bemerkung. Räume ohne Probe kommen mit Status dazu: Sichtprüfung unauffällig, Sichtprüfung auffällig, nicht begangen / nicht zugänglich. Ähnliche Schreibweisen („Kü.“ / „Küche“) werden erkannt und lassen sich zusammenführen; „Küche“ und „Kueche“ gelten ohnehin als derselbe Raum. Hinweise vor dem Export: auffällige Räume ohne Maßnahme, Proben ohne Raum, fehlende Laborwerte.
+- Ausgabe als **Word-Anlage** (zum Einfügen in den Bericht) und als **Tabelle für Excel (CSV)** für die Sanierung, im Projektordner in „Mitteilungen“ (nie überschreibend, mit Zeile im Anlagen-Protokoll). Keine Flächen und Mengen: „Flächenangaben und Mengenermittlung obliegen dem ausführenden Unternehmen.“
+- **Raum** je Probe und Brandherd: kommt beim „Proben übernehmen“ aus LabelKit („Raum / Ort“), sonst unter „Markierungen“ im neuen Feld „Raum“. Eine Eingabe in PlanKit bleibt auch bei erneutem Import. Das Geschoss kommt aus dem Plannamen (EG, 1. OG …) oder aus dem Anfang des Raumnamens („EG Küche“).
+- Projektdatei: `raum` an Markern und offenen Proben, `raumbuch` am Projekt. Ältere PlanKit-Versionen öffnen die Datei, verlieren beim Speichern aber Raum und Raumbuch.
+
 ## 1.23.0 – 24. Oktober 2026
 
 - **Oberflächenart** statt Testfunktion „Probenfläche“: Aufsicht, Ansicht oder Untersicht je Probe kommt beim „Proben übernehmen“ aus LabelKit (Spalte „Oberflächenart“); fehlt sie dort, unter „Markierungen“ wählbar. Eine Eingabe in PlanKit bleibt auch bei erneutem Import. Immer sichtbar: Balken unten (Aufsicht), links (Ansicht) oder oben (Untersicht), im Wertkästchen und in der Legende. Ältere Projektdateien mit der Testfunktion bleiben lesbar.

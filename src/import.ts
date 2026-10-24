@@ -4,7 +4,7 @@ import type {LabData} from './model';
 import {copyOrigin,validOrigin} from './lab-provenance';
 import DOMPurify from 'dompurify';
 import { unzipSync } from 'fflate';
-import { MARKER_SCALE, type Plan, type Project, type Preparation, type Sheet, type ResultSettings, type Scale, validLabel, SHAPES, MAX_SHEETS, cleanSheetName, allMarkers, allAreas ,SURFACES,TRIALS,type Trials} from './model';
+import { MARKER_SCALE, type Plan, type Project, type Preparation, type Sheet, type ResultSettings, type Scale, validLabel, SHAPES, MAX_SHEETS, cleanSheetName, allMarkers, allAreas ,SURFACES,TRIALS,type Trials,MAX_RAUM,RAUM_STATUS,type Raumbuch,type RaumEintrag} from './model';
 import {MAX_AREAS,MAX_POINTS,PALETTE,cleanName,polygonError} from './areas';
 import {MAX_ANGLE,wholeSize} from './preparation';
 const MAX=60*1024*1024;
@@ -78,6 +78,7 @@ export async function validateProject(value:unknown):Promise<Project>{
   const p=(fine?{...raw,version:raw.sheets!==undefined?5:4}:raw) as Project;
   const result=await validateFormat(p,fine);
   if(fine)result.version=6;
+  if(raw.raumbuch!==undefined){const rb=validRaumbuch(raw.raumbuch);if(rb.rooms.length||rb.alias)result.raumbuch=rb;}
   if(raw.trials!==undefined){const t=raw.trials;if(!t||typeof t!=='object'||Array.isArray(t)||Object.entries(t).some(([k,v])=>!TRIALS.includes(k as keyof Trials)||v!==true))throw Error('Ungültige Testfunktionen in der Projektdatei.');if(Object.keys(t).length)result.trials={...t};}
   return result;
 }
@@ -134,7 +135,7 @@ async function validateSingle(p:Project,fine=false):Promise<Project>{
   if(p.plan.north!==undefined){const n=p.plan.north;if(typeof n!=='number'||!Number.isFinite(n)||n<0||n>=360)throw Error('Ungültige Nordrichtung in der Projektdatei.');plan.north=n;}
   const ids=new Set<string>();const labels=new Set<string>();
   for(const m of p.markers){
-    if(!m||!['sample','fire'].includes(m.kind)||typeof m.id!=='string'||!/^[\w-]{1,80}$/.test(m.id)||ids.has(m.id)||typeof m.label!=='string'||!validLabel({...p,markers:[],areas:[],pending:[]},m.label,m.id)||labels.has(m.label.toLocaleUpperCase())||typeof m.note!=='string'||m.note.length>500||![m.x,m.y,m.lx,m.ly].every(n=>Number.isFinite(n)&&Math.abs(n)<1_000_000)||(m.shape!==undefined&&!SHAPES.includes(m.shape))||(m.typ!==undefined&&(typeof m.typ!=='string'||m.typ.length>40))||(m.surface!==undefined&&(m.kind!=='sample'||!SURFACES.includes(m.surface))))throw Error('Ungültige oder doppelte Markierungen in der Projektdatei.');
+    if(!m||!['sample','fire'].includes(m.kind)||typeof m.id!=='string'||!/^[\w-]{1,80}$/.test(m.id)||ids.has(m.id)||typeof m.label!=='string'||!validLabel({...p,markers:[],areas:[],pending:[]},m.label,m.id)||labels.has(m.label.toLocaleUpperCase())||typeof m.note!=='string'||m.note.length>500||![m.x,m.y,m.lx,m.ly].every(n=>Number.isFinite(n)&&Math.abs(n)<1_000_000)||(m.shape!==undefined&&!SHAPES.includes(m.shape))||(m.typ!==undefined&&(typeof m.typ!=='string'||m.typ.length>40))||(m.surface!==undefined&&(m.kind!=='sample'||!SURFACES.includes(m.surface)))||(m.raum!==undefined&&(typeof m.raum!=='string'||!m.raum.trim()||m.raum.length>MAX_RAUM)))throw Error('Ungültige oder doppelte Markierungen in der Projektdatei.');
     ids.add(m.id);labels.add(m.label.toLocaleUpperCase());
   }
   if(![p.nextSample,p.nextFire].every(n=>Number.isSafeInteger(n)&&n>=1&&n<1e9))throw Error('Ungültige Startnummer.');
@@ -151,7 +152,7 @@ async function validateSingle(p:Project,fine=false):Promise<Project>{
   for(const m of p.markers)if(m.lab!==undefined&&!validLab(m.lab))throw Error('Ungültige Labordaten an einer Markierung.');
   if(p.pending!==undefined){if(!Array.isArray(p.pending)||p.pending.length>1000)throw Error('Ungültige Liste offener Proben.');for(const row of p.pending){if(!validLab(row)||!/^P[1-9]\d{0,8}$/.test(row.label)||labels.has(row.label.toUpperCase()))throw Error('Ungültige oder doppelte offene Probe.');labels.add(row.label.toUpperCase());}}
   for(const row of [...p.markers.flatMap(m=>m.lab?[m.lab]:[]),...(p.pending||[])])if(row.reportId!==undefined){const r=reports.get(row.reportId);if(!r||(row.bericht!==undefined&&row.bericht!==r.bericht))throw Error('Laborprobe verweist auf eine fehlende oder widersprüchliche Bericht-Herkunft.');}
-  return {format:'probenplan',version:p.version>=3?p.version:plan.pdf||plan.preparation?2:p.version,plan,markers:p.markers.map(m=>({id:m.id,kind:m.kind,label:m.label,note:m.note,x:m.x,y:m.y,lx:m.lx,ly:m.ly,...(m.lab?{lab:copyLab(m.lab)}:{}),...(m.kind==='sample'&&m.shape&&m.shape!=='circle'?{shape:m.shape}:{}),...(m.kind==='sample'&&m.typ?{typ:m.typ}:{}),...(m.surface?{surface:m.surface}:{})})),nextSample:p.nextSample,nextFire:p.nextFire,report:p.report,date:p.date,...(p.areas!==undefined?{areas:p.areas!.map(a=>({id:a.id,label:a.label,name:cleanName(a.name),color:a.color,opacity:a.opacity,points:a.points.map(pt=>({x:Math.max(0,Math.min(plan.width,pt.x)),y:Math.max(0,Math.min(plan.height,pt.y))}))})),nextArea:p.nextArea}:{}),...(p.pending!==undefined?{pending:p.pending.map(r=>({label:r.label,...copyLab(r),...(typeof r.typ==='string'&&r.typ&&r.typ.length<=40?{typ:r.typ}:{}),...(r.shape&&SHAPES.includes(r.shape)?{shape:r.shape}:{}),...(r.surface&&SURFACES.includes(r.surface)?{surface:r.surface}:{})}))}:{}),...(p.labReports!==undefined?{labReports:p.labReports.map(copyOrigin)}:{}),...(p.results!==undefined?{results:validResults(p.results)}:{})};
+  return {format:'probenplan',version:p.version>=3?p.version:plan.pdf||plan.preparation?2:p.version,plan,markers:p.markers.map(m=>({id:m.id,kind:m.kind,label:m.label,note:m.note,x:m.x,y:m.y,lx:m.lx,ly:m.ly,...(m.lab?{lab:copyLab(m.lab)}:{}),...(m.kind==='sample'&&m.shape&&m.shape!=='circle'?{shape:m.shape}:{}),...(m.kind==='sample'&&m.typ?{typ:m.typ}:{}),...(m.surface?{surface:m.surface}:{}),...(m.raum?{raum:m.raum}:{})})),nextSample:p.nextSample,nextFire:p.nextFire,report:p.report,date:p.date,...(p.areas!==undefined?{areas:p.areas!.map(a=>({id:a.id,label:a.label,name:cleanName(a.name),color:a.color,opacity:a.opacity,points:a.points.map(pt=>({x:Math.max(0,Math.min(plan.width,pt.x)),y:Math.max(0,Math.min(plan.height,pt.y))}))})),nextArea:p.nextArea}:{}),...(p.pending!==undefined?{pending:p.pending.map(r=>({label:r.label,...copyLab(r),...(typeof r.typ==='string'&&r.typ&&r.typ.length<=40?{typ:r.typ}:{}),...(r.shape&&SHAPES.includes(r.shape)?{shape:r.shape}:{}),...(r.surface&&SURFACES.includes(r.surface)?{surface:r.surface}:{}),...(typeof r.raum==='string'&&r.raum.trim()&&r.raum.length<=MAX_RAUM?{raum:r.raum}:{})}))}:{}),...(p.labReports!==undefined?{labReports:p.labReports.map(copyOrigin)}:{}),...(p.results!==undefined?{results:validResults(p.results)}:{})};
 }
 export function validResults(value:unknown):ResultSettings{
   const r=value as ResultSettings;if(!r||typeof r!=='object'||typeof r.parameter!=='string'||r.parameter.length>160||!r.scales||typeof r.scales!=='object'||Array.isArray(r.scales)||Object.keys(r.scales).length>100)throw Error('Ungültige Einstellungen der Ergebniskarte.');
@@ -163,3 +164,21 @@ export function validResults(value:unknown):ResultSettings{
 
 export function validLab(row:unknown):row is LabData{const r=row as LabData;return !!r&&typeof r.ref==='string'&&r.ref.length<=160&&typeof r.desc==='string'&&r.desc.length<=500&&(['art','labNr','bericht'] as const).every(k=>r[k as 'art'|'labNr'|'bericht']===undefined||(typeof r[k]==='string'&&r[k].length<=160))&&(r.reportId===undefined||(typeof r.reportId==='string'&&/^[\w-]{1,80}$/.test(r.reportId)))&&(r.datum===undefined||r.datum===''||validDate(r.datum))&&(r.werte===undefined||(Array.isArray(r.werte)&&r.werte.length<=300&&r.werte.every(w=>!!w&&typeof w.p==='string'&&w.p.length<=160&&typeof w.r==='string'&&w.r.length<=40&&typeof w.u==='string'&&w.u.length<=40)));}
 export function copyLab(r:LabData):LabData{return {ref:r.ref,desc:r.desc,...(r.art!==undefined?{art:r.art}:{}),...(r.labNr!==undefined?{labNr:r.labNr}:{}),...(r.datum!==undefined?{datum:r.datum}:{}),...(r.bericht!==undefined?{bericht:r.bericht}:{}),...(r.reportId!==undefined?{reportId:r.reportId}:{}),...(r.werte!==undefined?{werte:r.werte.map(w=>({p:w.p,r:w.r,u:w.u}))}:{})};}
+
+/** Raumbuch prüfen: nur bekannte Felder, Längen begrenzt; Ungültiges weist die Datei ab, statt still etwas zu verlieren. */
+export function validRaumbuch(value:unknown):Raumbuch{
+  const r=value as Raumbuch,bad=()=>Error('Ungültiges Raumbuch in der Projektdatei.');
+  if(!r||typeof r!=='object'||Array.isArray(r)||!Array.isArray(r.rooms)||r.rooms.length>500)throw bad();
+  const str=(v:unknown,max:number,need=false)=>v===undefined?!need:typeof v==='string'&&v.length<=max&&(!need||!!v.trim());
+  const rooms:RaumEintrag[]=r.rooms.map(e=>{
+    if(!e||typeof e!=='object'||!str(e.floor,40)||typeof e.floor!=='string'||!str(e.name,MAX_RAUM,true)||(e.status!==undefined&&!RAUM_STATUS.includes(e.status))||!str(e.massnahme,500)||!str(e.bemerkung,500))throw bad();
+    return {floor:e.floor,name:e.name,...(e.status?{status:e.status}:{}),...(e.massnahme?{massnahme:e.massnahme}:{}),...(e.bemerkung?{bemerkung:e.bemerkung}:{})};
+  });
+  let alias:Record<string,string>|undefined;
+  if(r.alias!==undefined){
+    if(!r.alias||typeof r.alias!=='object'||Array.isArray(r.alias)||Object.keys(r.alias).length>500)throw bad();
+    alias={};for(const [k,v] of Object.entries(r.alias)){if(k.length>200||typeof v!=='string'||v.length>200||k===v||k==='__proto__')throw bad();alias[k]=v;}
+    if(!Object.keys(alias).length)alias=undefined;
+  }
+  return {rooms,...(alias?{alias}:{})};
+}
