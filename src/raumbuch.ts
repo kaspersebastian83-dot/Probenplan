@@ -17,7 +17,7 @@ export function norm(s:string){
 }
 export const roomKey=(floor:string,name:string)=>`${norm(floor)}|${norm(name)}`;
 
-const FLOOR_RE=/^(KG|UG|EG|DG|SB|OG|\d+\s*\.\s*OG|\d+\s*\.\s*UG|\d+\s*OG)(?=$|[\s,:/-])[\s,:/-]*/i;
+const FLOOR_RE=/^(KG|UG|EG|DG|SB|OG|\d+\s*\.\s*OG|\d+\s*\.\s*UG|\d+\s*OG)(?=$|[\s,:/_-])[\s,:/_-]*/i;
 /** Geschoss am Anfang des Raumnamens („EG Küche“, „1. OG Bad“) in einheitlicher Schreibweise. */
 function floorPrefix(name:string){const m=FLOOR_RE.exec(name.trim());if(!m)return null;
   const f=m[1].toUpperCase().replace(/\s+/g,'').replace(/^(\d+)\.?(OG|UG)$/,'$1. $2');return {floor:f,rest:name.trim().slice(m[0].length).trim()};}
@@ -58,6 +58,8 @@ export function raumbuchStand(source:Project):RaumbuchStand{
   const p=clone(source);if(hasValues(p))prepare(p);
   const parameter=p.results?.parameter||'',rb:Raumbuch=p.raumbuch||{rooms:[]},alias=rb.alias;
   const rows=new Map<string,RaumZeile>(),ohneRaum:string[]=[],firstName=new Map<string,string>();
+  // Ein einzelner Plan hat keinen Blattnamen: Geschoss dann aus dem Plannamen („EG.pdf“, „1. OG Grundriss.svg“), sonst keins.
+  const singleFloor=sheetCount(p)<=1?floorPrefix(String(p.plan?.name||'').replace(/\.[a-z0-9]{2,4}$/i,'')+' ')?.floor||'':'';
   const sheetOrder=new Map<string,number>();for(let i=0;i<sheetCount(p);i++){const f=floorName(p,i);if(f&&!sheetOrder.has(norm(f)))sheetOrder.set(norm(f),i);}
   const rowFor=(floor:string,name:string)=>{
     const own=roomKey(floor,name),key=resolve(alias,own);
@@ -77,10 +79,13 @@ export function raumbuchStand(source:Project):RaumbuchStand{
     if(rating){const b=best.get(r.key);if(!b||rating.rank>b.rank)best.set(r.key,rating);}
   };
   for(let i=0;i<sheetCount(p);i++){
-    const view=sheetProject(p,i),rated=parameter?rateMarkers(view):null,rt=ratings(rated),floor=floorName(p,i);
+    const view=sheetProject(p,i),rated=parameter?rateMarkers(view):null,rt=ratings(rated),floor=floorName(p,i)||singleFloor;
     for(const m of view.markers){const w=parameter&&m.kind==='sample'?valueOf(m,parameter):undefined;add(m,floor,w?`${w.r} ${w.u}`.trim():'',w?rt.get(m.label):undefined,true);}
   }
-  for(const r of p.pending||[]){const w=parameter?r.werte?.find(x=>x.p===parameter):undefined;add({label:r.label,kind:'sample',raum:r.raum,surface:r.surface},'',w?`${w.r} ${w.u}`.trim():'',undefined,false);}
+  // Noch nicht platzierte Proben mit Laborwerten werden nach derselben Skala bewertet wie die platzierten.
+  const pending=p.pending||[],pseudo:Marker[]=pending.map((r,i)=>({id:`pending-${i}`,kind:'sample',label:r.label,note:'',x:0,y:0,lx:0,ly:0,lab:{ref:r.ref,desc:r.desc,werte:r.werte}}));
+  const rtPending=parameter?ratings(rateMarkers(p,pseudo)):new Map<string,Rating>();
+  pending.forEach(r=>{const w=parameter?r.werte?.find(x=>x.p===parameter):undefined;add({label:r.label,kind:'sample',raum:r.raum,surface:r.surface},singleFloor,w?`${w.r} ${w.u}`.trim():'',w?rtPending.get(r.label):undefined,false);});
   // Eingaben des Sachverständigen: an beprobte Räume anhängen oder als Räume ohne Probe aufnehmen
   for(const e of rb.rooms){const r=rowFor(e.floor,e.name);r.massnahme=e.massnahme||'';r.bemerkung=e.bemerkung||'';if(!r.sampled&&!r.brandherd)r.status=e.status||'unauffaellig';else if(!r.sampled)r.status=e.status;}
   for(const r of rows.values()){

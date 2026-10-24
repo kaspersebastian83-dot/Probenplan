@@ -45,6 +45,18 @@ ok('Räume, Befund, Bewertung nach VdS-Referenz, Reihenfolge', ()=>{
   assert.deepEqual(s.ohneRaum,['P7']);
   assert.equal(s.doppelt.length,1);assert.deepEqual(s.doppelt[0].map(r=>r.name).sort(),['Kü.','Küche']);
 });
+ok('offene Proben mit Laborwerten werden bewertet', ()=>{
+  const p=projekt();p.pending.push({label:'P9',ref:'Probe 9',desc:'',raum:'EG Abstellraum',werte:[{p:SUM,r:'520',u:U}]});
+  const s=R.raumbuchStand(p),row=s.rows.find(r=>r.name==='Abstellraum');
+  assert.equal(row.probes[0].placed,false);assert.equal(row.auffaellig,true);assert.match(row.bewertung,/Referenzwert erreicht/);
+  assert.ok(R.pruefhinweise(s).some(h=>/5 auffällige Räume ohne Maßnahme/.test(h.text)));
+});
+ok('ein einzelner Plan: Geschoss aus dem Plannamen', ()=>{
+  const p=projekt();p.plan.name='1. OG Grundriss.pdf';p.markers=[m('P1','Küche','10'),m('P2','1. OG Bad','10')];p.pending=[];
+  assert.deepEqual(R.raumbuchStand(p).rows.map(r=>[r.floor,r.name]),[['1. OG','Küche'],['1. OG','Bad']]);
+  p.plan.name='EG_Bestand.svg';assert.equal(R.raumbuchStand(p).rows[0].floor,'EG');
+  p.plan.name='Grundriss.pdf';assert.deepEqual(R.raumbuchStand(p).rows.map(r=>r.floor),['1. OG',''],'ohne Geschoss im Plannamen wie bisher');
+});
 ok('ähnliche Namen: Nummern unterscheiden Räume, andere Geschosse nie', ()=>{
   const row=(floor,name)=>({floor,name});
   assert.equal(R.aehnlich([row('EG','Zimmer 1'),row('EG','Zimmer 2')]).length,0);
