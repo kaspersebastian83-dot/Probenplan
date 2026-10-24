@@ -1,5 +1,12 @@
 # Änderungen
 
+## 1.29.0 – 24. Oktober 2026
+
+- Neues Erscheinungsbild aller Word-Anlagen (Probenahme und Laborergebnisse, Raumbuch, Wandansichten) – passend zur Bilddokumentation aus FotoKit: Titel mit feiner blauer Linie statt Unterstreichung, Abschnitte in Firmenblau, Tabellen mit Haarlinien zwischen den Zeilen statt schwarzem Gitter, helle Kopfzeile mit blauer Linie, Bezeichnungen in Faktentabellen grau.
+- Spaltenbreiten so gewählt, dass „Probe“, Datum, „Wischprobe“, „Kinderzimmer“ oder „Referenzwert“ nicht mehr mitten im Wort umbrechen; „erreicht/überschritten“ bricht am Schrägstrich.
+- Wandansichten: gemeinsame Einheit steht im Spaltenkopf (z. B. „KW C10-C40 [mg/kg TS]“), die Einordnung als farbiges Kästchen vor dem Text statt vollflächig eingefärbter Zelle.
+- Inhalte, Werte, Dateinamen und Speicherorte unverändert. Die Anlagen bleiben ohne Formatvorlagen, damit sie sich mit „Einfügen › Objekt › Text aus Datei“ in das Gutachten einfügen.
+
 ## 1.28.2 – 24. Oktober 2026
 
 - Behoben: Raumbuch – wurde die Tabelle während des Tippens im Hintergrund neu gezeichnet (z. B. nach einer Sicherung oder Neuberechnung der Schilder), ging der gerade getippte Text in „Maßnahme“/„Bemerkung“ verloren. Jetzt bleiben Text, Fokus und Cursor erhalten, und der Text wird beim Verlassen des Felds gespeichert.

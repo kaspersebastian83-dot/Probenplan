@@ -1,6 +1,6 @@
 # PlanKit (früher Probenplan)
 
-Aktuelle Version **1.28.2** – alle Änderungen in `CHANGELOG.md`. Schritt ③ der Büro-App-Suite **Spektron** (Projektzentrale, LabelKit, FotoKit, PlanKit, BelegKit, SpesenKit; Übersicht im [README der Projektzentrale](https://github.com/kaspersebastian83-dot/Projektzentrale#readme)).
+Aktuelle Version **1.29.0** – alle Änderungen in `CHANGELOG.md`. Schritt ③ der Büro-App-Suite **Spektron** (Projektzentrale, LabelKit, FotoKit, PlanKit, BelegKit, SpesenKit; Übersicht im [README der Projektzentrale](https://github.com/kaspersebastian83-dot/Projektzentrale#readme)).
 
 PlanKit gehört zur Familie von LabelKit und FotoKit und sieht genauso aus. Webadresse, Repository, Startdatei und das Dateiformat `.probenplan` behalten den bisherigen Namen – bestehende Projekte, Lesezeichen und installierte Apps funktionieren unverändert weiter.
 

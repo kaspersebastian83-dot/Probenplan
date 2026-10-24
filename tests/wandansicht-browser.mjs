@@ -62,7 +62,7 @@ try{
   assert.equal(Object.keys(files).filter(n=>/^word\/media\/.*\.png$/.test(n)).length,2,'ein Bild je Fläche');
   assert.match(t,/Anlage 6: Bohrkerne – Wandansichten/);assert.match(t,/Erdgeschoss · Wohnzimmer · Wand B/);assert.match(t,/Erdgeschoss · Wohnzimmer · Boden/);
   assert.match(t,/EG-WZ-B-7/);assert.match(t,/0,60 m von links, 0,30 m über OKFF/);assert.match(t,/Raummitte/);
-  assert.match(t,/8400 mg\/kg TS/);assert.match(t,/stark/);assert.match(t,/Rückstellprobe/);assert.match(t,/Testskala MKW \(synthetisch\)/);assert.match(t,/Werte aus vorläufigem Prüfbericht AR-999-2099-000001-01/);
+  assert.match(t,/KW C10-C40\[mg\/kg TS\]/,'gemeinsame Einheit im Spaltenkopf');assert.match(t,/8400/);assert.match(t,/stark/);assert.match(t,/Rückstellprobe/);assert.match(t,/Testskala MKW \(synthetisch\)/);assert.match(t,/Werte aus vorläufigem Prüfbericht AR-999-2099-000001-01/);
  });
  await check('CSV: eine Zeile je Segment',async()=>{
   await page.locator('#wand-csv').click();await page.locator('#toast',{hasText:/Wandansichten gespeichert: .*\.csv/}).waitFor({timeout:30000});
