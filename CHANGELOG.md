@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.28.1 – 24. Oktober 2026
+
+- Leiste oben in allen Apps wieder identisch (FotoKit-Projektzuordnung und offenes Menü wie in FotoKit, aktuelle Projektdaten wie in LabelKit/PlanKit); Speicherkandidaten und Kopien von PlanKit zählen nicht als Plan.
+
 ## 1.28.0 – 24. Oktober 2026
 
 - **Vorläufiger Prüfbericht**: Eine Labor-XML mit „vorläufig“ (`IsPreliminaryReport="true"`) wird beim Import genannt und bleibt an der Herkunft vermerkt (`labReports[].vorlaeufig`). Solange Werte daraus im Projekt stehen, steht ein Hinweis in der Ergebniskarte, in den Wandansichten und als Fußnote in Raumbuch und Wandansichten; die Anlage Probenahme führt ihn im Prüfprotokoll. Nach dem Import des endgültigen Berichts („Aktualisieren“) verschwindet der Hinweis von selbst. Ältere PlanKit-Versionen öffnen die Datei und lassen den Vermerk weg.
