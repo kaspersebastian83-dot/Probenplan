@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.25.0 – 24. Oktober 2026
+
+- **Bohrkern-Fotos in der Anlage**: Steht in FotoKit unter „Probe-Nr.“ die Kern-ID (z. B. „EG-WZ-B-7“, wie auf dem Schild im Bild) oder die Segment-ID („EG-WZ-B-7-T2“), ordnet die Anlage das Foto über die neueste LabelKit-Datei in „Laboraufträge“ den Proben zu: Kern-ID → alle analysierten Segmente, Segment-ID → genau dieses. Rückstellproben zählen nicht. In der Fotoliste steht die Zuordnung mit der Angabe vom Foto, z. B. „P2, P3 (EG-WZ-B-7)“. Gleiche Regel wie FotoKit 1.11.0 (Ergebnistabelle).
+
 ## 1.24.1 – 24. Oktober 2026
 
 - Bohrkerne aus LabelKit: Beschreibung mit der vollen Segment-ID (z. B. „EG-WZ-B-7-T2“) und dem Material statt nur der Kernbezeichnung – wie auf Etikett, Schnittplan und Laborauftrag. Rückstellproben (nur gesägt und aufbewahrt) kommen nicht mehr als offene Probe in den Plan, sie bekommen keinen Laborwert; die Prüfliste nennt ihre Anzahl.

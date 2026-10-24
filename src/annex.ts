@@ -9,7 +9,7 @@ import type {Block,Cell,Row} from './docx';
 
 export interface AnnexImage {data:Uint8Array;ext:'png'|'jpeg';widthPx:number;heightPx:number}
 export type PhotoStatus='ok'|'changed'|'nohash'|'missing';
-export interface AnnexPhoto {file:string;desc:string;section:string;taken:string;sha:string;status:PhotoStatus;labels:string[];image?:AnnexImage}
+export interface AnnexPhoto {file:string;desc:string;section:string;taken:string;sha:string;status:PhotoStatus;labels:string[];probe?:string;image?:AnnexImage}
 export interface AnnexPlanPage {floor:string;image:AnnexImage;widthMm:number;heightMm:number;ratio:number|null;results:boolean}
 export interface AnnexSource {role:string;name:string;stand:string;sha:string}
 export interface AnnexSample {label:string;floor:string;placed:boolean;desc:string;note:string;art:string;datum:string;labNr:string;ref:string;bericht:string;labor:string;werte:Wert[];value?:Wert;rating:string;excerpt?:AnnexImage}
@@ -25,8 +25,25 @@ const t=(v:unknown)=>v==null?'':String(v).trim();
 const deDate=(v:string)=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(t(v));return m?`${m[3]}.${m[2]}.${m[1]}`:t(v);};
 const clock=(iso:string)=>{const d=new Date(iso);if(isNaN(+d))return iso;const z=(n:number)=>String(n).padStart(2,'0');return `${z(d.getDate())}.${z(d.getMonth()+1)}.${d.getFullYear()} ${z(d.getHours())}:${z(d.getMinutes())} Uhr`;};
 const order=(a:string,b:string)=>a.localeCompare(b,'de',{numeric:true});
-/** „P1, p 2; Probe 3“ → ['P1','P2','P3'] (wie FotoKit). */
-export function photoLabels(s:string){return String(s||'').split(/[,;/]+/).map(x=>x.trim()).filter(Boolean).map(x=>{const m=/^(?:p|probe)?\s*-?\s*0*(\d+)\s*([a-z]?)$/i.exec(x);return m?`P${m[1]}${m[2].toLowerCase()}`:x.toUpperCase();});}
+/** „P1, p 2; Probe 3“ → ['P1','P2','P3'] (wie FotoKit). Bohrkern-IDs („EG-WZ-B-7“, „EG-WZ-B-7-T2“) über die
+ *  Zuordnung aus LabelKit (bohrkernNummern); Unbekanntes bleibt wie geschrieben. */
+export function photoLabels(s:string,bk?:Map<string,string[]>){
+  const one=(x:string)=>{const m=/^(?:p|probe)?\s*-?\s*0*(\d+)\s*([a-z]?)$/i.exec(x);return m?`P${m[1]}${m[2].toLowerCase()}`:x.toUpperCase();};
+  return [...new Set(String(s||'').split(/[,;/]+/).map(x=>x.trim()).filter(Boolean).flatMap(x=>{const p=one(x);return (!/^P\d+[a-z]?$/.test(p)&&bk?.get(p))||[p];}))];
+}
+/** Bohrkerne aus der LabelKit-Projektdatei: Kern-ID → alle analysierten Segmente, Segment-ID → genau dieses (P-Nummer).
+ *  Rückstellproben haben keinen Laborwert und zählen nicht. Gleiche Regel in FotoKit (Ergebnistabelle). */
+export function bohrkernNummern(daten:unknown){
+  const map=new Map<string,string[]>(),liste=(daten as {sonstigeProben?:unknown})?.sonstigeProben;
+  const add=(k:unknown,pn:string)=>{const key=String(k??'').trim().toUpperCase();if(!key)return;const l=map.get(key)||[];if(!l.includes(pn))l.push(pn);map.set(key,l);};
+  for(const raw of Array.isArray(liste)?liste:[]){
+    if(!raw||typeof raw!=='object')continue;const p=raw as Record<string,unknown>;if(p.matrix!=='Bohrkern')continue;
+    if(String(p.bkStatus??'').trim().toUpperCase()==='R'||String(p.notiz??'').trim()==='Rückstellprobe – nicht analysieren')continue;
+    const n=[p._nr,p.chloridNr,p.id].map(Number).find(v=>Number.isSafeInteger(v)&&v>0&&v<1e9);if(!n)continue;
+    const id=String(p.bkId??'').trim();add(id,`P${n}`);add(id.replace(/-T\d+$/i,''),`P${n}`);add(p.bkBez,`P${n}`);
+  }
+  return map;
+}
 
 /** Einordnung je Probe als Text (Kategorie der Skala, „unter BG“, „n.n.“ … oder leer ohne Wert). */
 function ratingTexts(rated:Rated){
@@ -167,7 +184,7 @@ export function annexBlocks(a:AnnexInput):Block[]{
   if(a.photosIncluded&&fotoRows.length){
     b.push(P('Fotos',{size:10,b:true,before:200,after:60,keepNext:true}));
     b.push({t:'table',widths:[900,2600,1500,W-5000],size:8,rows:[{header:true,cells:[th('Probe'),th('Datei'),th('Status'),th('SHA-256 (beim Erstellen berechnet)')]},
-      ...fotoRows.map(f=>({cells:[{text:f.labels.join(', ')},{text:f.file},{text:{ok:'unverändert',changed:'verändert',nohash:'ohne FotoKit-Prüfsumme',missing:'fehlt'}[f.status]},{text:f.sha||'–',mono:true,size:6.5}]}))]});
+      ...fotoRows.map(f=>({cells:[{text:f.labels.join(', ')+(f.probe&&f.probe.toUpperCase()!==f.labels.join(', ')?` (${f.probe})`:'')},{text:f.file},{text:{ok:'unverändert',changed:'verändert',nohash:'ohne FotoKit-Prüfsumme',missing:'fehlt'}[f.status]},{text:f.sha||'–',mono:true,size:6.5}]}))]});
     b.push(small('In der Anlage sind verkleinerte Kopien abgebildet; maßgeblich sind die Originaldateien im Ordner „Fotos“ mit der angegebenen Prüfsumme.'));
   }
   b.push(P('Verfahren',{size:10,b:true,before:200,after:60,keepNext:true}));

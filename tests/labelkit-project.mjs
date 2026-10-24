@@ -12,6 +12,7 @@ registerHooks({
 const {labelkitReport}=await import('../src/labelkit.ts');
 const {applyLabImport}=await import('../src/lab-provenance.ts');
 const {setNutzung,usageFromNutzung,prepare,vdsScale}=await import('../src/results.ts');
+const {photoLabels,bohrkernNummern}=await import('../src/annex.ts');
 const project='26.0101 Muster',quelle='26.0999_Daten.json';
 const data=nr=>({version:'4.30.10',projekt:{nr},proben:[{id:1,_nr:1,z2:'FREMDES PROJEKT',datum:'2026-10-21',matrix:'Wischprobe',cm2:'100'}]});
 let checks=0;
@@ -49,6 +50,17 @@ check('Bohrkern: Segment-ID und Material in der Beschreibung, Rückstellproben n
  const report=labelkitReport(JSON.stringify(input),quelle,project);
  assert.deepEqual(report.rows.map(r=>[r.label,r.desc,r.raum]),[['P1','EG-WZ-B-7-T1 · Putz · 0–2 cm','EG Wohnzimmer'],['P2','EG-WZ-B-7-T2 · Putz · 2–6 cm','EG Wohnzimmer']]);
  assert.match(report.warnings.join(' '),/1 Bohrkern-Rückstellprobe .*nicht übernommen/);
+});
+check('Bohrkern-Fotos: Kern-ID und Segment-ID auf dem Foto → Probennummern aus LabelKit (wie FotoKit)',()=>{
+ const seg=(nr,t,extra)=>({id:100+nr,_nr:nr,matrix:'Bohrkern',bkBez:'EG-WZ-B-7',bkId:`EG-WZ-B-7-T${t}`,bkStatus:'A',notiz:'MKW',...extra});
+ const bk=bohrkernNummern({sonstigeProben:[seg(2,1),seg(3,2),seg(4,3,{bkStatus:'R',notiz:'Rückstellprobe – nicht analysieren'}),{_nr:6,matrix:'Bohrkern',bkId:'1OG-KZ2-A-3-T1'},{_nr:7,matrix:'Feststoff',bkBez:'EG-WZ-B-7'}]});
+ assert.deepEqual(photoLabels('EG-WZ-B-7',bk),['P2','P3']);
+ assert.deepEqual(photoLabels('eg-wz-b-7-t2',bk),['P3']);
+ assert.deepEqual(photoLabels('1OG-KZ2-A-3',bk),['P6']);
+ assert.deepEqual(photoLabels('P1, EG-WZ-B-7; Probe 3',bk),['P1','P2','P3']);
+ assert.deepEqual(photoLabels('EG-WZ-B-7-T3',bk),['EG-WZ-B-7-T3'],'Rückstellprobe bleibt unzugeordnet');
+ assert.deepEqual(photoLabels('EG-WZ-B-7'),['EG-WZ-B-7'],'ohne LabelKit-Datei wie bisher');
+ assert.deepEqual(photoLabels('P 3a, p2'),['P3a','P2']);
 });
 check('beschädigte und fachfremde JSON bleiben abgewiesen',()=>{
  for(const text of ['{','null','{}','[]'])assert.throws(()=>labelkitReport(text,quelle,project,()=>true));
