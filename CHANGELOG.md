@@ -1,5 +1,12 @@
 # Änderungen
 
+## 1.26.0 – 24. Oktober 2026
+
+- **Wandansichten (Bohrkerne)** (Liste → „Wandansichten (Bohrkerne) …“): je Wand, Boden und Decke eine Zeichnung mit den Bohrkernen an ihrer Lage und je Kern einer Tiefensäule T1, T2 … mit dem Messwert und der Farbe der Einordnung; Rückstellproben gemustert, fehlende Laborwerte grau. Dazu je Fläche eine Tabelle (Probe, Kern/Tiefe, Lage, Material, Geruch, zwei Werte, Einordnung).
+- Quelle: die neueste LabelKit-Datei in „Laboraufträge“ (Bohrkern-ID nach AidKit, Tiefe, Material, A/R; ab LabelKit 4.38 auch Abstand zur linken Ecke, Höhe über OKFF und Wandmaße – damit maßstäblich, sonst nach Raster 1–9). Messwerte aus dem importierten Prüfbericht über die Probennummer; die Bohrkerne müssen dafür nicht im Plan platziert sein.
+- Wert und Farbe: Vorschlag MKW C10–C40, C10–C22 als zweiter Wert in der Tabelle; beides wählbar. Eingeordnet wird nur mit einer vorhandenen Skala (VdS-Referenz, Skala des Projekts oder aus FotoKit), sonst steht nur der Wert – keine eigenen Grenzwerte.
+- Ausgabe als Word-Anlage (je Fläche eine Seite) und als Tabelle für Excel (CSV) in „Mitteilungen“, nie überschreibend, mit Zeile im Anlagen-Protokoll. Nichts davon wird im Projekt gespeichert.
+
 ## 1.25.0 – 24. Oktober 2026
 
 - **Bohrkern-Fotos in der Anlage**: Steht in FotoKit unter „Probe-Nr.“ die Kern-ID (z. B. „EG-WZ-B-7“, wie auf dem Schild im Bild) oder die Segment-ID („EG-WZ-B-7-T2“), ordnet die Anlage das Foto über die neueste LabelKit-Datei in „Laboraufträge“ den Proben zu: Kern-ID → alle analysierten Segmente, Segment-ID → genau dieses. Rückstellproben zählen nicht. In der Fotoliste steht die Zuordnung mit der Angabe vom Foto, z. B. „P2, P3 (EG-WZ-B-7)“. Gleiche Regel wie FotoKit 1.11.0 (Ergebnistabelle).
