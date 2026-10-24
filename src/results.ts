@@ -93,13 +93,21 @@ export function prepare(p:Project):boolean{
 }
 export function units(p:Project,parameter:string){const seen:string[]=[];for(const w of werte(p))if(w.p===parameter&&!seen.includes(w.u))seen.push(w.u);return seen;}
 
+/** Eine Regel für Ergebniskarte, Raumbuch, Anlage und Wandansicht: Ist eine Nutzung gewählt und gibt es für Parameter
+ *  und Einheit eine VdS-Referenz, gilt sie – außer sie wurde im Projekt angepasst. Sonst gilt die eigene Skala des Projekts.
+ *  Beide bleiben bearbeitbar; keine Skala wird erfunden. */
+export function scaleFor(settings:ResultSettings|undefined,parameter:string,unit:string):{scale?:Scale;vds?:Scale;angepasst:boolean}{
+  const key=scaleKey(parameter,unit),vds=settings?.usage?vdsScale(parameter,unit,settings.usage):undefined;
+  if(vds){const eigen=settings?.vds?.[key];return {scale:eigen||vds,vds,angepasst:!!eigen};}
+  return {scale:settings?.scales[key],angepasst:false};
+}
 export interface Rated {fill:Map<string,string>;groups:{key:string;unit:string;scale:Scale|undefined;cats:(Category&{labels:string[]})[]}[];unrated:string[];below:string[];notDetected:string[];notDetermined:string[];parameter:string}
 /** Farben je Marker und Legende für die Marker des übergebenen (Teil-)Projekts. */
 export function rateMarkers(p:Project,markers:Marker[]=p.markers,settings:ResultSettings|undefined=p.results):Rated{
   const fill=new Map<string,string>(),unrated:string[]=[],below:string[]=[],notDetected:string[]=[],notDetermined:string[]=[],parameter=settings?.parameter||'';const groups=new Map<string,Rated['groups'][number]>();
   for(const m of markers){if(m.kind!=='sample')continue;const w=valueOf(m,parameter);
     if(!w){unrated.push(m.label);fill.set(m.id,UNRATED);continue;}
-    const key=scaleKey(parameter,w.u),scale=settings?.usage?vdsScale(parameter,w.u,settings.usage):settings?.scales[key];if(!groups.has(key))groups.set(key,{key,unit:w.u,scale,cats:(scale?.cats||[]).map(c=>({...c,labels:[]}))});
+    const key=scaleKey(parameter,w.u),scale=scaleFor(settings,parameter,w.u).scale;if(!groups.has(key))groups.set(key,{key,unit:w.u,scale,cats:(scale?.cats||[]).map(c=>({...c,labels:[]}))});
     const qualifier=labQualifier(w.r);
     if(qualifier==='below'){below.push(m.label);fill.set(m.id,BELOW_LIMIT);continue;}
     if(qualifier==='notDetected'){notDetected.push(m.label);fill.set(m.id,NOT_DETECTED);continue;}

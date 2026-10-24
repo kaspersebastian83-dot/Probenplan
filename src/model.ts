@@ -8,7 +8,8 @@ export interface LabData {ref:string;desc:string;art?:string;labNr?:string;datum
 /** Ergebniskarte: Kategorie ab einem Wert (erste Kategorie ab 0), Farbe als #rrggbb. */
 export interface Category {name:string;from:number;color:string}
 export interface Scale {name:string;cats:Category[]}
-export interface ResultSettings {usage?:'residential'|'industrial';parameter:string;scales:Record<string,Scale>}
+/** scales: eigene Skalen je Parameter|Einheit. vds: im Projekt angepasste VdS-Referenzen (ab 1.27) – getrennt, damit die eigene Skala erhalten bleibt. */
+export interface ResultSettings {usage?:'residential'|'industrial';parameter:string;scales:Record<string,Scale>;vds?:Record<string,Scale>}
 /** typ: Probenart aus LabelKit (PAK, Chlorid, Asbest, Sonstige) – bleibt erhalten, wenn der Laborbericht die Probe ergänzt. */
 export interface LabSample extends LabData {label:string;typ?:string;shape?:Shape;surface?:Surface;raum?:string}
 /** Form der Probenahmestelle (Kreis ist Standard und wird nicht gespeichert); typ = Probenart aus LabelKit für die Legende. */

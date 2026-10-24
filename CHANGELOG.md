@@ -1,5 +1,11 @@
 # Änderungen
 
+## 1.27.0 – 24. Oktober 2026
+
+- **Eine Skalenregel überall** (Ergebniskarte, Raumbuch, Anlage, Wandansicht): Ist eine Nutzung gewählt und gibt es für Parameter und Einheit eine VdS-Referenz, gilt sie. Sonst gilt die eigene Skala des Projekts – auch bei gewählter Nutzung (bisher blieben dann alle anderen Parameter grau, z. B. MKW oder BaP).
+- **VdS-Referenz bearbeitbar**: Änderungen ergeben eine angepasste Skala nur für dieses Projekt (Hinweis „Angepasst aus …“, in der Anlage „VdS-Referenz, im Projekt angepasst“). „Zurück zur VdS-Referenz“ verwirft sie. Die eigene Skala für denselben Parameter bleibt dabei erhalten, und an FotoKit geht nichts. Projektdatei: neues Feld `results.vds`; ältere PlanKit-Versionen öffnen die Datei und verwenden die unveränderte Referenz.
+- **Wandansicht: Anteil C10–C22 an C10–C40** in Prozent, wenn beide Werte gewählt sind – neben jeder Tiefenzelle, als Spalte in Tabelle und CSV. Nur aus den beiden Laborwerten gerechnet; liegt C10–C22 unter der BG, steht eine Obergrenze („< 6 %“). Keine Zuordnung zu einer Ölart.
+
 ## 1.26.0 – 24. Oktober 2026
 
 - **Wandansichten (Bohrkerne)** (Liste → „Wandansichten (Bohrkerne) …“): je Wand, Boden und Decke eine Zeichnung mit den Bohrkernen an ihrer Lage und je Kern einer Tiefensäule T1, T2 … mit dem Messwert und der Farbe der Einordnung; Rückstellproben gemustert, fehlende Laborwerte grau. Dazu je Fläche eine Tabelle (Probe, Kern/Tiefe, Lage, Material, Geruch, zwei Werte, Einordnung).
