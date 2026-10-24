@@ -291,3 +291,26 @@ dialog.export-card label.export-check input{width:auto;margin:0}
 #trial-section .check-row input{width:auto;margin:0;accent-color:var(--kit-accent)}
 #trial-section .tiny{margin:0 0 4px 0}
 #trial-section #trial-surface-note{margin-left:24px}
+/* Raumbuch */
+#raumbuch-dialog{max-width:1180px;max-height:92dvh;overflow:auto}
+#raumbuch-dialog h2{margin:6px 0 4px}
+.raumbuch-table-wrap{overflow:auto;margin:10px 0;border:1px solid var(--kit-line);border-radius:8px}
+.raumbuch-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.raumbuch-table th{position:sticky;top:0;background:#f4f6f8;text-align:left;font-weight:600;padding:6px 8px;border-bottom:1px solid var(--kit-line);white-space:nowrap}
+.raumbuch-table td{padding:5px 8px;border-bottom:1px solid var(--kit-line);vertical-align:top}
+.raumbuch-table td.raum{font-weight:600;white-space:nowrap}
+.raumbuch-table td.befund{min-width:190px;font-variant-numeric:tabular-nums}
+.raumbuch-table tr.auffaellig td:first-child{box-shadow:inset 3px 0 0 #d42a1f}
+.raumbuch-table input,.raumbuch-table select{width:100%;min-width:150px;font-size:12.5px;padding:4px 6px}
+.raumbuch-table input[data-f=massnahme]{min-width:280px}
+.raumbuch-table input[data-f=bemerkung]{min-width:180px}
+.raumbuch-table select{min-width:170px}
+.raumbuch-table input.missing{border-color:#d9a400;background:#fffbea}
+.raumbuch-table td:last-child button{padding:2px 8px}
+.raumbuch-hint{margin:4px 0;color:#7a5a00}
+.raumbuch-merge{margin:4px 8px 4px 0;font-size:12px}
+.raumbuch-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:8px 0}
+.raumbuch-add input{width:auto;flex:0 1 220px}
+.raumbuch-add input:first-child{flex:0 1 110px}
+.raumbuch-title{display:flex;flex-direction:column;max-width:260px;margin:6px 0 4px}
+@media (max-width:700px){.raumbuch-table input,.raumbuch-table select{font-size:16px}}

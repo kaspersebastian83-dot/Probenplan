@@ -10,12 +10,14 @@ export interface Category {name:string;from:number;color:string}
 export interface Scale {name:string;cats:Category[]}
 export interface ResultSettings {usage?:'residential'|'industrial';parameter:string;scales:Record<string,Scale>}
 /** typ: Probenart aus LabelKit (PAK, Chlorid, Asbest, Sonstige) – bleibt erhalten, wenn der Laborbericht die Probe ergänzt. */
-export interface LabSample extends LabData {label:string;typ?:string;shape?:Shape;surface?:Surface}
+export interface LabSample extends LabData {label:string;typ?:string;shape?:Shape;surface?:Surface;raum?:string}
 /** Form der Probenahmestelle (Kreis ist Standard und wird nicht gespeichert); typ = Probenart aus LabelKit für die Legende. */
 export type Shape = 'circle' | 'square' | 'diamond';
 export const SHAPES:readonly Shape[]=['circle','square','diamond'];
 export const SHAPE_NAMES:Record<Shape,string>={circle:'Kreis',square:'Quadrat',diamond:'Raute'};
-export interface Marker { id: string; kind: Kind; label: string; note: string; x: number; y: number; lx: number; ly: number; lab?:LabData; shape?:Shape; typ?:string; surface?:Surface }
+/** raum: Raum / Ort aus LabelKit oder von Hand (Proben und Brandherd) – Grundlage für das Raumbuch. */
+export interface Marker { id: string; kind: Kind; label: string; note: string; x: number; y: number; lx: number; ly: number; lab?:LabData; shape?:Shape; typ?:string; surface?:Surface; raum?:string }
+export const MAX_RAUM=80;
 /** LabelKit-Probenart („PAK · Wischprobe“) → Typ und Standardform: PAK Kreis, Chlorid Quadrat, Asbest Raute, Sonstige Kreis. */
 const TYPES:[RegExp,string,Shape][]=[[/^pak\b/i,'PAK','circle'],[/^chlorid\b/i,'Chlorid','square'],[/^asbest\b/i,'Asbest','diamond'],[/^sonstige\b/i,'Sonstige','circle']];
 export function typeFromArt(art?:string):{typ:string;shape:Shape}|null{const a=(art||'').trim();for(const [re,typ,shape] of TYPES)if(re.test(a))return {typ,shape};return null;}
@@ -52,7 +54,13 @@ export interface Plan { name: string; width: number; height: number; data: strin
 export interface Sheet { id:string; name:string; plan?:Plan; markers?:Marker[]; areas?:Area[] }
 // Format 6: wie 5, zusätzlich Feinausrichtung (Preparation.angle). Ältere PlanKit-Versionen lehnen es ab, statt den Winkel still zu übergehen.
 export type Version = 1|2|3|4|5|6;
-export interface Project { format: 'probenplan'; version: Version; plan: Plan; markers: Marker[]; nextSample: number; nextFire: number; report: string; date: string; areas?:Area[]; nextArea?:number; pending?:LabSample[]; labReports?:LabOrigin[]; sheets?:Sheet[]; active?:number; results?:ResultSettings; trials?:Trials }
+/** Raumbuch (ab 1.24): je Raum Maßnahme und Bemerkung; Räume ohne Probe mit Status. Befund und Bewertung werden nie gespeichert,
+ *  sondern immer aus den Proben berechnet. alias: Raumschlüssel → Schlüssel des Raums, in den er zusammengeführt wurde. */
+export type RaumStatus='unauffaellig'|'auffaellig'|'nicht_begangen';
+export const RAUM_STATUS:readonly RaumStatus[]=['unauffaellig','auffaellig','nicht_begangen'];
+export interface RaumEintrag {floor:string;name:string;status?:RaumStatus;massnahme?:string;bemerkung?:string}
+export interface Raumbuch {rooms:RaumEintrag[];alias?:Record<string,string>}
+export interface Project { format: 'probenplan'; version: Version; plan: Plan; markers: Marker[]; nextSample: number; nextFire: number; report: string; date: string; areas?:Area[]; nextArea?:number; pending?:LabSample[]; labReports?:LabOrigin[]; sheets?:Sheet[]; active?:number; results?:ResultSettings; trials?:Trials; raumbuch?:Raumbuch }
 const clonePlan=(plan:Plan):Plan=>({...plan,...(plan.sketch?{sketch:structuredClone(plan.sketch)}:{}),...(plan.calibration?{calibration:{...plan.calibration}}:{}),...(plan.preparation?{preparation:structuredClone(plan.preparation)}:{}),...(plan.pdf?{pdf:{...plan.pdf}}:{})});
 const cloneMarkers=(markers:Marker[])=>markers.map(m=>({...m,...(m.lab?{lab:{...m.lab}}:{})}));
 const cloneAreas=(areas:Area[])=>areas.map(a=>({...a,points:a.points.map(pt=>({...pt}))}));
@@ -61,7 +69,7 @@ export const clone = <T>(value: T): T => {
     const p=value as unknown as Project;
     // Image data is immutable. Share the large string across history snapshots;
     // only coordinates and preparation metadata need independent copies.
-    return {...p,plan:clonePlan(p.plan),markers:cloneMarkers(p.markers),...(p.pending?{pending:p.pending.map(r=>({...r}))}:{}),...(p.labReports?{labReports:p.labReports.map(r=>({...r,sources:{...r.sources}}))}:{}),...(p.areas?{areas:cloneAreas(p.areas)}:{}),...(p.results?{results:structuredClone(p.results)}:{}),
+    return {...p,plan:clonePlan(p.plan),markers:cloneMarkers(p.markers),...(p.pending?{pending:p.pending.map(r=>({...r}))}:{}),...(p.labReports?{labReports:p.labReports.map(r=>({...r,sources:{...r.sources}}))}:{}),...(p.areas?{areas:cloneAreas(p.areas)}:{}),...(p.results?{results:structuredClone(p.results)}:{}),...(p.raumbuch?{raumbuch:structuredClone(p.raumbuch)}:{}),
       ...(p.sheets?{sheets:p.sheets.map(sh=>({...sh,...(sh.plan?{plan:clonePlan(sh.plan)}:{}),...(sh.markers?{markers:cloneMarkers(sh.markers)}:{}),...(sh.areas?{areas:cloneAreas(sh.areas)}:{})}))}:{})} as T;
   }
   return structuredClone(value);

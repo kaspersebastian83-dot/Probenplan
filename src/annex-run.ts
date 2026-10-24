@@ -139,3 +139,20 @@ export async function saveAnnex(folder:ProjectFolder,title:string,data:Uint8Arra
   catch{/* Protokoll ist Zusatz – die Anlage enthält das Prüfprotokoll selbst */}
   return {name,sha:digest};
 }
+
+/** Weitere Dokumente (Raumbuch als Word oder CSV) wie die Anlage in „Mitteilungen“ ablegen: nie überschreibend,
+ *  zurückgelesen und mit Zeile im Anlagen-Protokoll. name() erhält die vorhandenen Dateinamen. */
+export async function saveDocument(folder:ProjectFolder,name:(taken:string[])=>string,data:Uint8Array,sourceName:string,app:string,created:string){
+  const bytes=new Uint8Array(data);
+  const dir=await findSubdir(folder.dir,ANNEX_DIR)||await folder.dir.getDirectoryHandle(ANNEX_DIR,{create:true}) as Dir;
+  const names:string[]=[];for await(const h of dir.values())names.push(h.name);
+  const file=name(names);
+  try{await dir.getFileHandle(file);throw Error(`„${file}“ existiert bereits – nichts überschrieben.`);}catch(e){if((e as DOMException).name!=='NotFoundError')throw e;}
+  const fh=await dir.getFileHandle(file,{create:true}),w=await fh.createWritable();await w.write(bytes);await w.close();
+  const digest=await sha(bytes);if(await sha(await (await fh.getFile()).arrayBuffer())!==digest)throw Error(`„${file}“ wurde nicht vollständig geschrieben – bitte erneut erstellen.`);
+  try{const ph=await dir.getFileHandle(ANNEX_LOG,{create:true}),old=await ph.getFile();
+    const head=old.size?'':'Anlagen-Protokoll (Projektzentrale) – je Zeile: Zeit (UTC) | Anlage | SHA-256 der Anlage | Quelle | SHA-256 der Quelle | Programm\r\n';
+    const pw=await ph.createWritable({keepExistingData:true});await pw.write({type:'write',position:old.size,data:head+[created,file,digest,sourceName,'–',app].join(' | ')+'\r\n'});await pw.close();}
+  catch{/* Protokoll ist Zusatz */}
+  return {name:file,sha:digest};
+}
