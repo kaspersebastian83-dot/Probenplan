@@ -5,6 +5,7 @@ import {floorName,metersPerUnit,northAngle,starPath,FIRE_RED,type Project} from 
 import {contentBounds,drawLegend,drawPlanContent,legendLayout,wrap} from './export';
 import {loadImage} from './import';
 import type {Rated} from './results';
+import {vorlaeufigeBerichteAufPlan,vorlaeufigText} from './lab-provenance';
 // Als data:-URL eingebettet: das Blatt lädt beim Export nichts nach (offline sicher, unabhängig vom Service Worker).
 import logoUrl from './assets/firmenlogo.png?inline';
 
@@ -34,6 +35,10 @@ function legendHeight(p:Project,rated:Rated|null|undefined,width:number,fs:numbe
   const l=legendLayout(p,width*10,fs*10,rated);
   return 2*fs*1.7+fs*1.8+(l.entries.length?l.height/10:0)+2;
 }
+/** Ergebniskarte mit Werten aus einem vorläufigen Prüfbericht: Hinweistext für Legende und Schriftfeld, sonst ''. */
+// Nur Werte, die dieses Blatt zeigt (Proben des Geschosses mit dem dargestellten Parameter)
+export const vorlaeufigHinweis=(p:Project,rated:Rated|null|undefined)=>rated?vorlaeufigText(vorlaeufigeBerichteAufPlan(p,p.results?.parameter||'')):'';
+const VORLAEUFIG_ROT='#B3261E';
 function hasLegendEntries(p:Project,rated?:Rated|null){return legendLayout(p,1000,10,rated).entries.length>0;}
 /** Wählt Ausrichtung und Anordnung mit dem größten genormten Maßstab (bzw. der größten Darstellung ohne Kalibrierung). */
 export function sheetLayout(p:Project,paper:Paper,rated?:Rated|null):SheetLayout{
@@ -97,7 +102,13 @@ export async function renderSheet(p:Project,layout:SheetLayout,rated:Rated|null|
   {const x=L.legend.x+PAD;let y=L.legend.y+PAD+fs*1.2;text('Legende',x,y,fs*1.15,{bold:true});y+=fs*1.9;
     const r=fs*.55;ctx.lineWidth=fs*.13*k;ctx.strokeStyle='#17665e';ctx.beginPath();ctx.arc((x+r)*k,(y-fs*.35)*k,r*k,0,2*Math.PI);ctx.stroke();text('P · Probenahmestelle',x+fs*2,y,fs*.9);y+=fs*1.7;
     {const cx=x+r,cy=y-fs*.35,f=ctx.fillStyle;ctx.fillStyle=FIRE_RED;ctx.fill(new Path2D(starPath(cx*k,cy*k,r*1.35*k)));ctx.fillStyle=f;}text('Brandherd',x+fs*2,y,fs*.9);y+=fs*.6;
-    if(hasLegendEntries(p,rated)){const legend=legendLayout(p,(L.legend.w-2*PAD)*k,fs*k,rated);drawLegend(ctx,legend,x*k,y*k);}}
+    if(hasLegendEntries(p,rated)){const legend=legendLayout(p,(L.legend.w-2*PAD)*k,fs*k,rated);drawLegend(ctx,legend,x*k,y*k);}
+    // Vorläufiger Prüfbericht: „VORLÄUFIG“ steht immer im Schriftfeld; der ausführliche Hinweis unten in der Legende, wenn dort Platz frei ist
+    // (die Aufteilung des Blatts – und damit der Maßstab – ändert sich dadurch nicht)
+    const v=vorlaeufigHinweis(p,rated);
+    const size=fs*.85;ctx.font=`${size*k}px Arial`;const lines=v?wrap(ctx,v,(L.legend.w-2*PAD)*k):[],frei=L.legend.h-legendHeight(p,rated,L.legend.w-2*PAD,fs);
+    if(v&&frei>=lines.length*size*1.25+PAD){let yy=L.legend.y+L.legend.h-PAD-(lines.length-1)*size*1.25;
+      for(const [i,l] of lines.entries()){text(l,x,yy,size,{color:VORLAEUFIG_ROT});yy+=size*1.25;}}}
   // Nordpfeil und Maßstabsleiste.
   {const north=northAngle(p.plan),cy=L.ns.y+L.ns.h/2;let x=L.ns.x+PAD;
     if(north!==null){const r=7.5,cx=x+r;ctx.save();ctx.translate(cx*k,cy*k);ctx.lineWidth=.25*k;ctx.strokeStyle=ink;ctx.beginPath();ctx.arc(0,0,r*k,0,2*Math.PI);ctx.stroke();ctx.rotate(north*Math.PI/180);
@@ -119,7 +130,9 @@ export async function renderSheet(p:Project,layout:SheetLayout,rated:Rated|null|
     ctx.drawImage(logo,(T.x+PAD)*k,(T.y+2)*k,lw*k,lh*k);
     const tx=T.x+PAD+lw+3,tmax=T.x+T.w-PAD-tx;text(COMPANY.name,tx,T.y+7,3.4,{bold:true,max:tmax});text(COMPANY.address,tx,T.y+11.4,2.3,{color:muted,max:tmax});
     line(.25);let y=T.y+15;ctx.beginPath();ctx.moveTo(T.x*k,y*k);ctx.lineTo((T.x+T.w)*k,y*k);ctx.stroke();
-    const floor=floorName(p),heading=rated?'ERGEBNISKARTE':'PROBENPLAN';text(floor?`${heading} · ${floor}`:heading,T.x+PAD,y+6.6,4.2,{bold:true,max:T.w-2*PAD});
+    const floor=floorName(p),heading=rated?'ERGEBNISKARTE':'PROBENPLAN',vorl=!!vorlaeufigHinweis(p,rated),vw=vorl?17:0;
+    text(floor?`${heading} · ${floor}`:heading,T.x+PAD,y+6.6,4.2,{bold:true,max:T.w-2*PAD-vw});
+    if(vorl)text('VORLÄUFIG',T.x+T.w-PAD,y+6.4,2.9,{bold:true,color:VORLAEUFIG_ROT,align:'right'});
     y+=10;ctx.beginPath();ctx.moveTo(T.x*k,y*k);ctx.lineTo((T.x+T.w)*k,y*k);ctx.stroke();
     const field=(label:string,value:string,x:number,top:number,width:number)=>{text(label,x+PAD,top+2.5,1.9,{color:muted});ctx.font=`${2.8*k}px Arial`;const lines=wrap(ctx,value||'–',(width-2*PAD)*k);text(lines.length>1?`${lines[0].replace(/\s*\S*$/,'')} …`:lines[0],x+PAD,top+6,2.8,{max:width-2*PAD});};
     const half=T.w/2,rowH=7;
