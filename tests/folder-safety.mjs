@@ -63,10 +63,10 @@ try{
    const files=await names(f),backups=files.filter(n=>n.includes('(vorher '));
    return {count:backups.length,texts:await Promise.all(backups.map(n=>read(f,n))),copy:files.some(n=>n.includes('(Kopie manuell)')),main:await read(f),recovery:files.filter(n=>n.includes('Wiederherstellung')).length};
   });
-  assert.equal(got.count,10);assert.equal(got.main,'v14');assert.ok(got.copy);assert.equal(got.recovery,0);
+  assert.equal(got.count,5);assert.equal(got.main,'v14');assert.ok(got.copy);assert.equal(got.recovery,0);
   assert.ok(got.texts.includes('v13'),'newest backup kept');assert.ok(!got.texts.includes('v0'),'oldest backup pruned');
  });
- await check('Office safety: backup names use local time; unique old UTC backups survive cleanup',async()=>{
+ await check('Office safety: backup names use local time; old UTC backups are pruned like the rest',async()=>{
   const got=await page.evaluate(async()=>{const m=await import('/folder.mjs'),f=await make();let rev=null;
    rev=(await m.saveFolderProject(f,'a',rev)).revision;rev=(await m.saveFolderProject(f,'b',rev)).revision;
    const now=new Date(),z=n=>String(n).padStart(2,'0'),backups=(await names(f)).filter(n=>n.includes('(vorher '));
@@ -81,7 +81,7 @@ try{
   assert.ok(got.first.includes(`${got.today} ${got.hour}-`)||got.first.includes(`${got.today} `),'Ortszeit im Namen');
   assert.equal(got.utc,Date.UTC(2026,9,16,19,37,16,853));assert.equal(got.local,new Date(2026,9,16,21,37,16,853).getTime());
   assert.ok(got.texts.includes('a')&&got.texts.includes('b'),'neue Sicherungen bleiben, auch neben 12 älteren im UTC-Format');
-  assert.ok(got.texts.includes('alt0'),'einzigartige alte UTC-Sicherung darf nicht gelöscht werden');
+  assert.ok(!got.texts.includes('alt0'),'alte UTC-Sicherungen jenseits der letzten 5 werden aufgeräumt');
  });
  await context.close();
 }finally{await browser.close();await new Promise(r=>server.close(r));}
