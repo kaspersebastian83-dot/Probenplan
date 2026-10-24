@@ -7,6 +7,7 @@ import {renderSheet,sheetLayout} from './sheet';
 import {drawPlanContent} from './export';
 import {clone,floorName,markerSize,sheetCount,sheetProject,type Project} from './model';
 import {hasValues,prepare,rateMarkers} from './results';
+import {vorlaeufigeBerichte} from './lab-provenance';
 import {fileInfo,fileRevision,findSubdir,listFiles,projectFileName,AUFTRAEGE,LABOR,PLAENE,type ProjectFolder} from './folder';
 
 export const ANNEX_DIR='Mitteilungen',ANNEX_LOG='_Anlagen-Protokoll.txt',FOTOS='Fotos',FOTOKIT_FILE='_Bildumbenenner.json';
@@ -119,6 +120,7 @@ export async function createAnnex(p:Project,folder:ProjectFolder|null,o:AnnexOpt
     sources.push({role:'PlanKit-Projekt (nicht im Projektordner gespeichert)',name:'Projektstand beim Erstellen',stand:stand(Date.now()),sha:await sha(new TextEncoder().encode(JSON.stringify(project)))});
   }
   if(missing.length)extra.push({text:'Laborbericht-Dateien nicht im Ordner „Laborergebnisse“ gefunden',ok:false,detail:missing.join(', ')});
+  {const v=vorlaeufigeBerichte(project);if(v.length)extra.push({text:'Werte aus vorläufigem Prüfbericht – sie können sich mit dem endgültigen Bericht ändern',ok:false,detail:v.map(r=>r.bericht||'(ohne Nummer)').join(', ')});}
   const parameter=project.results?.parameter||'';
   const checks=annexChecks(samples,fotos||[],plans,parameter,!!fotos,extra);
   o.progress?.('Word-Datei wird erstellt …');

@@ -32,13 +32,15 @@ try{
   const archiv=await root.getDirectoryHandle('Mosaik Archivordner',{create:true}),proj=await archiv.getDirectoryHandle(name,{create:true});
   const put=async(sub,n,data)=>{const d=await proj.getDirectoryHandle(sub,{create:true});const w=await(await d.getFileHandle(n,{create:true})).createWritable();await w.write(data);await w.close();};
   await put('Pläne','Grundriss EG.svg',svg);await put('Laboraufträge','26.0142_24.10.2026_Daten.json',JSON.stringify(daten));await put('Laborergebnisse','AR-999.xml',xml);
- },[NAME,svg,daten,labXML(rows)]);
+ },[NAME,svg,daten,labXML(rows,{vorlaeufig:true})]);
  // Skala für MKW (synthetisch) wie aus FotoKit
  await page.evaluate(([k])=>localStorage.setItem('bu-scales',JSON.stringify({[k]:{name:'Testskala MKW (synthetisch)',cats:[{name:'gering',from:0},{name:'erhöht',from:1000},{name:'stark',from:5000}]}})),[`${C40}|${U}`]);
  await page.locator('#open-folder').click();
  await page.locator('#folder-plans button',{hasText:'Grundriss EG.svg'}).click();await page.locator('#welcome').waitFor({state:'hidden'});
  await page.locator('#lab-import').click();await page.locator('#lab-folder-dialog [data-lab-file]',{hasText:'AR-999.xml'}).click();await page.locator('#lab-review').waitFor();
+ assert.match(await page.locator('#lab-review').textContent(),/Vorläufiger Prüfbericht AR-999-2099-000001-01/,'Hinweis beim Import');
  await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});
+ await page.locator('#results-toggle').click();await page.locator('#result-vorlaeufig:not([hidden])').waitFor();assert.match(await page.locator('#result-vorlaeufig').textContent(),/vorläufigem Prüfbericht AR-999/);await page.locator('#results-toggle').click();
 
  await check('Dialog: Kerne aus LabelKit, MKW C10–C40 vorgeschlagen, Vorschau je Fläche, Hinweise',async()=>{
   await page.locator('#wand-open').click();await page.locator('#wand-dialog[open]').waitFor();
@@ -46,7 +48,7 @@ try{
   assert.equal(await page.locator('#wand-p1').inputValue(),C40);assert.equal(await page.locator('#wand-p2').inputValue(),C22);
   assert.equal(await page.locator('#wand-vorschau img').count(),2);
   await page.waitForFunction(()=>[...document.querySelectorAll('#wand-vorschau img')].every(i=>i.complete&&i.naturalWidth>0));
-  assert.equal(await page.locator('#wand-hinweise p').count(),0,'alle analysierten Segmente haben Werte, Wand B hat Maße');
+  assert.deepEqual(await page.locator('#wand-hinweise p').allTextContents(),['Werte aus vorläufigem Prüfbericht AR-999-2099-000001-01 – sie können sich mit dem endgültigen Bericht ändern.'],'nur der Hinweis „vorläufig“: alle Segmente haben Werte, Wand B hat Maße');
   if(process.env.WAND_DUMP)await page.locator('#wand-dialog').screenshot({path:`${process.env.WAND_DUMP}/dialog.png`});
  });
  await check('Word-Anlage: je Fläche Bild und Tabelle, Rückstellprobe, Einordnung, in „Mitteilungen“',async()=>{
@@ -60,7 +62,7 @@ try{
   assert.equal(Object.keys(files).filter(n=>/^word\/media\/.*\.png$/.test(n)).length,2,'ein Bild je Fläche');
   assert.match(t,/Anlage 6: Bohrkerne – Wandansichten/);assert.match(t,/Erdgeschoss · Wohnzimmer · Wand B/);assert.match(t,/Erdgeschoss · Wohnzimmer · Boden/);
   assert.match(t,/EG-WZ-B-7/);assert.match(t,/0,60 m von links, 0,30 m über OKFF/);assert.match(t,/Raummitte/);
-  assert.match(t,/8400 mg\/kg TS/);assert.match(t,/stark/);assert.match(t,/Rückstellprobe/);assert.match(t,/Testskala MKW \(synthetisch\)/);
+  assert.match(t,/8400 mg\/kg TS/);assert.match(t,/stark/);assert.match(t,/Rückstellprobe/);assert.match(t,/Testskala MKW \(synthetisch\)/);assert.match(t,/Werte aus vorläufigem Prüfbericht AR-999-2099-000001-01/);
  });
  await check('CSV: eine Zeile je Segment',async()=>{
   await page.locator('#wand-csv').click();await page.locator('#toast',{hasText:/Wandansichten gespeichert: .*\.csv/}).waitFor({timeout:30000});
