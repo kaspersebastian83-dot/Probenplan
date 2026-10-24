@@ -6,7 +6,9 @@
    Teilt sich mit den anderen Apps nur den Browser-Speicher: IndexedDB „mosaik-suite“ / „kv“, Schlüssel „archiv“ (Ordner-Handle)
    und „zuletzt“ (Liste der zuletzt geöffneten Projektnamen). Liest den Ordner nur, schreibt nie hinein und fragt nie selbst
    nach Ordnerrechten – ohne Recht (oder ohne Ordnerzugriff, z. B. Safari) fehlen nur die Haken. Aufruf: MosaikLeiste.start('label'|'fotos'|'plan'|'beleg'[, {kompakt: true}]),
-   danach MosaikLeiste.aktualisieren() nach dem Öffnen oder Wechseln eines Projekts. */
+   danach MosaikLeiste.aktualisieren() nach dem Öffnen oder Wechseln eines Projekts.
+   Optional opt.projektName: Funktion, die die bestätigte Projektzuordnung statt der angeforderten URL liefert (FotoKit).
+   Projektdaten: window.SpektronProjectData (LabelKit, PlanKit) liefert den aktuellen Stand samt „möglicherweise veraltet“; sonst _Projekt.json direkt. */
 (function(){
   if (window.MosaikLeiste) return;
   var APPS = [
@@ -16,7 +18,7 @@
     ['beleg', 'BelegKit',  'aufwandkit',     '../aufwandkit/',     '#2f7d6d']
   ];
   var ZENTRALE = '../Projektzentrale/', MAX = 6;
-  var ich = '', kompakt = false, name = '', stand = null, zuletzt = [], bar = null, pop = null, timer = 0, lauf = 0;
+  var ich = '', kompakt = false, projektName = null, name = '', stand = null, zuletzt = [], bar = null, pop = null, timer = 0, lauf = 0;
   var nfc = function(s){ try{ return String(s).normalize('NFC'); }catch(e){ return String(s); } };
   /* Kurzfassung von SPEKTRON-ORDNERNAME v1 (Projektzentrale): Kürzel am Ende des Ordnernamens anhand der Mitarbeiterliste */
   var maNorm = function(x){ return nfc(x == null ? '' : x).toLowerCase().replace(/[\s.]+/g, ''); };
@@ -98,7 +100,7 @@
       catch(e){ res(false); }
     }); });
   }
-  function urlName(){ try{ return new URLSearchParams(location.hash.slice(1)).get('projekt') ?? new URLSearchParams(location.search).get('projekt') ?? ''; }catch(e){ return ''; } }
+  function urlName(){ try{ return projektName ? projektName() || '' : new URLSearchParams(location.hash.slice(1)).get('projekt') ?? new URLSearchParams(location.search).get('projekt') ?? ''; }catch(e){ return ''; } }
   function href(app, projekt){ return (app[0] === ich ? '' : app[3]) + (projekt ? '#projekt=' + encodeURIComponent(projekt) : ''); }   // die eigene App relativ zur aktuellen Seite (auch ohne den Pfad /<App>/)
 
   /* Ordnerstand: nur Namen prüfen, Fotos nur über die eine Datei (der Ordner kann tausende Bilder enthalten) */
@@ -134,7 +136,7 @@
     }catch(e5){}
     try{
       var pl = await unterordner(proj, 'Pläne');
-      if (pl) for await (var g of pl.values()) if (g.kind === 'file' && /\.probenplan$/i.test(g.name) && !/ \((vorher|Wiederherstellung) [^)]*\)\.probenplan$/i.test(g.name)){ s.plan = true; break; }
+      if (pl) for await (var g of pl.values()) if (g.kind === 'file' && /\.probenplan$/i.test(g.name) && !/ \((vorher|Wiederherstellung|Speicherkandidat|Kopie)\b[^)]*\)\.probenplan$/i.test(g.name)){ s.plan = true; break; }
     }catch(e6){}
     try{
       var ab = await unterordner(proj, 'Abrechnung');
@@ -247,8 +249,10 @@
     }
   }
   async function aktualisieren(){
-    if (pop) return;   // Menü offen: nicht neu zeichnen (würde es schließen); der nächste Durchlauf holt das nach
-    var mein = ++lauf, n = urlName();
+    var n = urlName();
+    if (pop && n === name) return;   // Menü offen und Projekt unverändert: nicht neu zeichnen (würde es schließen)
+    if (pop) schliessePop();
+    var mein = ++lauf;
     if (n !== name){ name = n; stand = null; }
     try{ zuletzt = (await kvGet('zuletzt')) || []; if (!Array.isArray(zuletzt)) zuletzt = []; }catch(e){ zuletzt = []; }
     if (name && nfc(zuletzt[0] || '') !== nfc(name)){
@@ -265,6 +269,7 @@
   }
   function start(appId, opt){
     ich = appId; kompakt = !!(opt && opt.kompakt);
+    projektName = opt && typeof opt.projektName === 'function' ? opt.projektName : null;
     var los = function(){
       aktualisieren();
       window.addEventListener('focus', aktualisieren);
