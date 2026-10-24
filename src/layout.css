@@ -293,6 +293,13 @@ dialog.export-card label.export-check input{width:auto;margin:0}
 #trial-section #trial-surface-note{margin-left:24px}
 /* Raumbuch */
 #raumbuch-dialog{max-width:1180px;max-height:92dvh;overflow:auto}
+#wand-dialog{max-width:1080px;width:calc(100vw - 32px);max-height:92dvh;overflow:auto}
+#wand-dialog h2{margin:6px 0 4px}
+.wand-optionen{display:flex;flex-wrap:wrap;gap:10px 16px;margin:10px 0}
+.wand-optionen label{display:flex;flex-direction:column;gap:3px;font-size:12.5px;flex:1 1 220px}
+.wand-vorschau{display:flex;flex-direction:column;gap:14px;margin:10px 0}
+.wand-vorschau img{width:100%;height:auto;border:1px solid var(--kit-line);border-radius:8px;background:#fff}
+#wand-dialog .dialog-actions{position:sticky;bottom:-1px;background:#fff;padding:10px 0 4px;margin:0;border-top:1px solid var(--kit-line)}
 #raumbuch-dialog h2{margin:6px 0 4px}
 .raumbuch-table-wrap{overflow:auto;margin:10px 0;border:1px solid var(--kit-line);border-radius:8px}
 .raumbuch-table{width:100%;border-collapse:collapse;font-size:12.5px}

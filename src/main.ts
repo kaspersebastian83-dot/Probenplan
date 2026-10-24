@@ -9,6 +9,7 @@ import {labeled,shownSVG,ensureInk,inkTried,autoLabels,valueLabels,type Shown} f
 import {addMarker,addSheet,bounds,clone,createProject,escape,floorName,History,markerScale,markerSize,markerSVG,MARKER_SCALE,metersPerUnit,northAngle,stepMarkerScale,moveSheet,removeSheet,renameSheet,sheetCount,sheetProject,switchSheet,validLabel,MAX_SHEETS,shapeOf,typeOf,typeFromArt,SHAPES,type Shape,type Project,type Marker,trialOn,SURFACES,type Surface,allMarkers,MAX_RAUM,RAUM_STATUS,type RaumStatus} from './model';
 import {raumbuchStand,setEintrag,addRaum,removeRaum,mergeRaum,pruefhinweise,raumbuchBlocks,raumbuchCSV,raumbuchName,STATUS_TEXT,FOOTNOTE_MENGEN,type RaumZeile,type RaumbuchStand} from './raumbuch';
 import {build as buildDocx} from './docx';
+import {wandStand,wandSvg,wandBlocks,wandCSV,wandName,wandHinweise,vorschlag as wandVorschlag,type WandStand,type WandBildDatei} from './wandansicht';
 import {candidates,loadImage,readPlan,validateProject,type Candidate} from './import';
 import {download,restoreLocal,saveLocal} from './storage';
 import {labelkitReport} from './labelkit';
@@ -85,10 +86,11 @@ document.querySelector('#help-dialog')!.insertAdjacentHTML('beforeend','<h3>Labo
 input('file').accept='.zip,.svg,.png,.jpg,.jpeg,.pdf,.heic,.heif,application/pdf,image/png,image/jpeg';
 $('plan-name').textContent='PDF, Polycam-ZIP, SVG, PNG oder JPG';
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Beschriftung</h3><p>Liste → „Beschriftung“, je Plan: <b>Schilder automatisch platzieren</b> – die Probenstelle bleibt exakt, das Schild weicht Text, Linien und anderen Schildern aus (mit Hinweislinie). Ein von Hand gezogenes Schild bleibt fest; „Schilder neu anordnen“ gibt es wieder frei. <b>Messwerte am Plan</b> – in der Ergebniskarte ein Wertkästchen je Probe (Wert wie im Prüfbericht, Einheit, Kategorie), auch in der Exportkarte schaltbar.</p>');
+document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Wandansichten (Bohrkerne)</h3><p>Liste → „Wandansichten (Bohrkerne) …“ (Projekt aus der Projektzentrale geöffnet): je Wand, Boden und Decke eine Zeichnung mit den Bohrkernen und je Kern einer Säule T1, T2 … mit Messwert und Farbe der Einordnung, dazu eine Tabelle. Die Kerne kommen aus der neuesten LabelKit-Datei (Wandblatt: Bezeichnung, Tiefe, Material, A/R, Abstand zur Ecke und Höhe über OKFF), die Werte aus dem importierten Prüfbericht über die Probennummer. Ohne Maße steht ein Punkt nach dem Raster 1–9. Eingeordnet wird nur mit einer vorhandenen Skala (VdS, Skala des Projekts oder aus FotoKit) – sonst nur der Wert. Ausgabe als Word-Anlage und Tabelle für Excel (CSV) in „Mitteilungen“.</p>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Raumbuch</h3><p>Liste → „Raumbuch bearbeiten …“: je Raum Befund (Proben mit Messwert und Oberflächenart, Brandherd) und Bewertung nach der Skala der Ergebniskarte – beides berechnet. Sie tragen je Raum Maßnahme und Bemerkung ein; Räume ohne Probe kommen mit Status dazu (Sichtprüfung unauffällig / auffällig, nicht begangen). Der Raum kommt aus LabelKit („Raum / Ort“) oder steht unter „Markierungen“ im Feld „Raum“. Ähnliche Schreibweisen (z. B. „Kü.“ und „Küche“) lassen sich zusammenführen. Ausgabe als Word-Anlage und als Tabelle für Excel (CSV) in „Mitteilungen“. Keine Flächen und Mengen – die Mengenermittlung bleibt beim ausführenden Unternehmen.</p><h3>Oberflächenart</h3><p>Aufsicht, Ansicht oder Untersicht je Probe kommt beim „Proben übernehmen“ aus LabelKit (Spalte „Oberflächenart“). Fehlt sie dort, lässt sie sich unter „Markierungen“ wählen; eine Eingabe in PlanKit bleibt auch bei erneutem Import. Am Schild ein Balken unten (Aufsicht), links (Ansicht) oder oben (Untersicht), dazu im Wertkästchen der Ergebniskarte und in der Legende.</p>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Skizze (kein Plan vorhanden)</h3><p>Startseite „Kein Plan? Skizze zeichnen“ oder unten „＋ Skizze“ für ein weiteres Geschoss. <b>Raum</b>: von Ecke zu Ecke aufziehen (Raster 10 cm, Räume rasten an Wänden ein), danach Name, Breite und Tiefe in Metern eintippen. <b>Wand</b>: frei ziehen, auch schräg (15°-Schritte rasten ein, Länge eintippbar). <b>Tür</b>/<b>Fenster</b>: auf eine Wand tippen (Tür 0,90 m mit Aufschlag, Fenster 1,20 m). <b>Text</b>: antippen und eintippen, z. B. „Treppe“. <b>Auswählen</b>: Räume, Wände, Texte ziehen, Ecke unten rechts ändert die Raumgröße, Entf löscht. „Skizze fertig“ schneidet die Zeichenfläche auf die Räume zu; der Maßstab ist automatisch gesetzt. „Skizze“ links bearbeitet sie weiter; Proben bleiben an ihrer Stelle.</p>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Entzerren (Fluchtplan fotografiert)</h3><p>„Entzerren“ (W) links in der Leiste: die vier Ecken des Plans im Foto antippen oder ziehen – 1 oben links, 2 oben rechts, 3 unten rechts, 4 unten links. Die Lupe zeigt die Ecke vergrößert. Seitenverhältnis „wie im Foto“ oder DIN quer/hoch (Fluchtpläne sind meist A3/A4). „Entzerren“ rechnet ein gerades Bild; Proben und Flächen werden mitgerechnet. Ein vorhandener Maßstab und die Nordrichtung werden dabei entfernt und sind neu zu setzen. Rückgängig stellt das Foto wieder her; die Fotodatei selbst bleibt unverändert.</p>');
-document.getElementById('app-version')!.textContent='v1.25.0';
+document.getElementById('app-version')!.textContent='v1.26.0';
 document.querySelector('#help-dialog h2')!.insertAdjacentHTML('afterend','<h3>Neu in PlanKit 1.16.1 · 20.10.2026</h3><p>Projektzentrale und Spektron-Leiste übergeben Projekte jetzt über #projekt im Fragment. Sonderzeichen bleiben erhalten; alte ?projekt-Links funktionieren weiterhin und werden nach dem Laden bereinigt. Projektwechsel laden auch bereits geöffnete App-Fenster neu; eine Warnung vor ungesicherten Eingaben kann den Wechsel abbrechen. Die Anlagenaktion aktion=anlage wird ebenfalls im Fragment übergeben. Installiertes PlanKit nach einer Online-Aktualisierung vollständig schließen und erneut öffnen.</p>');
 const colorOptions=PALETTE.map(c=>`<option value="${c.color}">${c.title} · ${c.suggestion}</option>`).join('');
 document.querySelector('.modes')!.insertAdjacentHTML('beforeend','<button data-mode="area-draw" class="mode" disabled><span class="tool-icon">⬡</span><span>Fläche zeichnen<small>Eckpunkte setzen & abschließen</small></span></button><button data-mode="area-edit" class="mode" disabled><span class="tool-icon">◇</span><span>Fläche bearbeiten<small>Ecken oder ganze Fläche ziehen</small></span></button>');
@@ -857,6 +859,73 @@ async function raumbuchExport(kind:'docx'|'csv'){
 }
 $('raumbuch-word').onclick=()=>void raumbuchExport('docx');
 $('raumbuch-csv').onclick=()=>void raumbuchExport('csv');
+
+/* Wandansichten der Bohrkerne (ab 1.26): Kerne aus der neuesten LabelKit-Datei, Werte aus dem Projekt über die P-Nummer.
+   Nichts davon wird im Projekt gespeichert – die Ansicht wird jedes Mal neu berechnet. */
+document.getElementById('raumbuch-open')!.insertAdjacentHTML('afterend','<button type="button" id="wand-open" title="Bohrkerne je Wand mit Tiefenprofil – aus LabelKit (Wandblatt) und den Laborwerten">Wandansichten (Bohrkerne) …</button>');
+document.body.insertAdjacentHTML('beforeend','<dialog id="wand-dialog" aria-labelledby="wand-title"><span class="eyebrow">BOHRKERNE</span><h2 id="wand-title">Wandansichten</h2><p class="tiny" id="wand-quelle"></p><div class="wand-optionen"><label>Farbe und Wert<select id="wand-p1"></select></label><label>Zweiter Wert (nur Tabelle)<select id="wand-p2"></select></label><label>Bezeichnung der Anlage<input id="wand-anlage" maxlength="60" placeholder="z. B. Anlage 6"></label></div><div id="wand-hinweise"></div><div id="wand-vorschau" class="wand-vorschau"></div><div class="dialog-actions"><button type="button" class="primary" id="wand-word">Word-Anlage speichern</button><button type="button" id="wand-csv">Tabelle für Excel (CSV)</button><button type="button" id="wand-close">Schließen</button></div></dialog>');
+let wandDaten:{st:WandStand;datei:string}|null=null,wandUrls:string[]=[];
+function wandKey(){return `plankit-wand-anlage:${folder?.name||''}`;}
+async function wandLaden(){
+  if(!project)throw Error('Kein Projekt geöffnet.');
+  if(!folder)throw Error('Die Wandansichten brauchen den Projektordner (Bohrkerne aus LabelKit). Bitte das Projekt aus der Projektzentrale öffnen.');
+  const dir=await findSubdir(folder.dir,AUFTRAEGE),f=dir?(await listFiles(dir,/_Daten\.json$/i))[0]:undefined;
+  if(!f)throw Error(`In „${AUFTRAEGE}“ liegt keine LabelKit-Datei (…_Daten.json).`);
+  let daten:unknown;try{daten=JSON.parse(await (await f.handle.getFile()).text());}catch{throw Error(`„${AUFTRAEGE}/${f.name}“ ist nicht lesbar.`);}
+  return {st:wandStand(daten,project),datei:`${AUFTRAEGE}/${f.name}`};
+}
+function wandFreigeben(){for(const u of wandUrls)URL.revokeObjectURL(u);wandUrls=[];}
+function renderWand(){
+  if(!project||!wandDaten)return;const {st,datei}=wandDaten;
+  const sel=(id:string,opts:string[],value:string,leer:string)=>{const s=$<HTMLSelectElement>(id);s.replaceChildren(...[leer,...opts].map((v,i)=>{const o=document.createElement('option');o.value=i?v:'';o.textContent=i?shortParameter(v):v;return o;}));s.value=opts.includes(value)?value:'';};
+  const [v1,v2]=wandVorschlag(st.parameter,project.results?.parameter||''),p1=$<HTMLSelectElement>('wand-p1').dataset.wahl??v1,p2=$<HTMLSelectElement>('wand-p2').dataset.wahl??v2;
+  sel('wand-p1',st.parameter,p1,st.parameter.length?'– kein Wert –':'– noch keine Laborwerte –');sel('wand-p2',st.parameter.filter(x=>x!==$<HTMLSelectElement>('wand-p1').value),p2,'– keiner –');
+  const n=st.waende.reduce((a,w)=>a+w.kerne.length,0);
+  $('wand-quelle').textContent=st.waende.length?`${st.waende.length} ${st.waende.length===1?'Fläche':'Flächen'} mit ${n} ${n===1?'Bohrkern':'Bohrkernen'} aus ${datei}. Messwerte aus dem Plan (Prüfbericht importiert, über die Probennummer).`:`In ${datei} gibt es keine Bohrkerne mit Bezeichnung nach AidKit (z. B. EG-WZ-B-7-T2).`;
+  const parameter=$<HTMLSelectElement>('wand-p1').value;
+  $('wand-hinweise').replaceChildren(...wandHinweise(st,parameter).map(h=>{const p=document.createElement('p');p.className='tiny raumbuch-hint';p.textContent=h;return p;}));
+  wandFreigeben();
+  $('wand-vorschau').replaceChildren(...st.waende.map(w=>{const b=wandSvg(project!,w,parameter),u=URL.createObjectURL(new Blob([b.svg],{type:'image/svg+xml'}));wandUrls.push(u);const img=document.createElement('img');img.src=u;img.alt=`Wandansicht ${w.key}`;img.width=b.width;img.height=b.height;return img;}));
+  $<HTMLButtonElement>('wand-word').disabled=$<HTMLButtonElement>('wand-csv').disabled=!st.waende.length&&!st.referenz.length;
+}
+for(const id of ['wand-p1','wand-p2'])$(id).addEventListener('change',()=>{$(id).dataset.wahl=$<HTMLSelectElement>(id).value;renderWand();});
+$('wand-open').onclick=async()=>{
+  if(!project||busy)return;
+  try{wandDaten=await wandLaden();}catch(e){fail(e);return;}
+  delete $('wand-p1').dataset.wahl;delete $('wand-p2').dataset.wahl;
+  try{input('wand-anlage').value=localStorage.getItem(wandKey())||'';}catch{/* ohne Speicher */}
+  renderWand();$<HTMLDialogElement>('wand-dialog').showModal();
+};
+$('wand-close').onclick=()=>$<HTMLDialogElement>('wand-dialog').close();
+$('wand-dialog').addEventListener('close',()=>{wandFreigeben();$('wand-vorschau').replaceChildren();});
+/** SVG → PNG (doppelte Auflösung) für die Word-Anlage. */
+async function svgPng(svg:string,w:number,h:number,scale=2):Promise<WandBildDatei>{
+  const url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'}));let c:HTMLCanvasElement|null=document.createElement('canvas');
+  try{const img=new Image();img.src=url;await img.decode();c.width=w*scale;c.height=h*scale;const g=c.getContext('2d');if(!g)throw Error('Kein Bildspeicher verfügbar.');g.drawImage(img,0,0,c.width,c.height);
+    const blob=await new Promise<Blob>((res,rej)=>c!.toBlob(b=>b?res(b):rej(Error('Der Browser konnte das Bild nicht erzeugen.')),'image/png'));
+    return {data:new Uint8Array(await blob.arrayBuffer()),ext:'png',widthPx:c.width,heightPx:c.height};}
+  finally{URL.revokeObjectURL(url);if(c){c.width=1;c.height=1;}c=null;}
+}
+async function wandExport(kind:'docx'|'csv'){
+  if(!project||busy)return;const title=input('wand-anlage').value.trim()||'Anlage';try{localStorage.setItem(wandKey(),title);}catch{/* ohne Speicher */}
+  busy=true;const buttons=[$<HTMLButtonElement>('wand-word'),$<HTMLButtonElement>('wand-csv')];buttons.forEach(b=>b.disabled=true);
+  try{
+    if(folder&&!await flushFolder())throw Error(`Der Plan ist noch nicht in „${PLAENE}“ gespeichert. Bitte „Speichern“ und erneut versuchen.`);
+    wandDaten=await wandLaden();const {st,datei}=wandDaten,p1=$<HTMLSelectElement>('wand-p1').value,p2=$<HTMLSelectElement>('wand-p2').value;
+    if(!st.waende.length&&!st.referenz.length)throw Error('Keine Bohrkerne zum Darstellen.');
+    const created=new Date().toISOString(),app=`PlanKit ${$('app-version').textContent?.replace(/^v/,'')}`,source=folder?`${PLAENE}/${projectFileName(folder)}`:'PlanKit-Projekt';
+    let bytes:Uint8Array;
+    if(kind==='docx'){const bilder=new Map<string,WandBildDatei>();for(const w of st.waende){const b=wandSvg(project,w,p1,{titel:false});bilder.set(w.key,await svgPng(b.svg,b.width,b.height));}
+      bytes=buildDocx({title:`${title}: Bohrkerne – Wandansichten`,author:app,application:app,created,blocks:wandBlocks(project,st,bilder,p1,p2,{title,nr:folder?.nr||project.report||'',ort:folder?.ort||'',projectData,created,app,source,labelkit:datei})});}
+    else bytes=new TextEncoder().encode(wandCSV(project,st,p1,p2));
+    const d=new Date(),z=(n:number)=>String(n).padStart(2,'0'),date=`${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`,nr=folder?.nr||project.report||'Probenplan';
+    const hints=wandHinweise(st,p1),hint=hints.length?` · ${hints.length} Hinweis${hints.length===1?'':'e'}`:'';
+    const saved=await saveDocument(folder!,taken=>wandName(nr,kind,date,taken),bytes,source,app,created);
+    toast(`Wandansichten gespeichert: ${ANNEX_DIR}/${saved.name}${hint}`,!!hints.length);renderWand();
+  }catch(e){fail(e);}finally{busy=false;buttons.forEach(b=>b.disabled=false);}
+}
+$('wand-word').onclick=()=>void wandExport('docx');
+$('wand-csv').onclick=()=>void wandExport('csv');
 function updateLabelUI(){const s=$('label-section');s.hidden=!project;if(!project)return;input('auto-labels').checked=autoLabels(project.plan);input('value-labels').checked=valueLabels(project.plan);
   const manual=project.markers.filter(m=>m.kind==='sample'&&Math.hypot(m.x-m.lx,m.y-m.ly)>.01).length;$<HTMLButtonElement>('labels-reset').disabled=!manual;$('labels-reset').textContent=manual?`Schilder neu anordnen (${manual} von Hand)`:'Schilder neu anordnen';
   $('value-labels-note').textContent=hasValues(project)?'In der Ergebniskarte: Wertkästchen je Probe mit Wert wie im Prüfbericht, Einheit und Kategorie.':'Erst nach dem Import von Messwerten sichtbar (Ergebniskarte).';}
