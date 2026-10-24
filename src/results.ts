@@ -2,6 +2,7 @@
 // Die Skalen sind dieselben wie in FotoKits „Ergebnistabelle“ (gleicher Browser-Speicher „bu-scales“ unter
 // kaspersebastian83-dot.github.io): je Parameter und Einheit eine Liste von Kategorien mit „ab“-Wert.
 // Für die Karte wird die Skala zusätzlich mit Farben im Projekt gespeichert, damit Kollegen dieselbe Karte sehen.
+import {skalaTeilen} from './skalen-archiv.js';
 import {allMarkers,type Category,type Marker,type Project,type ResultSettings,type Scale,type Wert} from './model';
 
 export const UNRATED='#c3ccd5';
@@ -76,7 +77,9 @@ export function rate(scale:Scale|undefined,value:number){if(!scale?.cats.length|
 
 type Shared=Record<string,{name?:string;cats?:{name:string;from:number}[];geaendert?:string}>;
 export function sharedScales():Shared{try{const v=JSON.parse(localStorage.getItem('bu-scales')||'{}');return v&&typeof v==='object'?v:{};}catch{return {};}}
-export function saveShared(key:string,scale:Scale|null){try{const all=sharedScales();if(scale)all[key]={name:scale.name,cats:scale.cats.map(c=>({name:c.name,from:c.from})),geaendert:new Date().toISOString()};else delete all[key];localStorage.setItem('bu-scales',JSON.stringify(all));}catch{/* Speicher nicht verfügbar */}}
+export function saveShared(key:string,scale:Scale|null){try{const all=sharedScales();if(scale)all[key]={name:scale.name,cats:scale.cats.map(c=>({name:c.name,from:c.from})),geaendert:new Date().toISOString()};else delete all[key];localStorage.setItem('bu-scales',JSON.stringify(all));
+  void skalaTeilen(key,scale?all[key]:null);   // fürs ganze Büro: <Archivordner>/_Spektron-Skalen.json (wie FotoKit)
+ }catch{/* Speicher nicht verfügbar */}}
 /** Skala aus FotoKit übernehmen (mit automatischen Farben), falls vorhanden. */
 export function fromShared(key:string):Scale|null{
   const s=sharedScales()[key];const cats=(s?.cats||[]).filter(c=>c&&typeof c.name==='string'&&c.name.trim()).map((c,i)=>({name:c.name.trim().slice(0,60),from:i===0?0:Number(c.from)})).filter(c=>Number.isFinite(c.from)&&c.from>=0).sort((a,b)=>a.from-b.from).slice(0,12);
