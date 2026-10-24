@@ -322,3 +322,9 @@ dialog.export-card label.export-check input{width:auto;margin:0}
 .raumbuch-add input:first-child{flex:0 1 110px}
 .raumbuch-title{display:flex;flex-direction:column;max-width:260px;margin:6px 0 4px}
 @media (max-width:700px){.raumbuch-table input,.raumbuch-table select{font-size:16px}}
+
+/* Pflichtangaben (in allen Apps gleich): solange leer, warmes Gelb am Feld und „Pflicht“ am Namen; ausgefüllt wieder normal. */
+.pflicht-tag{display:none;margin-left:6px;vertical-align:1px;padding:0 6px;border-radius:8px;font-size:10.5px;font-weight:600;line-height:16px;color:#8a6500;background:rgba(217,164,0,.16);border:1px solid rgba(217,164,0,.45)}
+label.pflicht-offen .pflicht-tag{display:inline-block}
+label.pflicht-offen>input,label.pflicht-offen>select{border-color:#d9a400!important;background:#fff8e1;box-shadow:inset 3px 0 0 #d9a400}
+@media (prefers-color-scheme:dark){.pflicht-tag{color:#f0c850}label.pflicht-offen>input,label.pflicht-offen>select{background:rgba(217,164,0,.12)}}
