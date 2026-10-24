@@ -1,5 +1,11 @@
 # Änderungen
 
+## 1.24.1 – 24. Oktober 2026
+
+- Bohrkerne aus LabelKit: Beschreibung mit der vollen Segment-ID (z. B. „EG-WZ-B-7-T2“) und dem Material statt nur der Kernbezeichnung – wie auf Etikett, Schnittplan und Laborauftrag. Rückstellproben (nur gesägt und aufbewahrt) kommen nicht mehr als offene Probe in den Plan, sie bekommen keinen Laborwert; die Prüfliste nennt ihre Anzahl.
+- Laborbericht: eine Referenz wie „EG-WZ-B-10“ oder „REF-1“ wird nicht mehr als Probe 10 bzw. Probe 1 gelesen. Weiterhin erkannt: „Probe 7“, „P7“ und „<Projektnummer>-7“.
+- Skizze: Zähler „2 Räume · 3 Wände“ statt „Raume/Wande“.
+
 ## 1.24.0 – 24. Oktober 2026
 
 - **Raumbuch** (Liste → „Raumbuch bearbeiten …“): eine Zeile je Raum und Geschoss mit Befund (Proben mit Messwert und Oberflächenart, Brandherd) und Bewertung nach der Skala der Ergebniskarte – beides wird aus den Proben berechnet und nie gespeichert. Eingaben je Raum: Maßnahme (mit Vorschlägen aus den zuletzt benutzten) und Bemerkung. Räume ohne Probe kommen mit Status dazu: Sichtprüfung unauffällig, Sichtprüfung auffällig, nicht begangen / nicht zugänglich. Ähnliche Schreibweisen („Kü.“ / „Küche“) werden erkannt und lassen sich zusammenführen; „Küche“ und „Kueche“ gelten ohnehin als derselbe Raum. Hinweise vor dem Export: auffällige Räume ohne Maßnahme, Proben ohne Raum, fehlende Laborwerte.

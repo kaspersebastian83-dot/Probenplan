@@ -43,6 +43,13 @@ check('bestehende Listen, Nummern, Beschreibungen und Datumsformate bleiben erha
  const text=JSON.stringify(input),report=labelkitReport(text,quelle,project);
  assert.deepEqual(report.rows.map(r=>[r.label,r.typ]),[['P1','PAK'],['P2','Chlorid'],['P3','Asbest'],['P4','Sonstige']]);assert.equal(report.rows[1].datum,'2026-10-21');assert.equal(report.expected,4);assert.equal(JSON.stringify(input),text);
 });
+check('Bohrkern: Segment-ID und Material in der Beschreibung, Rückstellproben nicht als offene Probe',()=>{
+ const seg=(nr,t,von,bis,extra)=>({id:nr,_nr:nr,matrix:'Bohrkern',bkBez:'EG-WZ-B-7',bkId:`EG-WZ-B-7-T${t}`,bkMaterial:'Putz',bkVon:von,bkBis:bis,z2:'EG Wohnzimmer',bkStatus:'A',notiz:'MKW',...extra});
+ const input={...data('26.0101'),proben:[],sonstigeProben:[seg(1,1,0,2),seg(2,2,2,6),seg(3,3,6,12,{bkStatus:'R',notiz:'Rückstellprobe – nicht analysieren'})]};
+ const report=labelkitReport(JSON.stringify(input),quelle,project);
+ assert.deepEqual(report.rows.map(r=>[r.label,r.desc,r.raum]),[['P1','EG-WZ-B-7-T1 · Putz · 0–2 cm','EG Wohnzimmer'],['P2','EG-WZ-B-7-T2 · Putz · 2–6 cm','EG Wohnzimmer']]);
+ assert.match(report.warnings.join(' '),/1 Bohrkern-Rückstellprobe .*nicht übernommen/);
+});
 check('beschädigte und fachfremde JSON bleiben abgewiesen',()=>{
  for(const text of ['{','null','{}','[]'])assert.throws(()=>labelkitReport(text,quelle,project,()=>true));
 });
