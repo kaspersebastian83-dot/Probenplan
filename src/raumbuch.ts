@@ -4,7 +4,7 @@
 // Keine Flächen und keine Mengen: die Mengenermittlung bleibt beim ausführenden Unternehmen.
 import {clone,floorName,sheetCount,sheetProject,SURFACE_NAMES,type Marker,type Project,type RaumEintrag,type RaumStatus,type Raumbuch} from './model';
 import {hasValues,prepare,rateMarkers,shortParameter,valueOf,type Rated} from './results';
-import type {Block,Cell,Row} from './docx';
+import {STIL,type Block,type Cell,type Row} from './docx';
 import {scaleNotes} from './annex';
 
 export const STATUS_TEXT:Record<RaumStatus,string>={unauffaellig:'Sichtprüfung unauffällig',auffaellig:'Sichtprüfung auffällig',nicht_begangen:'nicht begangen / nicht zugänglich'};
@@ -169,17 +169,17 @@ const befund=(r:RaumZeile)=>[...r.probes.map(x=>`${x.label}${x.wert?` ${x.wert}`
 
 const W=9070;
 const P=(text:string,o:Record<string,unknown>={})=>({t:'p' as const,text,size:11,...o});
-const small=(text:string,o:Record<string,unknown>={})=>P(text,{size:8.5,after:40,...o});
-const th=(text:string):Cell=>({text,b:true,shade:'F2F2F2',size:8.5});
+const small=(text:string,o:Record<string,unknown>={})=>STIL.hinweis(text,o);
+const th=(text:string):Cell=>({text,b:true,size:8.5});
 export interface RaumbuchKopf {title:string;nr:string;ort:string;projectData:Record<string,unknown>;created:string;app:string;source:string;hinweis?:string}
 /** Word-Anlage: Kopf, Tabelle je Raum, Fußnoten. */
 export function raumbuchBlocks(s:RaumbuchStand,k:RaumbuchKopf):Block[]{
   const t=(v:unknown)=>v==null?'':String(v).trim(),b:Block[]=[];
-  b.push(P(`${k.title}: Raumbuch`,{size:12,u:true,after:60,keepNext:true}));
-  b.push(P(`Projekt ${k.nr}${k.ort?` · ${k.ort}`:''}${t(k.projectData.objekt)?` · ${t(k.projectData.objekt)}`:''}`,{after:80}));
+  b.push(STIL.titel(`${k.title}: Raumbuch`));
+  b.push(STIL.unterzeile(`Projekt ${k.nr}${k.ort?` · ${k.ort}`:''}${t(k.projectData.objekt)?` · ${t(k.projectData.objekt)}`:''}`,{after:60}));
   const info=[t(k.projectData.nutzung)?`Nutzung: ${t(k.projectData.nutzung)}`:'',s.parameter?`Bewertung: ${shortParameter(s.parameter)} (Skala siehe unten)`:''].filter(Boolean);
   if(info.length)b.push(P(info.join(' · '),{size:10,after:160}));
-  const floors=s.rows.some(r=>r.floor),w=floors?[1000,1250,2150,1500,2000,1170]:[1500,2500,1700,2200,1170];
+  const floors=s.rows.some(r=>r.floor),w=floors?[1000,1400,1950,1500,2000,1220]:[1500,2500,1700,2200,1170];
   const brich=(v:string)=>v.replace(/\//g,'/\u200B');   // „erreicht/überschritten“ darf am Schrägstrich umbrechen
   const rows:Row[]=[{header:true,cells:[...(floors?['Geschoss']:[]),'Raum','Befund','Bewertung','Maßnahme','Bemerkung'].map(th)}];
   for(const r of s.rows)rows.push({cells:[...(floors?[{text:r.floor||'–'}]:[]),{text:r.name,b:true},{text:befund(r).join('\n')||'–'},{text:brich(r.bewertung)||'–'},{text:r.massnahme||(r.auffaellig?'':'–')},{text:r.bemerkung}]});

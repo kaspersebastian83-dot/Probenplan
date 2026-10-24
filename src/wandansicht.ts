@@ -3,7 +3,7 @@
 // neueste LabelKit-Datei (Bohrkern-ID, Tiefe, Material, Status, Lage aus dem Wandblatt); die Messwerte kommen aus dem
 // PlanKit-Projekt über die Probennummer (P-Nummer), so wie sie der Prüfbericht liefert. Nichts wird gespeichert oder
 // geschätzt: ohne Maße steht der Punkt nach dem Raster 1–9, ohne Skala gibt es keine Einordnung, nur den Wert.
-import type {Block,Cell,Row} from './docx';
+import {STIL,type Block,type Cell,type Row} from './docx';
 import {allMarkers,escape,type Project,type Scale,type Wert} from './model';
 import {fromShared,labQualifier,labNumber,rangeText,rate,scaleFor,scaleKey,shortParameter,ink,BELOW_LIMIT,NOT_DETECTED,NOT_DETERMINED,UNRATED} from './results';
 
@@ -186,35 +186,41 @@ export function wandSvg(p:Project,w:Wand,parameter:string,o:{titel?:boolean;ante
 export interface WandKopf {title:string;nr:string;ort:string;projectData:Record<string,unknown>;created:string;app:string;source:string;labelkit:string;hinweis?:string}
 export interface WandBildDatei {data:Uint8Array;ext:'png';widthPx:number;heightPx:number}
 const P=(text:string,o:Record<string,unknown>={})=>({t:'p' as const,text,size:11,...o});
-const small=(text:string,o:Record<string,unknown>={})=>P(text,{size:8.5,after:40,...o});
-const th=(text:string):Cell=>({text,b:true,shade:'F2F2F2',size:8});
+const small=(text:string,o:Record<string,unknown>={})=>STIL.hinweis(text,o);
+const th=(text:string):Cell=>({text,b:true,size:8});
 /** Spaltenkopf: „Kohlenwasserstoffe C10-C40“ → „KW C10-C40“ (voller Name steht im Kopf der Anlage). */
 const kurz=(x:string)=>shortParameter(x).replace(/^Kohlenwasserstoffe\s+/i,'KW ');
-const BREITEN2=[650,1450,1500,900,750,1150,1150,1520],BREITEN1=[700,1600,1650,1000,800,1400,1920],BREITEN3=[600,1300,1400,850,650,1050,1050,850,1320];
+// Breiten so, dass „Probe“, „Geruch“ und „Rückstellprobe“ nicht mitten im Wort umbrechen
+const BREITEN2=[700,1400,1450,850,780,1150,1150,1590],BREITEN1=[700,1600,1650,950,800,1400,1970],BREITEN3=[700,1250,1200,800,720,1150,1150,850,1250];
 const breiten=(p2:string,paar:unknown)=>paar?BREITEN3:p2?BREITEN2:BREITEN1;
 function zeilen(p:Project,w:Wand|null,kerne:WandKern[],p1:string,p2:string):Row[]{
-  const paar=kwPaar(p1,p2),rows:Row[]=[{header:true,cells:['Probe','Kern / Tiefe','Lage','Material','Geruch',p1?kurz(p1):'Wert',...(p2?[kurz(p2)]:[]),...(paar?['Anteil C10–C22']:[]),'Einordnung'].map(th)}];
+  // Einheit in den Spaltenkopf, wenn alle Werte der Spalte dieselbe haben (wie in Prüfberichtstabellen üblich)
+  const einheit=(par:string)=>{const u=new Set(kerne.flatMap(k=>k.segmente.flatMap(s=>s.werte.filter(x=>x.p===par).map(x=>x.u.trim()))));return u.size===1?[...u][0]:'';};
+  const u1=p1?einheit(p1):'',u2=p2?einheit(p2):'',kopf=(par:string,u:string)=>u?`${kurz(par)}\n[${u}]`:kurz(par);
+  const paar=kwPaar(p1,p2),rows:Row[]=[{header:true,cells:['Probe','Kern / Tiefe','Lage','Material','Geruch',p1?kopf(p1,u1):'Wert',...(p2?[kopf(p2,u2)]:[]),...(paar?['Anteil C10–C22']:[]),'Einordnung'].map(th)}];
   for(const k of kerne)k.segmente.forEach((s,i)=>{
-    const e1=einordnung(p,s,p1),w1=s.werte.find(x=>x.p===p1),w2=s.werte.find(x=>x.p===p2),wert=(x?:Wert)=>s.status==='R'?'–':x?`${x.r} ${x.u}`.trim():'–';
-    rows.push({cells:[{text:s.label},{text:`${i?'':`${k.kern}\n`}T${s.tiefe} · ${tiefeText(s)}`},{text:i?'':w?lageText(w,k):'–'},{text:s.material||'–'},{text:i?'':k.geruch||'–'},{text:wert(w1)},...(p2?[{text:wert(w2)}]:[]),...(paar?[{text:kwAnteil(s,paar)||'–'}]:[]),{text:s.status==='R'?'Rückstellprobe':e1.kategorie||(w1?'–':'kein Laborwert'),shade:e1.art==='kategorie'?e1.fill.slice(1):undefined}]});
+    const e1=einordnung(p,s,p1),w1=s.werte.find(x=>x.p===p1),w2=s.werte.find(x=>x.p===p2),wert=(x:Wert|undefined,u:string)=>s.status==='R'?'–':x?(u?x.r:`${x.r} ${x.u}`.trim()):'–';
+    // Einordnung als farbiges Kästchen vor dem Text statt vollflächig eingefärbter Zelle
+    const ein:Cell=e1.art==='kategorie'?{runs:[{text:'■ ',color:e1.fill.slice(1).toUpperCase()},{text:e1.kategorie}]}:{text:s.status==='R'?'Rückstellprobe':e1.kategorie||(w1?'–':'kein Laborwert')};
+    rows.push({cells:[{text:s.label},{text:`${i?'':`${k.kern}\n`}T${s.tiefe} · ${tiefeText(s)}`},{text:i?'':w?lageText(w,k):'–'},{text:s.material||'–'},{text:i?'':k.geruch||'–'},{text:wert(w1,u1)},...(p2?[{text:wert(w2,u2)}]:[]),...(paar?[{text:kwAnteil(s,paar)||'–'}]:[]),ein]});
   });
   return rows;
 }
 export function wandBlocks(p:Project,st:WandStand,bilder:Map<string,WandBildDatei>,p1:string,p2:string,k:WandKopf):Block[]{
   const b:Block[]=[],pd=(x:string)=>t(k.projectData[x]);
-  b.push(P(`${k.title}: Bohrkerne – Wandansichten`,{size:12,u:true,after:60,keepNext:true}));
-  b.push(P(`Projekt ${k.nr}${k.ort?` · ${k.ort}`:''}${pd('objekt')?` · ${pd('objekt')}`:''}`,{after:80}));
+  b.push(STIL.titel(`${k.title}: Bohrkerne – Wandansichten`));
+  b.push(STIL.unterzeile(`Projekt ${k.nr}${k.ort?` · ${k.ort}`:''}${pd('objekt')?` · ${pd('objekt')}`:''}`,{after:60}));
   const n=st.waende.reduce((a,w)=>a+w.kerne.length,0),seg=st.waende.reduce((a,w)=>a+w.kerne.reduce((c,x)=>c+x.segmente.length,0),0);
   b.push(P(`${st.waende.length} ${st.waende.length===1?'Fläche':'Flächen'}, ${n} ${n===1?'Bohrkern':'Bohrkerne'}, ${seg} Segmente. Farbe und Wert: ${p1?shortParameter(p1):'–'}${p2?`; in der Tabelle zusätzlich ${shortParameter(p2)}`:''}.`,{size:10,after:160}));
   const skalen=new Set<string>();
   st.waende.forEach((w,i)=>{
-    b.push(P(`${geschossName(w.geschoss)} · ${w.raum} · ${flaecheName(w.flaeche)}${w.frei?' · Freimessung':''}`,{b:true,size:11,keepNext:true,pageBreakBefore:i>0,after:60}));
+    b.push(STIL.abschnitt(`${geschossName(w.geschoss)} · ${w.raum} · ${flaecheName(w.flaeche)}${w.frei?' · Freimessung':''}`,{size:11.5,pageBreakBefore:i>0,before:i>0?0:120,after:80}));
     const img=bilder.get(w.key);
     if(img){const widthMm=165;b.push({t:'image',data:img.data,ext:'png',widthMm,heightMm:Math.round(widthMm*img.heightPx/img.widthPx),alt:`Wandansicht ${w.key}`,after:80,keepNext:true});}
     b.push({t:'table',widths:breiten(p2,kwPaar(p1,p2)),rows:zeilen(p,w,w.kerne,p1,p2),size:8});
     for(const s of wandSvg(p,w,p1).skalen)skalen.add(s);
   });
-  if(st.referenz.length){b.push(P('Referenzproben',{b:true,size:11,keepNext:true,before:200,after:60}));b.push({t:'table',widths:breiten(p2,kwPaar(p1,p2)),rows:zeilen(p,null,st.referenz,p1,p2),size:8});}
+  if(st.referenz.length){b.push(STIL.abschnitt('Referenzproben',{size:11.5,before:240,after:80}));b.push({t:'table',widths:breiten(p2,kwPaar(p1,p2)),rows:zeilen(p,null,st.referenz,p1,p2),size:8});}
   b.push(small('Werte in der Schreibweise des Prüfberichts. Lage: Abstand von der linken Wandecke (Blick von innen auf die Wand) und Höhe über OKFF; ohne Maße nach Raster 1–9 wie eine Telefontastatur (1–3 deckennah, 7–9 bodennah). Boden und Decke: Raster von Wand A aus (Wand A oben).',{before:120}));
   if(k.hinweis)b.push(small(k.hinweis,{b:true}));
   b.push(small('Rückstellproben (R) wurden nur gesägt und aufbewahrt, nicht analysiert.'));

@@ -5,9 +5,9 @@
 // Gedacht zum Einfügen in den Bericht mit Word „Einfügen › Objekt › Text aus Datei“: nur direkte Formatierung
 // (Arial), keine Formatvorlagen, keine Kopf-/Fußzeilen, A4 mit den Rändern des Berichts, echte Tabellen.
 /* eslint-disable */
-export interface Run {text?:string;b?:boolean;i?:boolean;u?:boolean;size?:number;font?:string;color?:string;mono?:boolean}
-export interface Para extends Run {t?:'p';runs?:Run[];align?:'left'|'center'|'right'|'both';before?:number;after?:number;line?:number;keepNext?:boolean;keepLines?:boolean;pageBreakBefore?:boolean;indent?:number}
-export interface Cell {image?:Omit<Image,'t'>;text?:string;runs?:Run[];paras?:Para[];span?:number;shade?:string;align?:Para['align'];vAlign?:'top'|'center'|'bottom';b?:boolean;i?:boolean;size?:number}
+export interface Run {text?:string;b?:boolean;i?:boolean;u?:boolean;size?:number;font?:string;color?:string;mono?:boolean;caps?:boolean;track?:number}
+export interface Para extends Run {t?:'p';runs?:Run[];align?:'left'|'center'|'right'|'both';before?:number;after?:number;line?:number;keepNext?:boolean;keepLines?:boolean;pageBreakBefore?:boolean;indent?:number;rule?:{color:string;size?:number;space?:number}}
+export interface Cell {image?:Omit<Image,'t'>;text?:string;runs?:Run[];paras?:Para[];span?:number;shade?:string;align?:Para['align'];vAlign?:'top'|'center'|'bottom';b?:boolean;i?:boolean;size?:number;color?:string}
 export interface Row {header?:boolean;minHeight?:number;cells:Cell[]}
 export interface Table {t:'table';widths:number[];rows:Row[];size?:number;borders?:boolean;align?:'center'}
 export interface Image {t:'image';data:Uint8Array;ext:'png'|'jpeg';widthMm:number;heightMm:number;alt?:string;align?:Para['align'];after?:number;keepNext?:boolean}
@@ -19,6 +19,9 @@ type Any=any;
   const PAGE = { w: 11906, h: 16838, top: 1418, bottom: 1134, left: 1418, right: 1418 };   // A4, Ränder wie Bericht (25 mm seitlich)
   const TEXT_W = PAGE.w - PAGE.left - PAGE.right;                                             // 9070 twips nutzbare Breite
   const FONT = 'Arial';
+  // Berichtsdesign aller Anlagen (wie FotoKit-Bilddokumentation): dunkles Blaugrau für Text, Firmenblau als einziger Akzent,
+  // Haarlinien statt Gitter. Kopfzeilen von Tabellen hell mit blauer Linie, keine senkrechten Linien.
+  export const CD = { ink: '1D2A33', blue: '245C9E', accent: '3B7BC4', muted: '62707E', rule: 'D6DEE6', wash: 'F3F7FB' };
   const enc = new TextEncoder();
   // XML: Sonderzeichen maskieren und in XML 1.0 unzulässige Steuerzeichen entfernen (würden Word „beschädigt“ melden lassen)
   const ohneEinzelSurrogate = (s:string) => { let o = ''; for (let i = 0; i < s.length; i++){ const c = s.charCodeAt(i);
@@ -29,7 +32,8 @@ type Any=any;
 
   function rPr(o:Any){
     const f = o.mono ? 'Courier New' : (o.font || FONT), sz = Math.round((o.size || 11) * 2);
-    return `<w:rPr><w:rFonts w:ascii="${f}" w:hAnsi="${f}" w:cs="${f}" w:eastAsia="${f}"/>${o.b ? '<w:b/><w:bCs/>' : ''}${o.i ? '<w:i/><w:iCs/>' : ''}${o.u ? '<w:u w:val="single"/>' : ''}${o.color ? `<w:color w:val="${o.color}"/>` : ''}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/><w:lang w:val="de-DE"/></w:rPr>`;
+    // Reihenfolge nach Schema: … caps, color, spacing, sz, szCs, u, lang
+    return `<w:rPr><w:rFonts w:ascii="${f}" w:hAnsi="${f}" w:cs="${f}" w:eastAsia="${f}"/>${o.b ? '<w:b/><w:bCs/>' : ''}${o.i ? '<w:i/><w:iCs/>' : ''}${o.caps ? '<w:caps/>' : ''}${o.color ? `<w:color w:val="${o.color}"/>` : ''}${o.track ? `<w:spacing w:val="${Math.round(o.track * 20)}"/>` : ''}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/>${o.u ? '<w:u w:val="single"/>' : ''}<w:lang w:val="de-DE"/></w:rPr>`;
   }
   // Ein Lauf; Zeilenumbrüche → <w:br/>, Tabs → <w:tab/>
   function run(r:Any, base:Any){
@@ -48,20 +52,22 @@ type Any=any;
     const jc = { left: 'left', center: 'center', right: 'right', both: 'both' }[o.align || 'left'];
     const line = o.line || (inCell ? 240 : 240);
     return `<w:pPr>${o.keepNext ? '<w:keepNext/>' : ''}${o.keepLines ? '<w:keepLines/>' : ''}${o.pageBreakBefore ? '<w:pageBreakBefore/>' : ''}`
+      + (o.rule ? `<w:pBdr><w:bottom w:val="single" w:sz="${o.rule.size || 4}" w:space="${o.rule.space == null ? 4 : o.rule.space}" w:color="${o.rule.color}"/></w:pBdr>` : '')
       + `<w:spacing w:before="${o.before || 0}" w:after="${o.after == null ? (inCell ? 0 : 120) : o.after}" w:line="${line}" w:lineRule="auto"/>`
       + (o.indent ? `<w:ind w:left="${o.indent}"/>` : '') + `<w:jc w:val="${jc}"/>${rPr(o)}</w:pPr>`;
   }
   function para(o:Any, inCell:boolean){
-    const base = { size: o.size, b: o.b, i: o.i, u: o.u, mono: o.mono, font: o.font, color: o.color };
+    const base = { size: o.size, b: o.b, i: o.i, u: o.u, mono: o.mono, font: o.font, color: o.color, caps: o.caps, track: o.track };
     return `<w:p>${pPr(o, inCell)}${runsOf(o).map(r => run(r, base)).join('')}</w:p>`;
   }
   function table(o:Any, ctx:Any){
     const widths = o.widths, total = widths.reduce((a, b) => a + b, 0), size = o.size || 10;
-    const bd = v => `<w:top w:val="${v}" w:sz="4" w:space="0" w:color="000000"/><w:left w:val="${v}" w:sz="4" w:space="0" w:color="000000"/><w:bottom w:val="${v}" w:sz="4" w:space="0" w:color="000000"/><w:right w:val="${v}" w:sz="4" w:space="0" w:color="000000"/>`;
-    const border = o.borders === false ? 'nil' : 'single';
+    // Haarlinien zwischen den Zeilen und unten; oben nur ohne Kopfzeile; keine senkrechten Linien
+    const line = (side, on, sz = 4, c = CD.rule) => `<w:${side} w:val="${on ? 'single' : 'nil'}" w:sz="${sz}" w:space="0" w:color="${c}"/>`;
+    const on = o.borders !== false, kopf = !!(o.rows[0] && o.rows[0].header);
     let xml = `<w:tbl><w:tblPr><w:tblW w:w="${total}" w:type="dxa"/>${o.align === 'center' ? '<w:jc w:val="center"/>' : ''}<w:tblLayout w:type="fixed"/>`
-      + `<w:tblBorders>${bd(border)}<w:insideH w:val="${border}" w:sz="4" w:space="0" w:color="000000"/><w:insideV w:val="${border}" w:sz="4" w:space="0" w:color="000000"/></w:tblBorders>`
-      + `<w:tblCellMar><w:top w:w="40" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="40" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar>`
+      + `<w:tblBorders>${line('top', on && !kopf)}${line('left', false)}${line('bottom', on)}${line('right', false)}${line('insideH', on)}${line('insideV', false)}</w:tblBorders>`
+      + `<w:tblCellMar><w:top w:w="50" w:type="dxa"/><w:left w:w="80" w:type="dxa"/><w:bottom w:w="50" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar>`
       + `<w:tblLook w:val="0000" w:firstRow="0" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="1" w:noVBand="1"/></w:tblPr>`
       + `<w:tblGrid>${widths.map(w => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>`;
     for (const row of o.rows){
@@ -71,11 +77,14 @@ type Any=any;
         const span = c.span || 1, w = widths.slice(col, col + span).reduce((a, b) => a + b, 0); col += span;
         // Zelle mit Bild (z. B. Foto mit Bildunterschrift): Bild-Absatz zuerst, danach die Absätze
         const paras = c.paras || (c.image && c.text == null && !c.runs ? [] : [{ text: c.text, runs: c.runs }]);
+        // Kopfzeile: hell hinterlegt, fett, blaue Linie darunter (wiederholt sich auf Folgeseiten)
+        const kz = row.header && on, fill = kz ? CD.wash : c.shade;
         xml += `<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${span > 1 ? `<w:gridSpan w:val="${span}"/>` : ''}`
-          + (c.shade ? `<w:shd w:val="clear" w:color="auto" w:fill="${c.shade}"/>` : '')
-          + `<w:vAlign w:val="${c.vAlign || 'top'}"/></w:tcPr>`
+          + (kz ? `<w:tcBorders>${line('bottom', true, 8, CD.accent)}</w:tcBorders>` : '')
+          + (fill ? `<w:shd w:val="clear" w:color="auto" w:fill="${fill}"/>` : '')
+          + `<w:vAlign w:val="${c.vAlign || (kz ? 'bottom' : 'top')}"/></w:tcPr>`
           + (c.image ? image(Object.assign({ align: c.align || 'center', after: 40 }, c.image), ctx) : '')
-          + paras.map(p => para(Object.assign({ size, align: c.align, b: c.b, i: c.i, after: 0 }, p), true)).join('') + '</w:tc>';
+          + paras.map(p => para(Object.assign({ size, align: c.align, b: kz || c.b, i: c.i, color: c.color || CD.ink, after: 0 }, p), true)).join('') + '</w:tc>';
       }
       if (col !== widths.length) throw new Error(`Tabellenzeile hat ${col} statt ${widths.length} Spalten`);
       xml += '</w:tr>';
@@ -98,6 +107,23 @@ type Any=any;
       + `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>`
       + `</a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
   }
+  /** Bausteine im Berichtsdesign – gleiche Überschriften in allen Anlagen. */
+  export const STIL = {
+    /** Titel der Anlage („Anlage 5: …“) mit blauer Linie darunter */
+    titel: (text:string, o:Any = {}) => ({ t: 'p' as const, text, size: 14, b: true, color: CD.ink, after: 40, keepNext: true, rule: { color: CD.accent, size: 8, space: 6 }, ...o }),
+    /** Zeile unter dem Titel (Projekt, Objekt) */
+    unterzeile: (text:string, o:Any = {}) => ({ t: 'p' as const, text, size: 10, color: CD.muted, before: 80, after: 200, ...o }),
+    /** Abschnitt („1. Lageplan …“) */
+    abschnitt: (text:string, o:Any = {}) => ({ t: 'p' as const, text, size: 12, b: true, color: CD.blue, after: 120, keepNext: true, ...o }),
+    /** Zwischenüberschrift innerhalb eines Abschnitts */
+    zwischen: (text:string, o:Any = {}) => ({ t: 'p' as const, text, size: 10, b: true, color: CD.ink, before: 200, after: 60, keepNext: true, ...o }),
+    /** Bezeichnung in Formular-/Faktentabellen (links) */
+    label: (text:string, o:Any = {}) => ({ text, color: CD.muted, ...o }),
+    /** Abschnittszeile innerhalb einer Tabelle */
+    gruppe: (text:string, span:number, o:Any = {}) => ({ text, b: true, color: CD.blue, shade: CD.wash, span, ...o }),
+    /** Kleingedrucktes (Legende, Hinweise) */
+    hinweis: (text:string, o:Any = {}) => ({ t: 'p' as const, text, size: 8.5, color: CD.muted, after: 40, ...o }),
+  };
   function body(blocks:Any[], ctx:Any){
     let xml = '';
     for (const b of blocks){

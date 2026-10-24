@@ -5,7 +5,7 @@
 // Dieser Teil ist rein: er rechnet nur mit den übergebenen Daten (Bilder, Prüfsummen und Dateien liefert annex-run.ts).
 import {allMarkers,floorName,sheetCount,sheetProject,type Project,type Wert} from './model';
 import {rangeText,rateMarkers,scaleFor,shortParameter,valueOf,type Rated} from './results';
-import type {Block,Cell,Row} from './docx';
+import {STIL,type Block,type Cell,type Row} from './docx';
 
 export interface AnnexImage {data:Uint8Array;ext:'png'|'jpeg';widthPx:number;heightPx:number}
 export type PhotoStatus='ok'|'changed'|'nohash'|'missing';
@@ -105,23 +105,23 @@ export function annexChecks(samples:AnnexSample[],photos:AnnexPhoto[],plans:{flo
 }
 
 const P=(text:string,o:Record<string,unknown>={})=>({t:'p' as const,text,size:11,...o});
-const head=(text:string,pageBreak=true)=>P(text,{size:12,u:true,after:120,keepNext:true,pageBreakBefore:pageBreak});
-const small=(text:string,o:Record<string,unknown>={})=>P(text,{size:8.5,after:40,...o});
+const head=(text:string,pageBreak=true)=>STIL.abschnitt(text,{pageBreakBefore:pageBreak});
+const small=(text:string,o:Record<string,unknown>={})=>STIL.hinweis(text,o);
 const imageSize=(img:AnnexImage,maxW:number,maxH:number)=>{const s=Math.min(maxW/img.widthPx,maxH/img.heightPx);return {widthMm:img.widthPx*s,heightMm:img.heightPx*s};};
-const th=(text:string,o:Partial<Cell>={}):Cell=>({text,b:true,shade:'F2F2F2',...o});
+const th=(text:string,o:Partial<Cell>={}):Cell=>({text,b:true,...o});
 
 export function annexBlocks(a:AnnexInput):Block[]{
   const pd=a.projectData,b:Block[]=[];const param=a.parameter?shortParameter(a.parameter):'';
   const nrs=a.samples.map(s=>s.label);
   // 1 · Deckblatt
-  b.push(P(`${a.title}: Probenahme und Laborergebnisse`,{size:12,u:true,after:60,keepNext:true}));
-  b.push(P(`Projekt ${a.nr}${a.ort?` · ${a.ort}`:''}`,{after:200}));
+  b.push(STIL.titel(`${a.title}: Probenahme und Laborergebnisse`));
+  b.push(STIL.unterzeile(`Projekt ${a.nr}${a.ort?` · ${a.ort}`:''}`));
   const info:[string,string][]=([['Objekt',t(pd.objekt)],['Auftraggeber',t(pd.auftraggeber)],['Schaden-Nr. des Auftraggebers',t(pd.schadennummer)],['Schadenereignis',t(pd.schadenereignis)],
     ['Schadendatum',deDate(t(pd.schadendatum))],['Ortstermin',deDate(t(pd.ortstermin))],['Sachverständiger',t(pd.sachverstaendiger)]] as [string,string][]).filter(([,v])=>v);
-  if(info.length)b.push({t:'table',widths:[3000,W-3000],size:10,rows:info.map(([k,v])=>({cells:[th(k),{text:v}]}))});
+  if(info.length)b.push({t:'table',widths:[3000,W-3000],size:10,rows:info.map(([k,v])=>({cells:[STIL.label(k),{text:v}]}))});
   const withValue=a.samples.filter(s=>s.value).length,photoCount=new Set(a.photos.filter(f=>f.labels.length).map(f=>f.file)).size;
   b.push(P(`${a.samples.length} Probe${a.samples.length===1?'':'n'} auf ${a.plans.length} Plan${a.plans.length===1?'':'seiten'}`+(param?` · ${withValue} mit Messwert für ${param}`:'')+(a.photosIncluded?` · ${photoCount} zugeordnete Foto${photoCount===1?'':'s'}`:''),{before:120,after:160}));
-  b.push(P('Inhalt',{b:true,after:40}));
+  b.push(STIL.zwischen('Inhalt',{before:0}));
   const inhalt=[`1. Lageplan der Probenahmestellen${a.plans.length>1?` (${a.plans.map(x=>x.floor||'Plan').join(', ')})`:''}`,'2. Probenverzeichnis'+(param?' mit Messwerten':''),
     `3. Probenblätter${nrs.length?` ${nrs[0]}${nrs.length>1?`–${nrs.at(-1)}`:''}`:''} (je Probe mit Lage${a.photosIncluded?', Fotos':''} und Laborwerten)`,'4. Prüfprotokoll und Herkunftsnachweis'];
   inhalt.forEach(x=>b.push(P(x,{after:20,indent:284})));
@@ -137,12 +137,13 @@ export function annexBlocks(a:AnnexInput):Block[]{
   b.push(head('2. Probenverzeichnis'));
   if(param)b.push(P(`Parameter: ${a.parameter}`,{size:10,after:80}));
   // Spalte „Geschoss“ nur bei mehreren Plänen; nicht platzierte Proben stehen dann in „Probenahmestelle“
-  const floors=a.plans.length>1,w=floors?[600,800,2100,1000,1000,1150,1350,1070]:[600,2700,1150,1000,1200,1350,1070];
+  // Breiten so, dass Datum, „Probe“ und „Referenzwert“ nicht mitten im Wort umbrechen
+  const floors=a.plans.length>1,w=floors?[650,900,1550,1200,1050,1150,1170,1400]:[650,2050,1200,1050,1250,1270,1600];
   const heads=['Probe',...(floors?['Geschoss']:[]),'Probenahmestelle','Art','Datum','Labor-Nr.','Messwert','Einordnung'];
   const rows:Row[]=[{header:true,cells:heads.map(h=>({...th(h),size:8.5}))}];
   for(const s of a.samples){const stelle=[s.desc,s.note,!floors&&!s.placed?'(nicht im Plan)':''].filter(Boolean).join('\n');
     rows.push({cells:[{text:s.label,b:true},...(floors?[{text:s.placed?s.floor||'–':'nicht im Plan'}]:[]),{text:stelle},{text:s.art},{text:deDate(s.datum)},{text:s.labNr},
-    {text:s.value?`${s.value.r} ${s.value.u}`.trim():''},{text:s.rating}]});}
+    {text:s.value?`${s.value.r} ${s.value.u}`.trim():''},{text:s.rating.replace(/\//g,'/\u200B')}]});}   // „erreicht/überschritten“ bricht am Schrägstrich
   b.push({t:'table',widths:w,rows,size:8.5});
   b.push(small('Messwerte unverändert in der Schreibweise des Prüfberichts. BG = Bestimmungsgrenze, n. n. = nicht nachgewiesen, n. b. = nicht bestimmt. Keine Werte zwischen den Probenahmestellen interpoliert oder hochgerechnet.',{before:80}));
   for(const n of a.scaleNotes)b.push(small(`Einordnung · ${n}`));
@@ -150,12 +151,12 @@ export function annexBlocks(a:AnnexInput):Block[]{
 
   // 4 · Probenblätter
   for(const s of a.samples){
-    b.push(P(`Probenblatt ${s.label}`,{size:12,b:true,after:40,keepNext:true,pageBreakBefore:true}));
-    b.push(P([s.art,s.placed?s.floor:'nicht im Plan platziert'].filter(Boolean).join(' · '),{size:10,after:120,keepNext:true}));
+    b.push(STIL.titel(`Probenblatt ${s.label}`,{size:13,pageBreakBefore:true,rule:undefined}));
+    b.push(STIL.unterzeile([s.art,s.placed?s.floor:'nicht im Plan platziert'].filter(Boolean).join(' · '),{before:0,after:140,keepNext:true}));
     const d:[string,string][]=([['Probenahmestelle',s.desc],['Notiz im Plan',s.note],['Geschoss',s.placed?s.floor:'nicht im Plan'],['Art / Matrix',s.art],['Probenahmedatum',deDate(s.datum)],
       ['Laborreferenz',s.ref],['Labor-Nr.',s.labNr],['Prüfbericht',[s.bericht,s.labor].filter(Boolean).join(' · ')],
       ...(param?[[`${param} (Einordnung)`,s.value?`${s.value.r} ${s.value.u}`.trim()+(s.rating?` · ${s.rating}`:''):'kein Messwert']]:[])] as [string,string][]).filter(([,v])=>v);
-    b.push({t:'table',widths:[2800,W-2800],size:9.5,rows:d.map(([k,v])=>({cells:[th(k),{text:v}]}))});
+    b.push({t:'table',widths:[2800,W-2800],size:9.5,rows:d.map(([k,v])=>({cells:[STIL.label(k),{text:v}]}))});
     if(s.excerpt){const sz=imageSize(s.excerpt,95,55);b.push({t:'image',data:s.excerpt.data,ext:s.excerpt.ext,...sz,alt:`Lage von ${s.label}`,after:20,keepNext:true});b.push(small(`Lage im Plan${s.floor?` (${s.floor})`:''} – Ausschnitt, ohne Maßstab`,{align:'center'}));}
     if(a.photosIncluded){
       const fotos=a.photos.filter(f=>f.labels.includes(s.label)),shown=fotos.filter(f=>f.image).slice(0,a.maxPhotos);
@@ -169,7 +170,7 @@ export function annexBlocks(a:AnnexInput):Block[]{
         const rest=fotos.filter(f=>!shown.includes(f));if(rest.length)b.push(small(`Weitere Fotos zu ${s.label}: ${rest.map(f=>f.file).join(', ')}`));
       }
     }
-    b.push(P('Laborwerte (Schreibweise des Prüfberichts)',{size:10,b:true,before:160,after:60,keepNext:true}));
+    b.push(STIL.zwischen('Laborwerte (Schreibweise des Prüfberichts)'));
     if(s.werte.length)b.push({t:'table',widths:[5070,2200,1800],size:9,rows:[{header:true,cells:[th('Parameter'),th('Ergebnis'),th('Einheit')]},...s.werte.map(x=>({cells:[{text:x.p,b:x.p===a.parameter},{text:x.r,b:x.p===a.parameter},{text:x.u}]}))]});
     else b.push(small('Keine Laborwerte zugeordnet.'));
   }
@@ -178,19 +179,19 @@ export function annexBlocks(a:AnnexInput):Block[]{
   b.push(head('4. Prüfprotokoll und Herkunftsnachweis'));
   b.push(P('Automatisch beim Erstellen dieser Anlage geprüft. Jede Abweichung wird hier genannt.',{size:10,after:120}));
   b.push({t:'table',widths:[700,4400,W-5100],size:9,rows:[{header:true,cells:[th(''),th('Prüfung'),th('Betroffen')]},...a.checks.map(c=>({cells:[{text:c.ok?'✓':'!',b:true,align:'center' as const},{text:c.text},{text:c.detail||''}]}))]});
-  b.push(P('Quelldateien',{size:10,b:true,before:200,after:60,keepNext:true}));
+  b.push(STIL.zwischen('Quelldateien'));
   b.push({t:'table',widths:[2000,3000,1500,W-6500],size:8,rows:[{header:true,cells:[th('Rolle'),th('Datei'),th('Stand'),th('SHA-256')]},...a.sources.map(x=>({cells:[{text:x.role},{text:x.name},{text:x.stand},{text:x.sha,mono:true,size:6.5}]}))]});
   const fotoRows=a.photos.filter(f=>f.labels.length);
   if(a.photosIncluded&&fotoRows.length){
-    b.push(P('Fotos',{size:10,b:true,before:200,after:60,keepNext:true}));
+    b.push(STIL.zwischen('Fotos'));
     b.push({t:'table',widths:[900,2600,1500,W-5000],size:8,rows:[{header:true,cells:[th('Probe'),th('Datei'),th('Status'),th('SHA-256 (beim Erstellen berechnet)')]},
       ...fotoRows.map(f=>({cells:[{text:f.labels.join(', ')+(f.probe&&f.probe.toUpperCase()!==f.labels.join(', ')?` (${f.probe})`:'')},{text:f.file},{text:{ok:'unverändert',changed:'verändert',nohash:'ohne FotoKit-Prüfsumme',missing:'fehlt'}[f.status]},{text:f.sha||'–',mono:true,size:6.5}]}))]});
     b.push(small('In der Anlage sind verkleinerte Kopien abgebildet; maßgeblich sind die Originaldateien im Ordner „Fotos“ mit der angegebenen Prüfsumme.'));
   }
-  b.push(P('Verfahren',{size:10,b:true,before:200,after:60,keepNext:true}));
+  b.push(STIL.zwischen('Verfahren'));
   for(const x of ['Lage, Proben und Messwerte stammen aus der PlanKit-Projektdatei; Messwerte wurden maschinell aus dem Laborbericht übernommen und unverändert wiedergegeben.',
     'Keine Interpolation oder Hochrechnung zwischen Probenahmestellen. Einordnung nur in die angegebene Skala.',
     'Prüfsummen (SHA-256) wurden beim Erstellen dieser Anlage aus den Dateien berechnet. Nachprüfen unter Windows: certutil -hashfile "Datei" SHA256 – das Ergebnis muss mit der Tabelle übereinstimmen.'])b.push(small(x,{after:60}));
-  b.push(small(`Erstellt am ${clock(a.created)} mit ${a.app}.`,{before:120,color:'595959'}));
+  b.push(small(`Erstellt am ${clock(a.created)} mit ${a.app}.`,{before:120}));
   return b;
 }
