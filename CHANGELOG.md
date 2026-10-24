@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.28.0 – 24. Oktober 2026
+
+- **Vorläufiger Prüfbericht**: Eine Labor-XML mit „vorläufig“ (`IsPreliminaryReport="true"`) wird beim Import genannt und bleibt an der Herkunft vermerkt (`labReports[].vorlaeufig`). Solange Werte daraus im Projekt stehen, steht ein Hinweis in der Ergebniskarte, in den Wandansichten und als Fußnote in Raumbuch und Wandansichten; die Anlage Probenahme führt ihn im Prüfprotokoll. Nach dem Import des endgültigen Berichts („Aktualisieren“) verschwindet der Hinweis von selbst. Ältere PlanKit-Versionen öffnen die Datei und lassen den Vermerk weg.
+
 ## 1.27.0 – 24. Oktober 2026
 
 - **Eine Skalenregel überall** (Ergebniskarte, Raumbuch, Anlage, Wandansicht): Ist eine Nutzung gewählt und gibt es für Parameter und Einheit eine VdS-Referenz, gilt sie. Sonst gilt die eigene Skala des Projekts – auch bei gewählter Nutzung (bisher blieben dann alle anderen Parameter grau, z. B. MKW oder BaP).

@@ -2,7 +2,7 @@ import type {LabSample,LabSources,Project} from './model';
 import {sourceFilename} from './lab-provenance';
 export interface TextItem {text:string;x:number;y:number;width:number;height:number}
 export interface TextPage {width:number;height:number;items:TextItem[]}
-export interface LabReport {bericht:string;labor:string;auftragsreferenz:string;quelle:string;batch:string;sources:LabSources;rows:LabSample[];expected:number|null;references:string[];warnings:string[];results:{ref:string;parameter:string;result:string;unit:string;loq:string}[]}
+export interface LabReport {bericht:string;labor:string;auftragsreferenz:string;quelle:string;batch:string;sources:LabSources;rows:LabSample[];expected:number|null;references:string[];warnings:string[];vorlaeufig?:boolean;results:{ref:string;parameter:string;result:string;unit:string;loq:string}[]}
 export const MAX_WERTE=300;
 const tidy=(s:string)=>s.normalize('NFC').replace(/\s+/g,' ').trim();
 const norm=(s:string)=>tidy(s).toLocaleLowerCase('de').replace(/[^\p{L}\p{N}]/gu,'');
@@ -23,7 +23,7 @@ export function parseLabXML(text:string,quelle=''):LabReport{
  if(/<!DOCTYPE|<!ENTITY/i.test(text))throw Error('XML mit Dokumenttyp/Entitäten wird nicht unterstützt. Bitte den PDF-Bericht verwenden.');
  const doc=new DOMParser().parseFromString(text,'application/xml'),root=doc.documentElement;
  if(doc.getElementsByTagNameNS('*','parsererror').length||root.localName!=='AnalyticalReport')throw Error('Keine unterstützte Eurofins-XML. Bitte den PDF-Bericht importieren oder Proben manuell eingeben.');
- const report=blankReport(quelle);report.bericht=tidy(root.getAttribute('AnalyticalReportCode')||'');report.labor='Eurofins';
+ const report=blankReport(quelle);report.bericht=tidy(root.getAttribute('AnalyticalReportCode')||'');report.labor='Eurofins';if(root.getAttribute('IsPreliminaryReport')==='true')report.vorlaeufig=true;
  const batches=child(root,'Batches');if(!batches)throw Error('Eurofins-XML enthält keine Batches. Bitte den PDF-Bericht verwenden.');
  const rows:{row:LabSample;order:number;index:number}[]=[];
  for(const batch of children(batches,'Batch')){
@@ -91,7 +91,7 @@ export function parseLabPDF(pages:TextPage[],quelle=''):LabReport{
  return report;
 }
 export function reportWarnings(report:LabReport,p?:Project){
- const warnings=[...report.warnings];if(report.expected!==null&&report.rows.length!==report.expected)warnings.push(`${report.rows.length} Proben erkannt/bearbeitet; laut Bericht ${report.expected}.`);
+ const warnings=[...report.warnings];if(report.vorlaeufig)warnings.push(`Vorläufiger Prüfbericht${report.bericht?` ${report.bericht}`:''}: Die Werte können sich mit dem endgültigen Bericht noch ändern. Sie werden in Ergebniskarte, Raumbuch und Anlagen als vorläufig gekennzeichnet.`);if(report.expected!==null&&report.rows.length!==report.expected)warnings.push(`${report.rows.length} Proben erkannt/bearbeitet; laut Bericht ${report.expected}.`);
  const duplicate=(values:string[])=>values.filter((v,i)=>v&&values.indexOf(v)!==i);for(const ref of new Set(duplicate(report.rows.map(r=>norm(r.ref)))))warnings.push(`Doppelte Probenreferenz: ${report.rows.find(r=>norm(r.ref)===ref)!.ref}.`);for(const label of new Set(duplicate(report.rows.map(r=>r.label.toUpperCase()))))warnings.push(`Doppelte P-Nummer: ${label}.`);
  const number=(s:string)=>s.match(/\b\d{2}\.\d{3,}\b/)?.[0];if(p?.report&&report.auftragsreferenz&&number(p.report)!==number(report.auftragsreferenz)&&p.report!==report.auftragsreferenz)warnings.push(`Auftragsreferenz „${report.auftragsreferenz}“ passt möglicherweise nicht zur Gutachtennummer „${p.report}“.`);
  return [...new Set(warnings)];

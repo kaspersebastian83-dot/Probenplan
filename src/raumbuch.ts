@@ -171,7 +171,7 @@ const W=9070;
 const P=(text:string,o:Record<string,unknown>={})=>({t:'p' as const,text,size:11,...o});
 const small=(text:string,o:Record<string,unknown>={})=>P(text,{size:8.5,after:40,...o});
 const th=(text:string):Cell=>({text,b:true,shade:'F2F2F2',size:8.5});
-export interface RaumbuchKopf {title:string;nr:string;ort:string;projectData:Record<string,unknown>;created:string;app:string;source:string}
+export interface RaumbuchKopf {title:string;nr:string;ort:string;projectData:Record<string,unknown>;created:string;app:string;source:string;hinweis?:string}
 /** Word-Anlage: Kopf, Tabelle je Raum, Fußnoten. */
 export function raumbuchBlocks(s:RaumbuchStand,k:RaumbuchKopf):Block[]{
   const t=(v:unknown)=>v==null?'':String(v).trim(),b:Block[]=[];
@@ -187,6 +187,7 @@ export function raumbuchBlocks(s:RaumbuchStand,k:RaumbuchKopf):Block[]{
   b.push(small('Befund: Proben mit Messwert in der Schreibweise des Prüfberichts und Oberflächenart. „Sichtprüfung“: Raum begangen, nicht beprobt. „nicht begangen“: keine Aussage zu diesem Raum.',{before:80}));
   for(const n of s.skalen)b.push(small(`Bewertung · ${n}`));
   b.push(small('Die Bewertung ist die Zuordnung zur angegebenen Skala; sie ersetzt nicht die Bewertung im Gutachtentext.'));
+  if(k.hinweis)b.push(small(k.hinweis,{b:true}));
   b.push(small(FOOTNOTE_MENGEN,{b:true}));
   if(s.ohneRaum.length)b.push(small(`Ohne Raumangabe und daher nicht aufgeführt: ${s.ohneRaum.join(', ')}.`));
   b.push(small(`Erstellt ${new Date(k.created).toLocaleString('de-DE')} mit ${k.app} aus ${k.source}.`,{before:80}));

@@ -5,13 +5,19 @@ const idPattern=/^[\w-]{1,80}$/;
 const text=(value:unknown,max:number):value is string=>typeof value==='string'&&value.length<=max&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value);
 export function sourceFilename(value:string){return value.split(/[\\/]/).at(-1)||'';}
 export function sourceText(sources:LabSources){return [sources.xml,sources.pdf].filter(Boolean).join(' + ');}
-export function copyOrigin(r:LabOrigin):LabOrigin{return {id:r.id,bericht:r.bericht,labor:r.labor,auftragsreferenz:r.auftragsreferenz,...(r.batch!==undefined?{batch:r.batch}:{}),sources:{...(r.sources.xml!==undefined?{xml:r.sources.xml}:{}),...(r.sources.pdf!==undefined?{pdf:r.sources.pdf}:{})}};}
+export function copyOrigin(r:LabOrigin):LabOrigin{return {id:r.id,bericht:r.bericht,labor:r.labor,auftragsreferenz:r.auftragsreferenz,...(r.batch!==undefined?{batch:r.batch}:{}),...(r.vorlaeufig===true?{vorlaeufig:true as const}:{}),sources:{...(r.sources.xml!==undefined?{xml:r.sources.xml}:{}),...(r.sources.pdf!==undefined?{pdf:r.sources.pdf}:{})}};}
+/** Vorläufige Prüfberichte, aus denen Werte im Projekt stammen (nur tatsächlich verwendete Herkunft). */
+export function vorlaeufigeBerichte(p:Project):LabOrigin[]{
+ const used=new Set<string>();for(const m of allMarkers(p))if(m.lab?.reportId)used.add(m.lab.reportId);for(const r of p.pending||[])if(r.reportId)used.add(r.reportId);
+ return (p.labReports||[]).filter(r=>r.vorlaeufig&&used.has(r.id));
+}
+export const vorlaeufigText=(rs:LabOrigin[])=>rs.length?`Werte aus vorläufigem Prüfbericht ${rs.map(r=>r.bericht||'(ohne Nummer)').join(', ')} – sie können sich mit dem endgültigen Bericht ändern.`:'';
 export function validOrigin(value:unknown):value is LabOrigin{
- const r=value as LabOrigin;if(!r||typeof r!=='object'||!text(r.id,80)||!idPattern.test(r.id)||!text(r.bericht,160)||!text(r.labor,500)||!text(r.auftragsreferenz,2000)||(r.batch!==undefined&&!text(r.batch,160))||!r.sources||typeof r.sources!=='object'||Array.isArray(r.sources))return false;
+ const r=value as LabOrigin;if(!r||typeof r!=='object'||!text(r.id,80)||!idPattern.test(r.id)||!text(r.bericht,160)||!text(r.labor,500)||!text(r.auftragsreferenz,2000)||(r.batch!==undefined&&!text(r.batch,160))||(r.vorlaeufig!==undefined&&r.vorlaeufig!==true)||!r.sources||typeof r.sources!=='object'||Array.isArray(r.sources))return false;
  return (['xml','pdf'] as const).every(k=>r.sources[k]===undefined||(text(r.sources[k],255)&&!!r.sources[k].trim()&&sourceFilename(r.sources[k])===r.sources[k]&&!/[:\u0000-\u001f]/.test(r.sources[k])&&r.sources[k]!=='.'&&r.sources[k]!=='..'));
 }
 export function originFromReport(report:LabReport,id=crypto.randomUUID()):LabOrigin{
- const r:LabOrigin={id,bericht:report.bericht,labor:report.labor,auftragsreferenz:report.auftragsreferenz,...(report.batch?{batch:report.batch}:{}),sources:{...report.sources}};
+ const r:LabOrigin={id,bericht:report.bericht,labor:report.labor,auftragsreferenz:report.auftragsreferenz,...(report.batch?{batch:report.batch}:{}),...(report.vorlaeufig?{vorlaeufig:true as const}:{}),sources:{...report.sources}};
  if(!validOrigin(r))throw Error('Ungültige Labor-Herkunft: Feldlängen und Quelldateinamen prüfen (keine lokalen Pfade).');return copyOrigin(r);
 }
 

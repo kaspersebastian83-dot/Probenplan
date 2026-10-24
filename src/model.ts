@@ -1,7 +1,8 @@
 import type {Sketch} from './sketch';
 export type Kind = 'sample' | 'fire';
 export interface LabSources {xml?:string;pdf?:string}
-export interface LabOrigin {id:string;bericht:string;labor:string;auftragsreferenz:string;batch?:string;sources:LabSources}
+/** vorlaeufig: Labor-XML mit IsPreliminaryReport="true" (ab 1.28) – Werte können sich mit dem endgültigen Bericht ändern. */
+export interface LabOrigin {id:string;bericht:string;labor:string;auftragsreferenz:string;batch?:string;sources:LabSources;vorlaeufig?:true}
 /** Ein Messwert aus dem Laborbericht: Parameter, Ergebnis wie gedruckt (z. B. "< 0,50"), Einheit. */
 export interface Wert {p:string;r:string;u:string}
 export interface LabData {ref:string;desc:string;art?:string;labNr?:string;datum?:string;bericht?:string;reportId?:string;werte?:Wert[]}

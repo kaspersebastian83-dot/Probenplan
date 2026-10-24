@@ -183,7 +183,7 @@ export function wandSvg(p:Project,w:Wand,parameter:string,o:{titel?:boolean;ante
 }
 
 /* ---------- Word und CSV ---------- */
-export interface WandKopf {title:string;nr:string;ort:string;projectData:Record<string,unknown>;created:string;app:string;source:string;labelkit:string}
+export interface WandKopf {title:string;nr:string;ort:string;projectData:Record<string,unknown>;created:string;app:string;source:string;labelkit:string;hinweis?:string}
 export interface WandBildDatei {data:Uint8Array;ext:'png';widthPx:number;heightPx:number}
 const P=(text:string,o:Record<string,unknown>={})=>({t:'p' as const,text,size:11,...o});
 const small=(text:string,o:Record<string,unknown>={})=>P(text,{size:8.5,after:40,...o});
@@ -216,6 +216,7 @@ export function wandBlocks(p:Project,st:WandStand,bilder:Map<string,WandBildDate
   });
   if(st.referenz.length){b.push(P('Referenzproben',{b:true,size:11,keepNext:true,before:200,after:60}));b.push({t:'table',widths:breiten(p2,kwPaar(p1,p2)),rows:zeilen(p,null,st.referenz,p1,p2),size:8});}
   b.push(small('Werte in der Schreibweise des Prüfberichts. Lage: Abstand von der linken Wandecke (Blick von innen auf die Wand) und Höhe über OKFF; ohne Maße nach Raster 1–9 wie eine Telefontastatur (1–3 deckennah, 7–9 bodennah). Boden und Decke: Raster von Wand A aus (Wand A oben).',{before:120}));
+  if(k.hinweis)b.push(small(k.hinweis,{b:true}));
   b.push(small('Rückstellproben (R) wurden nur gesägt und aufbewahrt, nicht analysiert.'));
   if(kwPaar(p1,p2))b.push(small(ANTEIL_TEXT));
   for(const s of skalen)b.push(small(`Einordnung · ${s}`));
