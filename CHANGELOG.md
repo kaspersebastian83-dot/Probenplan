@@ -1,5 +1,11 @@
 # Änderungen
 
+## 1.30.0 – 24. Oktober 2026
+
+- Ergebniskarte mit Werten aus einem vorläufigen Prüfbericht: „VORLÄUFIG“ in Rot im Schriftfeld (PDF, Bild und Lageplan der Word-Anlage); ist in der Legende Platz frei, steht dort zusätzlich der Hinweis mit Berichtsnummer. Aufteilung und Maßstab des Blatts ändern sich dadurch nicht.
+- Word-Anlage Probenahme: derselbe Hinweis unter dem Lageplan (als Ergebniskarte) und unter dem Probenverzeichnis; das Prüfprotokoll nennt ihn wie bisher.
+- Neuer Test „vorlaeufig“.
+
 ## 1.29.0 – 24. Oktober 2026
 
 - Neues Erscheinungsbild aller Word-Anlagen (Probenahme und Laborergebnisse, Raumbuch, Wandansichten) – passend zur Bilddokumentation aus FotoKit: Titel mit feiner blauer Linie statt Unterstreichung, Abschnitte in Firmenblau, Tabellen mit Haarlinien zwischen den Zeilen statt schwarzem Gitter, helle Kopfzeile mit blauer Linie, Bezeichnungen in Faktentabellen grau.

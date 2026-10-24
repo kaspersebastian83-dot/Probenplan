@@ -7,7 +7,7 @@ import {renderSheet,sheetLayout} from './sheet';
 import {drawPlanContent} from './export';
 import {clone,floorName,markerSize,sheetCount,sheetProject,type Project} from './model';
 import {hasValues,prepare,rateMarkers} from './results';
-import {vorlaeufigeBerichte} from './lab-provenance';
+import {vorlaeufigeBerichte,vorlaeufigText} from './lab-provenance';
 import {fileInfo,fileRevision,findSubdir,listFiles,projectFileName,AUFTRAEGE,LABOR,PLAENE,type ProjectFolder} from './folder';
 
 export const ANNEX_DIR='Mitteilungen',ANNEX_LOG='_Anlagen-Protokoll.txt',FOTOS='Fotos',FOTOKIT_FILE='_Bildumbenenner.json';
@@ -124,7 +124,7 @@ export async function createAnnex(p:Project,folder:ProjectFolder|null,o:AnnexOpt
   const parameter=project.results?.parameter||'';
   const checks=annexChecks(samples,fotos||[],plans,parameter,!!fotos,extra);
   o.progress?.('Word-Datei wird erstellt …');
-  const blocks=annexBlocks({title:o.title,nr:folder?.nr||project.report||'',ort:folder?.ort||'',projectData:o.projectData,parameter,scaleNotes:scaleNotes(project),plans,samples,photos:fotos||[],sources,checks,created,app:o.app,maxPhotos:o.maxPhotos,photosIncluded:!!fotos});
+  const blocks=annexBlocks({title:o.title,nr:folder?.nr||project.report||'',ort:folder?.ort||'',projectData:o.projectData,parameter,scaleNotes:scaleNotes(project),plans,samples,photos:fotos||[],sources,checks,created,app:o.app,maxPhotos:o.maxPhotos,photosIncluded:!!fotos,vorlaeufig:vorlaeufigText(vorlaeufigeBerichte(project))});
   const bytes=build({title:`${o.title}: Probenahme und Laborergebnisse${folder?` – Projekt ${folder.nr}`:''}`,author:o.app,application:o.app,created,blocks});
   return {bytes,checks,warnings:checks.filter(c=>!c.ok).length,created,source:sources[0]};
 }
