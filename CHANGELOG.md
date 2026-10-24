@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.22.1 – 24. Oktober 2026
+
+- **Aufgeräumt:** Im Ordner „Pläne“ bleiben von den automatischen Kopien („(vorher …)“ und „(Speicherkandidat …)“) nur noch die 5 neuesten je Art; ältere werden beim nächsten Speichern entfernt. Wiederherstellungsdateien und manuelle Kopien bleiben unberührt.
+
 ## 1.22.0 – 24. Oktober 2026
 
 - **Testfunktionen** (Liste → „Testfunktionen“): neue Ideen zum Ausprobieren im echten Projekt, je Projekt ein- und ausschaltbar (rückgängig machbar). Ausgeschaltet bleiben eingegebene Angaben erhalten, werden aber weder angezeigt noch exportiert.

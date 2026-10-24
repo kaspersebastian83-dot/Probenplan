@@ -56,22 +56,23 @@ try{
  // Explicit saving of identical content reuses the protected copy, without deleting it.
  const count=candidates.length;await B.m.saveFolderProject(folder,textB,resultB.revision);
  assert.equal((await readdir(plaene.path)).filter(n=>n.includes('(Speicherkandidat ')).length,count);
- // Even aged unique legacy backups may be the only remaining version. Never prune them by age alone.
+ // Old backups beyond the newest 5 are pruned, also legacy UTC names.
  const legacy=`Probenplan ${name} (vorher 2000-01-01T00-00-00-000Z-legacy).probenplan`;
  await writeFile(join(plaene.path,legacy),JSON.stringify({...alt,report:'LEGACY EINZIGARTIG'}));
  for(let i=0;i<45;i++)await writeFile(join(plaene.path,`Probenplan ${name} (vorher 2026-10-20 12-00-${String(i).padStart(2,'0')}-000 test).probenplan`),textB);
- await A.m.pruneBackups(folder);assert.equal(await readFile(join(plaene.path,candidateA),'utf8'),textA);assert.match(await readFile(join(plaene.path,legacy),'utf8'),/LEGACY EINZIGARTIG/);
+ await A.m.pruneBackups(folder);assert.equal(await readFile(join(plaene.path,candidateA),'utf8'),textA);
+ const left=(await readdir(plaene.path)).filter(n=>n.includes('(vorher '));assert.equal(left.length,5,'only the 5 newest backups stay');assert.ok(!left.includes(legacy),'old backups are pruned');
  // UTF-8 replacement characters are not proof of identical bytes in damaged files.
  const badBackup=`Probenplan ${name} (vorher 1999-01-01T00-00-00-000Z-invalid).probenplan`;
  const decodedCopy=await A.m.writeProjectCopy(folder,'Speicherkandidat','\ufffd');
  await writeFile(join(plaene.path,badBackup),Buffer.from([0xff]));await A.m.pruneBackups(folder);
- assert.deepEqual(await readFile(join(plaene.path,badBackup)),Buffer.from([0xff]));
+ assert.ok(!(await readdir(plaene.path)).includes(badBackup),'an old damaged backup is pruned too');
  const rawCopy=await A.m.writeProjectCopy(folder,'Kopie',new File([new Uint8Array([0xff])],'raw'));assert.deepEqual(await readFile(join(plaene.path,rawCopy)),Buffer.from([0xff]));
  // Name collisions must never overwrite a verified copy.
  const FixedDate=class extends Date{constructor(...args){super(...(args.length?args:['2026-10-21T12:00:00Z']));}};
  const collision=session({Date:FixedDate,crypto:{subtle:crypto.subtle,randomUUID:()=> '00000000-0000-4000-8000-000000000000'}}).m;
  const copy=await collision.writeProjectCopy(folder,'Kopie','first');await assert.rejects(collision.writeProjectCopy(folder,'Kopie','second'),/bereits belegt/);assert.equal(await readFile(join(plaene.path,copy),'utf8'),'first');
- console.log('OK F2 Node: independent A/B final checks, A success then B success; both complete versions survive cleanup, identical retry, unique legacy retention and UUID collision');
+ console.log('OK F2 Node: independent A/B final checks, A success then B success; both complete versions survive cleanup, identical retry, pruning to the newest 5 and UUID collision');
  // Carry exactly the verified race results into fresh UI sessions; no synthesized replacement for A/B.
  files=Object.fromEntries(await Promise.all((await readdir(plaene.path)).map(async n=>[n,await readFile(join(plaene.path,n),'utf8')])));
  delete files[copy]; // the intentionally non-project collision fixture is covered above

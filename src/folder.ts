@@ -108,14 +108,14 @@ export function stampTime(rest:string):number|null{
 const uniqueName=(f:ProjectFolder,kind:string)=>`Probenplan ${f.name} (${kind} ${localStamp()} ${crypto.randomUUID()}).probenplan`;
 /** Always use a fresh filename: backups/recovery files are never recycled. */
 export async function writeProjectCopy(f:ProjectFolder,kind:string,data:string|Blob){const name=uniqueName(f,kind);if(await fileInfo(f.plaene,name))throw Error('Der Name einer Sicherungsdatei ist bereits belegt. Bitte erneut versuchen.');const wanted=await fileRevision(new File([data],name));await writeFile(f.plaene,name,data);if(await fileRevision(await fileInfo(f.plaene,name))!==wanted)throw Error('Sicherungsdatei konnte nicht bestätigt werden.');return name;}
-/** These candidates are never cleaned up. Reuse only a byte-identical, re-read copy. */
+/** A verified copy of the new content before the main file is replaced; reuse a byte-identical one. */
 async function retainCandidate(f:ProjectFolder,text:string){
  const wanted=await fileRevision(new File([text],'candidate'));
  for(const file of await listFiles(f.plaene,/\.probenplan$/i))if(file.name.startsWith(`Probenplan ${f.name} (Speicherkandidat `)&&await fileRevision(await file.handle.getFile())===wanted)return file.name;
  return writeProjectCopy(f,'Speicherkandidat',text);
 }
 /** Serialize cooperating tabs; detect external changes again immediately before replacement.
- * File System Access commits a writable stream on close. Permanent candidates survive failed closes and later independent writers. */
+ * File System Access commits a writable stream on close. The candidate survives a failed close; old copies are pruned afterwards. */
 export async function saveFolderProject(f:ProjectFolder,text:string,expected:string|null){
  if(!navigator.locks)throw Error('Sicheres Speichern benötigt Chrome oder Edge mit Web Locks.');
  return navigator.locks.request(`plankit:project:${f.name}`,async()=>{
@@ -130,37 +130,23 @@ export async function saveFolderProject(f:ProjectFolder,text:string,expected:str
   await writeFile(f.plaene,name,text);
   const committed=await fileInfo(f.plaene,name),wanted=await fileRevision(new File([text],name));
   if(await fileRevision(committed)!==wanted)throw Error('Die geschriebene Datei konnte nicht bestätigt werden. Der geprüfte Speicherkandidat bleibt erhalten.');
-  // A later writer can still replace the main file after our readback. Keep our candidate permanently.
   await pruneBackups(f);
   return {revision:wanted,backup,candidate};
  });
 }
 
-/** Every save keeps the previous file as a backup. To stop them piling up in the shared folder, keep the newest
- * KEEP_RECENT plus the newest one of each of the last KEEP_DAYS days. Only "(vorher …)" backups are touched –
- * A backup outside that window is removable only with a byte-identical permanent candidate.
- * Unique old backups, recovery files, candidates and manual copies are never removed. */
-export const KEEP_RECENT=10,KEEP_DAYS=30;
+/** Keep the "Pläne" folder tidy: of the automatic copies ("(vorher …)" and "(Speicherkandidat …)") only the
+ * newest KEEP_RECENT of each kind stay. Recovery files, manual copies and names without a readable time stay untouched. */
+export const KEEP_RECENT=5;
 export async function pruneBackups(f:ProjectFolder){
  try{
-  const prefix=`Probenplan ${f.name} (vorher `,names:string[]=[];
-  for await(const h of f.plaene.values())if(h.kind==='file'&&h.name.startsWith(prefix)&&h.name.endsWith(').probenplan'))names.push(h.name);
-  // Nach Zeitpunkt sortieren (alte UTC- und neue Ortszeit-Namen gemischt), Tag in Ortszeit
-  const time=new Map(names.map(n=>[n,stampTime(n.slice(prefix.length))]));
-  names.sort((a,b)=>(time.get(b)??-1)-(time.get(a)??-1)||b.localeCompare(a));
-  const keep=new Set(names.slice(0,KEEP_RECENT)),days=new Set<string>();
-  for(const n of names){const t=time.get(n);
-   if(t==null){keep.add(n);continue;}
-   const d=new Date(t),day=`${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
-   if(!days.has(day)&&days.size<KEEP_DAYS){days.add(day);keep.add(n);}}
-  const candidates=(await listFiles(f.plaene,/\.probenplan$/i)).filter(x=>x.name.startsWith(`Probenplan ${f.name} (Speicherkandidat `));
-  for(const n of names)if(!keep.has(n)){
-   const original=await fileInfo(f.plaene,n);if(!original)continue;const revision=await fileRevision(original);
-   for(const candidate of candidates)if(await fileRevision(await candidate.handle.getFile())===revision){
-    // Check both copies again immediately before deletion. App code never deletes permanent candidates.
-    if(await fileRevision(await fileInfo(f.plaene,n))===revision&&await fileRevision(await candidate.handle.getFile())===revision)await f.plaene.removeEntry(n).catch(()=>{});
-    break;
-   }
+  for(const kind of ['vorher','Speicherkandidat']){
+   const prefix=`Probenplan ${f.name} (${kind} `,names:string[]=[];
+   for await(const h of f.plaene.values())if(h.kind==='file'&&h.name.startsWith(prefix)&&h.name.endsWith(').probenplan'))names.push(h.name);
+   // Nach Zeitpunkt sortieren (alte UTC- und neue Ortszeit-Namen gemischt)
+   const time=new Map(names.map(n=>[n,stampTime(n.slice(prefix.length))]));
+   const dated=names.filter(n=>time.get(n)!=null).sort((a,b)=>time.get(b)!-time.get(a)!||b.localeCompare(a));
+   for(const n of dated.slice(KEEP_RECENT))await f.plaene.removeEntry(n).catch(()=>{});
   }
  }catch{/* pruning is best effort */}
 }
