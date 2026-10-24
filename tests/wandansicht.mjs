@@ -10,6 +10,7 @@ registerHooks({
 });
 globalThis.localStorage={getItem:()=>null,setItem(){}};
 const W=await import('../src/wandansicht.ts');
+const {scaleFor}=await import('../src/results.ts');
 let n=0;const check=(name,fn)=>{fn();n++;console.log(`OK Wandansicht: ${name}`);};
 const C40='Kohlenwasserstoffe C10-C40',C22='Kohlenwasserstoffe C10-C22',U='mg/kg TS';
 const seg=(nr,id,st='A',extra={})=>({id:100+nr,_nr:nr,matrix:'Bohrkern',z2:'EG Wohnzimmer',bkBez:id.replace(/-T\d$/,''),bkId:id,bkVon:0,bkBis:2,bkMaterial:'Putz',bkStatus:st,notiz:st==='R'?'Rückstellprobe – nicht analysieren':'MKW',...extra});
@@ -58,8 +59,25 @@ check('Word-Blöcke und CSV',()=>{
  const txt=JSON.stringify(blocks);assert.equal(blocks.filter(b=>b.t==='image').length,4);assert.match(txt,/Anlage 6: Bohrkerne – Wandansichten/);assert.match(txt,/Referenzproben/);assert.match(txt,/P8 \(Boden alt\)/);
  const tables=blocks.filter(b=>b.t==='table');assert.ok(tables.every(t=>t.widths.reduce((a,b)=>a+b,0)===9070));assert.ok(tables.every(t=>t.rows.every(r=>r.cells.length===t.widths.length)));
  const csv=W.wandCSV(p,st,C40,C22).split('\r\n');assert.equal(csv[0].charCodeAt(0),0xfeff);assert.equal(csv.filter(Boolean).length,1+7);
- assert.match(csv[1],/^Erdgeschoss;Wohnzimmer;Wand B;EG-WZ-B-7;EG-WZ-B-7-T1;P1;0,60 m von links, 0,30 m über OKFF;0;2;Putz;;analysiert;8400 mg\/kg TS;2100 mg\/kg TS;stark$/);
+ assert.match(csv[1],/^Erdgeschoss;Wohnzimmer;Wand B;EG-WZ-B-7;EG-WZ-B-7-T1;P1;0,60 m von links, 0,30 m über OKFF;0;2;Putz;;analysiert;8400 mg\/kg TS;2100 mg\/kg TS;25;stark$/);
  assert.match(W.wandName('26.0142','docx','2026-10-24',['26-0142_Wandansichten_2026-10-24.docx']),/_2\.docx$/);
  assert.deepEqual(W.wandHinweise(st,C40).map(h=>h.replace(/:.*/,'')),['3 analysierte Segmente noch ohne Laborwert für Kohlenwasserstoffe C10-C40','2 Wände ohne Wandmaße – Lage nach Raster','Ohne gültige Bohrkern-ID, nicht dargestellt']);
 });
+check('Anteil C10–C22 an C10–C40: gerechnet, Obergrenze bei < BG, sonst leer – keine Ölart',()=>{
+ const s=(r40,r22,extra={})=>({label:'P1',id:'x',tiefe:1,von:0,bis:2,material:'',status:'A',werte:[{p:C40,r:r40,u:U},{p:C22,r:r22,u:extra.u||U}],...extra});
+ const paar=W.kwPaar(C40,C22);assert.deepEqual(paar,[C40,C22]);assert.deepEqual(W.kwPaar(C22,C40),[C40,C22]);assert.equal(W.kwPaar(C40,''),null);assert.equal(W.kwPaar('Summe 16 EPA-PAK',C22),null);
+ assert.equal(W.kwAnteil(s('8400','2100'),paar),'25 %');assert.equal(W.kwAnteil(s('1200','1150'),paar),'96 %');
+ assert.equal(W.kwAnteil(s('800','< 50'),paar),'< 6 %');assert.equal(W.kwAnteil(s('800','unter BG'),paar),'');
+ assert.equal(W.kwAnteil(s('< 50','< 50'),paar),'');assert.equal(W.kwAnteil(s('800','n.n.'),paar),'');
+ assert.equal(W.kwAnteil(s('800','100',{u:'mg/kg'}),paar),'','verschiedene Einheiten');assert.equal(W.kwAnteil(s('800','100',{status:'R'}),paar),'');
+ const p=projekt(true),st=W.wandStand(daten,p),svg=W.wandSvg(p,st.waende[0],C40,{anteil:paar}).svg;assert.match(svg,/>25 %</);assert.match(svg,/Anteil C10–C22 an C10–C40/);
+ assert.doesNotMatch(W.wandSvg(p,st.waende[0],C40).svg,/>25 %</,'ohne Paar kein Anteil');
+ const txt=JSON.stringify(W.wandBlocks(p,st,new Map(),C40,C22,{title:'A',nr:'1',ort:'',projectData:{},created:'2026-10-24T10:00:00Z',app:'t',source:'s',labelkit:'l'}));assert.match(txt,/Anteil C10–C22/);assert.match(txt,/Keine Zuordnung zu einer Ölart/);
+});
+check('Skalenregel (wie Ergebniskarte): VdS, wenn vorhanden – angepasst möglich; sonst eigene Skala',()=>{const SUM='Summe 16 EPA-PAK exkl. BG',u='µg/m²',own={name:'eigen',cats:[{name:'a',from:0,color:'#4caf50'}]},anp={name:'VdS angepasst',cats:[{name:'b',from:0,color:'#4caf50'}]};
+ assert.match(scaleFor({parameter:SUM,scales:{[`${SUM}|${u}`]:own},usage:'residential'},SUM,u).scale.name,/^VdS 2357/,'VdS vor eigener Skala');
+ assert.equal(scaleFor({parameter:SUM,scales:{[`${SUM}|${u}`]:own},usage:'residential',vds:{[`${SUM}|${u}`]:anp}},SUM,u).scale,anp);
+ assert.equal(scaleFor({parameter:SUM,scales:{[`${SUM}|${u}`]:own}},SUM,u).scale,own,'ohne Nutzung eigene Skala');
+ assert.equal(scaleFor({parameter:C40,scales:{[`${C40}|${U}`]:own},usage:'residential'},C40,U).scale,own,'MKW: keine VdS-Referenz → eigene Skala');
+ assert.equal(scaleFor({parameter:C40,scales:{},usage:'residential'},C40,U).scale,undefined,'keine erfunden');});
 console.log(`OK Wandansicht: ${n} Fälle`);

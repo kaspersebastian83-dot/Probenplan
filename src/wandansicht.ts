@@ -5,7 +5,7 @@
 // geschätzt: ohne Maße steht der Punkt nach dem Raster 1–9, ohne Skala gibt es keine Einordnung, nur den Wert.
 import type {Block,Cell,Row} from './docx';
 import {allMarkers,escape,type Project,type Scale,type Wert} from './model';
-import {fromShared,labQualifier,labNumber,rangeText,rate,scaleKey,shortParameter,vdsScale,ink,BELOW_LIMIT,NOT_DETECTED,NOT_DETERMINED,UNRATED} from './results';
+import {fromShared,labQualifier,labNumber,rangeText,rate,scaleFor,scaleKey,shortParameter,ink,BELOW_LIMIT,NOT_DETECTED,NOT_DETERMINED,UNRATED} from './results';
 
 /** Bezeichnung wie AidKit (konventionen.js): Geschoss-Raum-Fläche-Punkt-Tiefe, F- = Freimessung, REF-n = Referenz. */
 const MUSTER=/^(F-)?(?:(REF)-(\d{1,2})|(KG|UG|EG|[1-9]OG|DG)-([A-Z]{2,3})([1-9]?)-([A-H]|BO|DE)-([1-9]\d?)([a-z]?))(?:-T([1-9]))?$/;
@@ -69,10 +69,26 @@ export function vorschlag(params:string[],ergebnis=''):[string,string]{
   const p1=c40||(params.includes(ergebnis)?ergebnis:params[0]||'');return [p1,c22&&c22!==p1?c22:''];
 }
 
-/** Skala wie in der Ergebniskarte: VdS-Referenz, wenn es für den Parameter eine gibt, sonst die Skala des Projekts oder aus FotoKit. Keine eigene. */
+const C40_RE=/C\s*10\s*[-–]\s*C?\s*40/i,C22_RE=/C\s*10\s*[-–]\s*C?\s*22/i;
+/** Das Paar [C10–C40, C10–C22], wenn beide als Werte gewählt sind, sonst null. */
+export function kwPaar(p1:string,p2:string):[string,string]|null{const a=[p1,p2].filter(Boolean),c40=a.find(x=>C40_RE.test(x)),c22=a.find(x=>C22_RE.test(x));return c40&&c22&&c40!==c22?[c40,c22]:null;}
+/** Anteil C10–C22 an C10–C40 in Prozent – nur aus den beiden Laborwerten gerechnet, keine Zuordnung zu einer Ölart.
+ *  C10–C22 unter der BG („< 50“) ergibt eine Obergrenze („< 6 %“); ohne Zahl für C10–C40, bei n.n./n.b. oder
+ *  verschiedenen Einheiten gibt es keinen Anteil. */
+export function kwAnteil(s:WandSegment,paar:[string,string]|null):string{
+  if(!paar||s.status==='R')return '';const w40=s.werte.find(x=>x.p===paar[0]),w22=s.werte.find(x=>x.p===paar[1]);
+  if(!w40||!w22||w40.u.trim()!==w22.u.trim()||labQualifier(w40.r)!=='measured')return '';
+  const n40=labNumber(w40.r);if(!(n40>0))return '';const pct=(v:number)=>Math.round(v/n40*100).toLocaleString('de-DE');
+  const q=labQualifier(w22.r);
+  if(q==='measured'){const n=labNumber(w22.r);return Number.isFinite(n)?`${pct(n)} %`:'';}
+  if(q==='below'){const r=w22.r.trim().replace(/^\((.*)\)$/,'$1').trim();if(r.startsWith('<')){const g=labNumber(r.slice(1));if(Number.isFinite(g))return `< ${pct(g)} %`;}}
+  return '';
+}
+const ANTEIL_TEXT='Anteil C10–C22 an C10–C40 in % (aus den beiden Laborwerten gerechnet; „<“: C10–C22 unter der BG). Keine Zuordnung zu einer Ölart.';
+
+/** Skala wie in der Ergebniskarte (scaleFor: VdS, wenn vorhanden und nicht angepasst, sonst die Skala des Projekts), zuletzt aus FotoKit. Keine eigene. */
 export function skalaFuer(p:Project,parameter:string,unit:string):Scale|undefined{
-  const s=p.results,key=scaleKey(parameter,unit);
-  return (s?.usage?vdsScale(parameter,unit,s.usage):undefined)||s?.scales[key]||fromShared(key)||undefined;
+  return scaleFor(p.results,parameter,unit).scale||fromShared(scaleKey(parameter,unit))||undefined;
 }
 export interface Einordnung {fill:string;text:string;kategorie:string;art:'kategorie'|'below'|'notDetected'|'notDetermined'|'ohne'|'fehlt'|'R'}
 export function einordnung(p:Project,seg:WandSegment,parameter:string):Einordnung{
@@ -102,7 +118,7 @@ interface Legende {farbe:string;text:string;muster?:boolean}
 export interface WandBild {svg:string;width:number;height:number;legende:Legende[];skalen:string[]}
 
 /** Zeichnung einer Wand (oder von Boden/Decke) mit Tiefensäulen; Breite 1000 Einheiten, Höhe nach Wandmaßen. */
-export function wandSvg(p:Project,w:Wand,parameter:string,o:{titel?:boolean}={}):WandBild{
+export function wandSvg(p:Project,w:Wand,parameter:string,o:{titel?:boolean;anteil?:[string,string]|null}={}):WandBild{
   const titel=o.titel!==false,ratio=w.laenge&&w.hoehe?w.hoehe/w.laenge:istFlaeche(w)?.7:.55;
   const WH=Math.round(Math.min(560,Math.max(300,WW*ratio))),Y0=titel?96:52,aussen=w.kerne.filter(k=>k.nr>=10&&(istFlaeche(w)||k.ecke==null||k.okff==null||!w.laenge||!w.hoehe));
   const yAussen=Y0+WH+84,legY=yAussen+(aussen.length?Math.max(...aussen.map(k=>k.segmente.length))*CH+40:0);
@@ -132,7 +148,7 @@ export function wandSvg(p:Project,w:Wand,parameter:string,o:{titel?:boolean}={})
     if(gemessen){x=X0+Math.min(1,k.ecke!/w.laenge!)*WW;y=Y0+WH-Math.min(1,k.okff!/w.hoehe!)*WH;}
     else if(k.nr>=1&&k.nr<=9){const c=(k.nr-1)%3,r=Math.floor((k.nr-1)/3);x=X0+WW*(c*2+1)/6;y=Y0+WH*(r*2+1)/6;}
     else{x=X0+30+ai*190;y=yAussen;ai++;}
-    const n=k.segmente.length,nachLinks=x+18+CW>X0+WW-4,cx=nachLinks?x-18-CW:x+18;let cy=y-n*CH/2;
+    const n=k.segmente.length,nachLinks=x+18+CW+(o.anteil?44:0)>X0+WW-4,cx=nachLinks?x-18-CW:x+18;let cy=y-n*CH/2;
     if(y<Y0+WH+1)cy=Math.max(Y0+4,Math.min(Y0+WH-4-n*CH,cy));
     out.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="7" fill="#1d2a33" stroke="#fff" stroke-width="2"/>`);
     out.push(`<text x="${x.toFixed(1)}" y="${(y-13).toFixed(1)}" font-size="14" font-weight="600" text-anchor="middle" stroke="#f7f4ee" stroke-width="4" paint-order="stroke">${e(`${w.flaeche}-${k.punkt}`)}</text>`);
@@ -142,6 +158,8 @@ export function wandSvg(p:Project,w:Wand,parameter:string,o:{titel?:boolean}={})
       out.push(`<text x="${(cx+5).toFixed(1)}" y="${(yy+16.5).toFixed(1)}" font-size="12" fill="${col}" opacity=".8">T${s.tiefe}</text><text x="${(cx+CW-5).toFixed(1)}" y="${(yy+16.5).toFixed(1)}" font-size="12.5" font-weight="600" text-anchor="end" fill="${col}">${e(ein.text.length>11?ein.text.slice(0,10)+'…':ein.text)}</text>`);
     });
     out.push(`<rect x="${cx.toFixed(1)}" y="${cy.toFixed(1)}" width="${CW}" height="${n*CH}" fill="none" stroke="#1d2a33" stroke-width="1"/>`);
+    if(o.anteil)k.segmente.forEach((s,i)=>{const a=kwAnteil(s,o.anteil!);if(!a)return;const ax=nachLinks?cx-4:cx+CW+4;
+      out.push(`<text x="${ax.toFixed(1)}" y="${(cy+i*CH+16.5).toFixed(1)}" font-size="11.5" text-anchor="${nachLinks?'end':'start'}" fill="#4a5a68" stroke="#f7f4ee" stroke-width="3" paint-order="stroke">${e(a)}</text>`);});
   }
   if(aussen.length)out.push(`<text x="${X0}" y="${yAussen-40}" font-size="13" fill="#4a5a68">Außerhalb des Rasters, ohne Maße:</text>`);
   // Legende
@@ -154,9 +172,10 @@ export function wandSvg(p:Project,w:Wand,parameter:string,o:{titel?:boolean}={})
   if(arten.has('ohne'))legende.push({farbe:UNRATED,text:skalen.length?'Wert ohne Einordnung':'Wert (keine Skala für diesen Parameter)'});
   if(arten.has('fehlt'))legende.push({farbe:UNRATED,text:'– noch kein Laborwert'});
   if(arten.has('R'))legende.push({farbe:'url(#r)',text:'R Rückstellprobe (nicht analysiert)',muster:true});
+  if(o.anteil&&w.kerne.some(k=>k.segmente.some(s=>kwAnteil(s,o.anteil!))))legende.push({farbe:'none',text:'% neben der Säule: Anteil C10–C22 an C10–C40'});
   let lx=X0,ly=legY;const zeilen:string[]=[];
   for(const l of legende){const wtxt=l.text.length*7.2+34;if(lx+wtxt>BREITE-20&&lx>X0){lx=X0;ly+=26;}
-    zeilen.push(`<rect x="${lx}" y="${ly-13}" width="18" height="16" fill="${l.farbe}" stroke="#8a8172"/><text x="${lx+24}" y="${ly}" font-size="13">${e(l.text)}</text>`);lx+=wtxt;}
+    zeilen.push(`${l.farbe==='none'?'':`<rect x="${lx}" y="${ly-13}" width="18" height="16" fill="${l.farbe}" stroke="#8a8172"/>`}<text x="${l.farbe==='none'?lx:lx+24}" y="${ly}" font-size="13">${e(l.text)}</text>`);lx+=wtxt;}
   out.push(...zeilen);
   const height=Math.ceil((legende.length?ly+18:legY))+8;
   const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${BREITE} ${height}" width="${BREITE}" height="${height}" font-family="${FONT}" fill="#1d2a33"><rect width="${BREITE}" height="${height}" fill="#fff"/>${out.join('')}</svg>`;
@@ -171,12 +190,13 @@ const small=(text:string,o:Record<string,unknown>={})=>P(text,{size:8.5,after:40
 const th=(text:string):Cell=>({text,b:true,shade:'F2F2F2',size:8});
 /** Spaltenkopf: „Kohlenwasserstoffe C10-C40“ → „KW C10-C40“ (voller Name steht im Kopf der Anlage). */
 const kurz=(x:string)=>shortParameter(x).replace(/^Kohlenwasserstoffe\s+/i,'KW ');
-const BREITEN2=[650,1450,1500,900,750,1150,1150,1520],BREITEN1=[700,1600,1650,1000,800,1400,1920];
+const BREITEN2=[650,1450,1500,900,750,1150,1150,1520],BREITEN1=[700,1600,1650,1000,800,1400,1920],BREITEN3=[600,1300,1400,850,650,1050,1050,850,1320];
+const breiten=(p2:string,paar:unknown)=>paar?BREITEN3:p2?BREITEN2:BREITEN1;
 function zeilen(p:Project,w:Wand|null,kerne:WandKern[],p1:string,p2:string):Row[]{
-  const rows:Row[]=[{header:true,cells:['Probe','Kern / Tiefe','Lage','Material','Geruch',p1?kurz(p1):'Wert',...(p2?[kurz(p2)]:[]),'Einordnung'].map(th)}];
+  const paar=kwPaar(p1,p2),rows:Row[]=[{header:true,cells:['Probe','Kern / Tiefe','Lage','Material','Geruch',p1?kurz(p1):'Wert',...(p2?[kurz(p2)]:[]),...(paar?['Anteil C10–C22']:[]),'Einordnung'].map(th)}];
   for(const k of kerne)k.segmente.forEach((s,i)=>{
     const e1=einordnung(p,s,p1),w1=s.werte.find(x=>x.p===p1),w2=s.werte.find(x=>x.p===p2),wert=(x?:Wert)=>s.status==='R'?'–':x?`${x.r} ${x.u}`.trim():'–';
-    rows.push({cells:[{text:s.label},{text:`${i?'':`${k.kern}\n`}T${s.tiefe} · ${tiefeText(s)}`},{text:i?'':w?lageText(w,k):'–'},{text:s.material||'–'},{text:i?'':k.geruch||'–'},{text:wert(w1)},...(p2?[{text:wert(w2)}]:[]),{text:s.status==='R'?'Rückstellprobe':e1.kategorie||(w1?'–':'kein Laborwert'),shade:e1.art==='kategorie'?e1.fill.slice(1):undefined}]});
+    rows.push({cells:[{text:s.label},{text:`${i?'':`${k.kern}\n`}T${s.tiefe} · ${tiefeText(s)}`},{text:i?'':w?lageText(w,k):'–'},{text:s.material||'–'},{text:i?'':k.geruch||'–'},{text:wert(w1)},...(p2?[{text:wert(w2)}]:[]),...(paar?[{text:kwAnteil(s,paar)||'–'}]:[]),{text:s.status==='R'?'Rückstellprobe':e1.kategorie||(w1?'–':'kein Laborwert'),shade:e1.art==='kategorie'?e1.fill.slice(1):undefined}]});
   });
   return rows;
 }
@@ -191,12 +211,13 @@ export function wandBlocks(p:Project,st:WandStand,bilder:Map<string,WandBildDate
     b.push(P(`${geschossName(w.geschoss)} · ${w.raum} · ${flaecheName(w.flaeche)}${w.frei?' · Freimessung':''}`,{b:true,size:11,keepNext:true,pageBreakBefore:i>0,after:60}));
     const img=bilder.get(w.key);
     if(img){const widthMm=165;b.push({t:'image',data:img.data,ext:'png',widthMm,heightMm:Math.round(widthMm*img.heightPx/img.widthPx),alt:`Wandansicht ${w.key}`,after:80,keepNext:true});}
-    b.push({t:'table',widths:p2?BREITEN2:BREITEN1,rows:zeilen(p,w,w.kerne,p1,p2),size:8});
+    b.push({t:'table',widths:breiten(p2,kwPaar(p1,p2)),rows:zeilen(p,w,w.kerne,p1,p2),size:8});
     for(const s of wandSvg(p,w,p1).skalen)skalen.add(s);
   });
-  if(st.referenz.length){b.push(P('Referenzproben',{b:true,size:11,keepNext:true,before:200,after:60}));b.push({t:'table',widths:p2?BREITEN2:BREITEN1,rows:zeilen(p,null,st.referenz,p1,p2),size:8});}
+  if(st.referenz.length){b.push(P('Referenzproben',{b:true,size:11,keepNext:true,before:200,after:60}));b.push({t:'table',widths:breiten(p2,kwPaar(p1,p2)),rows:zeilen(p,null,st.referenz,p1,p2),size:8});}
   b.push(small('Werte in der Schreibweise des Prüfberichts. Lage: Abstand von der linken Wandecke (Blick von innen auf die Wand) und Höhe über OKFF; ohne Maße nach Raster 1–9 wie eine Telefontastatur (1–3 deckennah, 7–9 bodennah). Boden und Decke: Raster von Wand A aus (Wand A oben).',{before:120}));
   b.push(small('Rückstellproben (R) wurden nur gesägt und aufbewahrt, nicht analysiert.'));
+  if(kwPaar(p1,p2))b.push(small(ANTEIL_TEXT));
   for(const s of skalen)b.push(small(`Einordnung · ${s}`));
   b.push(small(skalen.size?'Die Einordnung ist die Zuordnung zur angegebenen Skala; sie ersetzt nicht die Bewertung im Gutachtentext.':'Für den dargestellten Parameter ist keine Skala hinterlegt – die Farben zeigen nur, ob ein Wert vorliegt; es gibt keine Einordnung.'));
   if(st.ohneId.length)b.push(small(`Ohne gültige Bohrkern-ID und daher nicht dargestellt: ${st.ohneId.join(', ')}.`));
@@ -204,10 +225,10 @@ export function wandBlocks(p:Project,st:WandStand,bilder:Map<string,WandBildDate
   return b;
 }
 export function wandCSV(p:Project,st:WandStand,p1:string,p2:string):string{
-  const safe=(v:string)=>/^[=+@\t\r]|^-\S/.test(v)?`'${v}`:v,q=(raw:string)=>{const v=safe(raw);return /[";\n\r]/.test(v)?`"${v.replace(/"/g,'""')}"`:v;};
-  const lines=[['Geschoss','Raum','Fläche','Kern','Segment','Probe','Lage','von cm','bis cm','Material','Geruch','Status',p1||'Wert',...(p2?[p2]:[]),'Einordnung'].map(q).join(';')];
+  const paar=kwPaar(p1,p2),safe=(v:string)=>/^[=+@\t\r]|^-\S/.test(v)?`'${v}`:v,q=(raw:string)=>{const v=safe(raw);return /[";\n\r]/.test(v)?`"${v.replace(/"/g,'""')}"`:v;};
+  const lines=[['Geschoss','Raum','Fläche','Kern','Segment','Probe','Lage','von cm','bis cm','Material','Geruch','Status',p1||'Wert',...(p2?[p2]:[]),...(paar?['Anteil C10-C22 an C10-C40 (%)']:[]),'Einordnung'].map(q).join(';')];
   const zeile=(w:Wand|null,k:WandKern)=>{for(const s of k.segmente){const e1=einordnung(p,s,p1),f=(x?:Wert)=>s.status==='R'||!x?'':`${x.r} ${x.u}`.trim();
-    lines.push([w?geschossName(w.geschoss):'',w?.raum||'Referenz',w?flaecheName(w.flaeche):'',k.kern,s.id,s.label,w?lageText(w,k):'',s.von==null?'':cm(s.von),s.bis==null?'':cm(s.bis),s.material,k.geruch,s.status==='R'?'Rückstellprobe':'analysiert',f(s.werte.find(x=>x.p===p1)),...(p2?[f(s.werte.find(x=>x.p===p2))]:[]),s.status==='R'?'':e1.kategorie].map(q).join(';'));}};
+    lines.push([w?geschossName(w.geschoss):'',w?.raum||'Referenz',w?flaecheName(w.flaeche):'',k.kern,s.id,s.label,w?lageText(w,k):'',s.von==null?'':cm(s.von),s.bis==null?'':cm(s.bis),s.material,k.geruch,s.status==='R'?'Rückstellprobe':'analysiert',f(s.werte.find(x=>x.p===p1)),...(p2?[f(s.werte.find(x=>x.p===p2))]:[]),...(paar?[kwAnteil(s,paar).replace(/ %$/,'')]:[]),s.status==='R'?'':e1.kategorie].map(q).join(';'));}};
   for(const w of st.waende)for(const k of w.kerne)zeile(w,k);
   for(const k of st.referenz)zeile(null,k);
   return '﻿'+lines.join('\r\n')+'\r\n';

@@ -4,7 +4,7 @@
 // Einordnung nur in die Skala des Sachverständigen (mit Angabe der Skala) – jede Abweichung steht im Prüfprotokoll.
 // Dieser Teil ist rein: er rechnet nur mit den übergebenen Daten (Bilder, Prüfsummen und Dateien liefert annex-run.ts).
 import {allMarkers,floorName,sheetCount,sheetProject,type Project,type Wert} from './model';
-import {rangeText,rateMarkers,shortParameter,valueOf,vdsScale,type Rated} from './results';
+import {rangeText,rateMarkers,scaleFor,shortParameter,valueOf,type Rated} from './results';
 import type {Block,Cell,Row} from './docx';
 
 export interface AnnexImage {data:Uint8Array;ext:'png'|'jpeg';widthPx:number;heightPx:number}
@@ -73,9 +73,9 @@ export function collectSamples(p:Project):AnnexSample[]{
 export function scaleNotes(p:Project):string[]{
   const s=p.results;if(!s?.parameter)return [];const seen=new Set<string>(),notes:string[]=[];
   for(const m of allMarkers(p)){const w=valueOf(m,s.parameter);if(!w||seen.has(w.u))continue;seen.add(w.u);
-    const scale=s.usage?vdsScale(s.parameter,w.u,s.usage):s.scales[`${s.parameter}|${w.u}`];
+    const eff=scaleFor(s,s.parameter,w.u),scale=eff.scale;
     if(!scale?.cats.length){notes.push(`${shortParameter(s.parameter)} in ${w.u}: keine Skala hinterlegt – Werte ohne Einordnung.`);continue;}
-    notes.push(`${shortParameter(s.parameter)} in ${w.u}: ${scale.name?`Skala „${scale.name}“`:'Skala'}${s.usage?'':' (Vorgabe des Sachverständigen)'} – ${scale.cats.map((c,i)=>`${c.name} ${rangeText(scale,i,w.u)}`).join(' · ')}.`);}
+    notes.push(`${shortParameter(s.parameter)} in ${w.u}: ${scale.name?`Skala „${scale.name}“`:'Skala'}${eff.vds?(eff.angepasst?' (VdS-Referenz, im Projekt angepasst)':''):' (Vorgabe des Sachverständigen)'} – ${scale.cats.map((c,i)=>`${c.name} ${rangeText(scale,i,w.u)}`).join(' · ')}.`);}
   return notes;
 }
 

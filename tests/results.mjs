@@ -61,8 +61,19 @@ for(const engine of ['chromium','webkit']){
    const file=await downloadedProject(page);assert.equal(file.results.usage,'industrial');assert.deepEqual(file.results.scales,before.results.scales);assert.deepEqual(file.markers,before.markers);
    await page.locator('#project-file').setInputFiles({name:'usage.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(file))});await page.locator('#replace-yes').click();await page.locator('#toast:not(.error)').waitFor();
    assert.equal((await savedProject(page)).results.usage,'industrial');
-   await page.locator('#result-param').selectOption('Benzo[a]pyren');assert.equal(await page.locator('#result-usage').inputValue(),'industrial');assert.ok(Object.values(await fills(page)).every(c=>c==='#c3ccd5'));
-   await page.locator('#result-param').selectOption(SUM);await page.locator('#result-usage').selectOption('');assert.deepEqual((await savedProject(page)).results,before.results);
+   // Ohne VdS-Referenz für den Parameter gilt die eigene Skala (hier die oben angelegte BaP-Skala)
+   await page.locator('#result-param').selectOption('Benzo[a]pyren');assert.equal(await page.locator('#result-usage').inputValue(),'industrial');
+   assert.deepEqual(await fills(page),{P1:'#4caf50',P2:'#4caf50',P3:'#4caf50',P4:'#4caf50',P5:'#e0453a'});assert.match(await page.locator('#result-scales').textContent(),/Keine VdS-Referenz .* eigene Skala/);
+   await page.locator('#result-param').selectOption(SUM);
+   // VdS-Referenz bleibt bearbeitbar: Änderung ergibt eine angepasste Skala nur im Projekt; eigene Skala und FotoKit bleiben unberührt
+   assert.match(await page.locator('#result-scales').textContent(),/Änderungen hier ergeben eine angepasste Skala/);
+   await page.locator('#result-scales [data-cat="1"] [data-cat-from]').fill('1000000');await page.locator('#result-scales [data-cat="1"] [data-cat-from]').dispatchEvent('change');
+   assert.ok(Object.values(await fills(page)).every(c=>c==='#4caf50'||c==='#749bb5'||c==='#c3ccd5'),'nach Anpassung alles unter der neuen Grenze');
+   assert.match(await page.locator('#result-scales').textContent(),/Angepasst aus „VdS 2357/);
+   {const saved=(await savedProject(page)).results;assert.deepEqual(Object.keys(saved.vds),[`${SUM}|${Object.keys(saved.vds)[0].split('|').pop()}`]);assert.deepEqual(saved.scales,before.results.scales,'eigene Skala bleibt erhalten');}
+   assert.equal(await page.evaluate(()=>localStorage.getItem('bu-scales')),shared,'angepasste VdS-Referenz geht nicht an FotoKit');
+   await page.locator('#result-scales [data-scale-del]').click();assert.equal((await savedProject(page)).results.vds,undefined,'zurück zur VdS-Referenz');
+   assert.match(await page.locator('#result-scales').textContent(),/Änderungen hier ergeben eine angepasste Skala/);await page.locator('#result-usage').selectOption('');assert.deepEqual((await savedProject(page)).results,before.results);
    assert.equal(await page.evaluate(()=>localStorage.getItem('bu-scales')),shared);
    const bad=structuredClone(file);bad.results.usage='unknown';await page.locator('#project-file').setInputFiles({name:'bad-usage.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(bad))});await page.locator('#toast.error').waitFor();assert.match(await page.locator('#toast').textContent(),/Nutzungskategorie/);
   });
