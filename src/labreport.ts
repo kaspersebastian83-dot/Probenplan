@@ -6,7 +6,7 @@ export interface LabReport {bericht:string;labor:string;auftragsreferenz:string;
 export const MAX_WERTE=300;
 const tidy=(s:string)=>s.normalize('NFC').replace(/\s+/g,' ').trim();
 const norm=(s:string)=>tidy(s).toLocaleLowerCase('de').replace(/[^\p{L}\p{N}]/gu,'');
-export function referenceLabel(ref:string){const s=tidy(ref),match=s.match(/^(?:Probe|P)\s*(\d+)$/i)||s.match(/-(\d+)$/);if(!match)return '';const n=Number(match[1]);return Number.isSafeInteger(n)&&n>0&&n<1e9?`P${n}`:'';}
+export function referenceLabel(ref:string){const s=tidy(ref),match=s.match(/^(?:Probe|P)\s*(\d+)$/i)||s.match(/^\d{2}\.\d{3,5}\s*-\s*(\d+)$/);if(!match)return '';const n=Number(match[1]);return Number.isSafeInteger(n)&&n>0&&n<1e9?`P${n}`:'';}
 export function berlinDate(value:string){
  if(/^\d{4}-\d{2}-\d{2}$/.test(value))return validDate(value)?value:'';
  const german=value.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);if(german){const s=`${german[3]}-${german[2]}-${german[1]}`;return validDate(s)?s:'';}
