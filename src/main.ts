@@ -844,6 +844,8 @@ function updateScaleUI(){
 document.querySelector('.panel-scroll')!.insertAdjacentHTML('afterbegin','<section class="results-section" id="results-section" hidden><div class="section-heading"><h2>Ergebniskarte</h2></div><label>Bewerteter Parameter<select id="result-param"></select></label><label>Nutzung / Referenz<select id="result-usage"><option value="">Eigene / FotoKit-Skala</option><option value="residential">VdS 2357 · Wohn-/Büroräume · 10 µg/m²</option><option value="industrial">VdS 2357 · Industrie · 100 µg/m²</option></select></label><p class="tiny" id="result-usage-hint" hidden></p><div id="result-scales"></div><p class="tiny">Kategorien aufsteigend: Ein Wert gehört zur letzten Kategorie, deren „ab“-Wert er erreicht; Unter BG nur bei „unter BG“ oder „&lt;“ mit gültiger Zahl. n.n.: Nicht nachgewiesen. n.b.: Nicht bestimmt / Bedeutung prüfen. Diese Angaben sind keine gemessenen Nullwerte; fehlerhafte „&lt;“-Angaben bleiben ohne Bewertung. Mehrdeutige Zahlen (z. B. 1.234) bleiben ohne Bewertung. Die Skalen gelten auch für die Ergebnistabelle in FotoKit. Farben werden im Projekt gespeichert. VdS 2357: Hintergrundreferenzen nur für Σ16 EPA-PAK auf Oberflächen, keine pauschalen Freigabe- oder Sanierungsgrenzwerte. Originalwerte und Einheiten bleiben erhalten.</p></section>');
 document.querySelector('.canvas-footer')!.insertAdjacentHTML('beforeend','<span id="result-legend" hidden></span>');
 let resultSignature='';
+/** Ergebniskarte angelegt, bevor _Projekt.json gelesen war: die Nutzung wählt die Referenz nach, solange niemand selbst gewählt hat. */
+let autoUsageFor='';
 function renderResults(){
   const p=project,available=!!p&&hasValues(p);$<HTMLButtonElement>('results-toggle').disabled=!available||busy;
   if(!available&&showResults)showResults=false;
@@ -853,7 +855,7 @@ function renderResults(){
   if(!p||!showResults){resultSignature='';return;}
   const settings=p.results,list=parameters(p),rated=rateMarkers(p);
   legend.innerHTML=rated.groups.flatMap(g=>g.scale?g.scale.cats.map(c=>`<span><i style="background:${c.color}"></i>${escape(c.name)}</span>`):[]).join('')+qualifierGroups(rated).map(g=>`<span><i style="background:${g.color}"></i>${escape(g.name)}</span>`).join('')+(rated.unrated.length?`<span><i style="background:${UNRATED}"></i>ohne Bewertung</span>`:'');
-  const signature=JSON.stringify([settings,list,rated.groups.map(g=>g.cats.map(c=>c.labels)),rated.unrated,rated.below,rated.notDetected,rated.notDetermined]);if(signature===resultSignature)return;resultSignature=signature;
+  const signature=JSON.stringify([getNutzung(),settings,list,rated.groups.map(g=>g.cats.map(c=>c.labels)),rated.unrated,rated.below,rated.notDetected,rated.notDetermined]);if(signature===resultSignature)return;resultSignature=signature;
   const select=input('result-param') as unknown as HTMLSelectElement;select.innerHTML=list.map(x=>`<option value="${escape(x)}">${escape(x)}</option>`).join('');select.value=settings?.parameter||'';
   (input('result-usage') as unknown as HTMLSelectElement).value=settings?.usage||'';
   {const n=getNutzung(),u=usageFromNutzung(n),hint=$('result-usage-hint');hint.hidden=!n;hint.textContent=n?`Nutzung laut Projektdaten: ${n}${u&&u!==settings?.usage?' – passende Referenz: '+(u==='industrial'?'Industrie':'Wohn-/Büroräume'):''}`:'';}
@@ -870,9 +872,9 @@ function renderResults(){
 function setScale(key:string,scale:Scale|null){if(!project?.results)return;mutate(p=>{if(scale)p.results!.scales[key]=scale;else delete p.results!.scales[key];});saveShared(key,scale);}
 function currentScale(key:string){return project?.results?.scales[key];}
 function recolor(scale:Scale):Scale{const colors=autoColors(scale.cats.length);return {...scale,cats:scale.cats.map((c,i)=>({...c,color:colors[i]}))};}
-$('results-toggle').onclick=()=>{if(!project||!hasValues(project))return;showResults=!showResults;if(showResults&&prepare(project))persist();render();if(showResults)reveal('results-section');};
+$('results-toggle').onclick=()=>{if(!project||!hasValues(project))return;showResults=!showResults;const fresh=!project.results;if(showResults&&prepare(project))persist();if(fresh&&project.results&&!project.results.usage&&!getNutzung()&&folder)autoUsageFor=folder.name;render();if(showResults)reveal('results-section');};
 (input('result-param') as unknown as HTMLSelectElement).onchange=()=>{const value=input('result-param').value;mutate(p=>{p.results={...p.results,parameter:value,scales:p.results?.scales||{}};prepare(p);});};
-(input('result-usage') as unknown as HTMLSelectElement).onchange=()=>{const usage=input('result-usage').value;mutate(p=>{if(!p.results)return;if(usage==='residential'||usage==='industrial')p.results.usage=usage;else delete p.results.usage;});};
+(input('result-usage') as unknown as HTMLSelectElement).onchange=()=>{autoUsageFor='';const usage=input('result-usage').value;mutate(p=>{if(!p.results)return;if(usage==='residential'||usage==='industrial')p.results.usage=usage;else delete p.results.usage;});};
 $('result-scales').addEventListener('click',e=>{
   const t=e.target as HTMLElement,box=t.closest<HTMLElement>('[data-key]');if(!box||!project?.results)return;const key=box.dataset.key!,scale=currentScale(key);
   if(t.closest('[data-scale-new]')){const s:Scale={name:'',cats:[{name:'unauffällig',from:0,color:''},{name:'auffällig',from:1,color:''}]};setScale(key,recolor(s));toast('Skala angelegt – „ab“-Werte und Namen bitte an Ihre Vorgaben anpassen.');}
@@ -990,7 +992,9 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 /** Projektdaten (_Projekt.json: Objekt, Schadendatum …) ändern sich auch in Projektzentrale oder bei Kollegen – beim Zurückkehren ins Fenster neu lesen,
  *  sonst steht im Schriftfeld, in der Fußzeile und in der Anlage das alte Objekt. Eine kurz leere/halb geschriebene Datei ersetzt vorhandene Angaben nicht. */
 function projectDataChanged(){
-  const status=projectReader.state;projectData=status.data;setNutzung(projectData.nutzung);
+  const status=projectReader.state,before=getNutzung();projectData=status.data;setNutzung(projectData.nutzung);
+  if(autoUsageFor&&autoUsageFor===folder?.name&&project?.results&&!project.results.usage){const usage=usageFromNutzung();if(usage){autoUsageFor='';mutate(p=>{if(p.results&&!p.results.usage)p.results.usage=usage;});}}
+  else if(getNutzung()!==before&&showResults){resultSignature='';renderResults();}
   const warning=$('project-data-warning'),text=$('project-data-warning-text'),button=$<HTMLButtonElement>('project-badge');
   warning.hidden=!folder||!status.stale;text.textContent=projectDataWarning(status);
   button.disabled=status.checking;button.setAttribute('aria-busy',String(status.checking));
