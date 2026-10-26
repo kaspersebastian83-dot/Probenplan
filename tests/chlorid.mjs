@@ -9,7 +9,7 @@ registerHooks({
  load(url,context,next){if(url.endsWith('.ts'))return{format:'module',source:stripTypeScriptTypes(readFileSync(fileURLToPath(url),'utf8'),{mode:'transform'}),shortCircuit:true};return next(url,context);}
 });
 // Chlorid nach VdS 2357 (5–10 µg/cm² korrosionschemisch relevante Größenordnung): wie in ResultKit und FotoKit (KORROSION-CHLORID v1).
-const {chloridScale,scaleFor,rate}=await import('../src/results.ts');
+const {chloridScale,scaleFor,rate,valueOf,wertFuer,units}=await import('../src/results.ts');
 let n=0;const ok=(name,fn)=>{fn();n++;console.log('OK Chlorid: '+name);};
 ok('drei Kategorien in µg/cm²: < 5 grün, 5 – < 10 amber, ≥ 10 rot',()=>{
  const s=chloridScale('Chlorid','µg/cm²');assert.deepEqual(s.cats.map(c=>c.from),[0,5,10]);
@@ -27,5 +27,13 @@ ok('gilt ohne Nutzung; in PlanKit anpassbar wie die PAK-Referenz',()=>{
  const eigen={name:'Eigene',cats:[{name:'ok',from:0},{name:'hoch',from:20}]};
  const a=scaleFor({scales:{},vds:{'Chlorid|µg/cm²':eigen}},'Chlorid','µg/cm²');assert.equal(a.angepasst,true);assert.equal(a.scale,eigen);
  assert.equal(scaleFor({scales:{}},'Summe 16 EPA-PAK exkl. BG','µg/m²').vds,undefined,'PAK-Referenz weiter nur mit Nutzung');
+});
+ok('Eurofins liefert Chlorid je Probe und je Fläche (Reihenfolge wechselt): bewertet und gezeigt wird der Flächenwert',()=>{
+ const P='Chlorid (Cl)';
+ const a=[{p:'Größe der Probenfläche',r:'140',u:'cm²'},{p:P,r:'2800',u:'µg/Probe'},{p:P,r:'199',u:'mg/m²'}],b=[{p:P,r:'32',u:'mg/m²'},{p:P,r:'450',u:'µg/Probe'}];
+ assert.equal(wertFuer(a,P).u,'mg/m²');assert.equal(wertFuer(b,P).u,'mg/m²');assert.equal(wertFuer([{p:P,r:'1',u:'µg/Probe'}],P).u,'µg/Probe','nur je Probe: wie im Bericht');
+ const project={markers:[{kind:'sample',label:'P6',lab:{werte:a}},{kind:'sample',label:'P5',lab:{werte:b}}],pending:[],sheets:undefined};
+ assert.equal(valueOf(project.markers[0],P).r,'199');assert.deepEqual(units(project,P),['mg/m²'],'keine leere Skala für µg/Probe');
+ assert.equal(rate(scaleFor({scales:{}},P,'mg/m²').scale,199),2,'199 mg/m² = 19,9 µg/cm² → oberhalb');
 });
 console.log(`${n} Prüfungen Chlorid bestanden`);

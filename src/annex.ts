@@ -4,7 +4,7 @@
 // Einordnung nur in die Skala des Sachverständigen (mit Angabe der Skala) – jede Abweichung steht im Prüfprotokoll.
 // Dieser Teil ist rein: er rechnet nur mit den übergebenen Daten (Bilder, Prüfsummen und Dateien liefert annex-run.ts).
 import {allMarkers,floorName,sheetCount,sheetProject,type Project,type Wert} from './model';
-import {rangeText,rateMarkers,scaleFor,shortParameter,valueOf,type Rated} from './results';
+import {rangeText,rateMarkers,scaleFor,shortParameter,valueOf,wertFuer,type Rated} from './results';
 import {STIL,type Block,type Cell,type Row} from './docx';
 
 export interface AnnexImage {data:Uint8Array;ext:'png'|'jpeg';widthPx:number;heightPx:number}
@@ -69,7 +69,7 @@ export function collectSamples(p:Project):AnnexSample[]{
       rows.push({label:m.label,floor:floorName(p,i),placed:true,desc:t(lab?.desc),note:t(m.note)!==t(lab?.desc)?t(m.note):'',art:t(lab?.art),datum:t(lab?.datum),labNr:t(lab?.labNr),ref:t(lab?.ref),
         bericht:t(lab?.bericht),labor:t(o?.labor),werte:lab?.werte||[],value,rating:value?texts.get(m.label)||'ohne Bewertung':''});}
   }
-  for(const r of p.pending||[]){const o=r.reportId?origins.get(r.reportId):undefined,value=parameter?r.werte?.find(w=>w.p===parameter):undefined;
+  for(const r of p.pending||[]){const o=r.reportId?origins.get(r.reportId):undefined,value=parameter?wertFuer(r.werte,parameter):undefined;
     rows.push({label:r.label,floor:'',placed:false,desc:t(r.desc),note:'',art:t(r.art),datum:t(r.datum),labNr:t(r.labNr),ref:t(r.ref),bericht:t(r.bericht),labor:t(o?.labor),werte:r.werte||[],value,rating:value?'nicht im Plan':''});}
   return rows.sort((a,b)=>order(a.label,b.label));
 }

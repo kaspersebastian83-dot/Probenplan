@@ -3,7 +3,7 @@
 // Eingaben des Sachverständigen: Maßnahme, Bemerkung, Räume ohne Probe mit Status, zusammengeführte Schreibweisen.
 // Keine Flächen und keine Mengen: die Mengenermittlung bleibt beim ausführenden Unternehmen.
 import {clone,floorName,sheetCount,sheetProject,SURFACE_NAMES,type Marker,type Project,type RaumEintrag,type RaumStatus,type Raumbuch} from './model';
-import {hasValues,prepare,rateMarkers,shortParameter,valueOf,type Rated} from './results';
+import {hasValues,prepare,rateMarkers,shortParameter,valueOf,wertFuer,type Rated} from './results';
 import {STIL,type Block,type Cell,type Row} from './docx';
 import {scaleNotes} from './annex';
 
@@ -140,7 +140,7 @@ export function raumbuchStand(source:Project):RaumbuchStand{
   // Noch nicht platzierte Proben mit Laborwerten werden nach derselben Skala bewertet wie die platzierten.
   const pending=p.pending||[],pseudo:Marker[]=pending.map((r,i)=>({id:`pending-${i}`,kind:'sample',label:r.label,note:'',x:0,y:0,lx:0,ly:0,lab:{ref:r.ref,desc:r.desc,werte:r.werte}}));
   const rtPending=parameter?ratings(rateMarkers(p,pseudo)):new Map<string,Rating>();
-  pending.forEach(r=>{const w=parameter?r.werte?.find(x=>x.p===parameter):undefined;add({label:r.label,kind:'sample',raum:r.raum,surface:r.surface},singleFloor,w?`${w.r} ${w.u}`.trim():'',w?rtPending.get(r.label):undefined,false);});
+  pending.forEach(r=>{const w=parameter?wertFuer(r.werte,parameter):undefined;add({label:r.label,kind:'sample',raum:r.raum,surface:r.surface},singleFloor,w?`${w.r} ${w.u}`.trim():'',w?rtPending.get(r.label):undefined,false);});
   // Eingaben des Sachverständigen: an beprobte Räume anhängen oder als Räume ohne Probe aufnehmen
   for(const e of rb.rooms){const r=rowFor(e.floor,e.name);r.massnahme=e.massnahme||'';r.bemerkung=e.bemerkung||'';if(!r.sampled&&!r.brandherd)r.status=e.status||'unauffaellig';else if(!r.sampled)r.status=e.status;}
   for(const r of rows.values()){
