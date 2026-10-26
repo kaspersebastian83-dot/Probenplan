@@ -33,6 +33,47 @@ ok('Geschoss aus Plan oder Raumnamen, Präfix entfällt', ()=>{
   assert.deepEqual(R.splitRoom('','Egon-Zimmer'),{floor:'',name:'Egon-Zimmer'},'„Eg…“ ist kein Geschoss');
   assert.equal(R.norm('Küche '),R.norm('Kueche'));assert.equal(R.norm('EG-Flur'),R.norm('eg flur'));
 });
+ok('Wischprobenbezeichnung „Gebäude Geschoss Raum Zusatz Bauteil“ (AidKit): Raum ohne Zusatz und Bauteil', ()=>{
+  assert.deepEqual(R.splitRoom('','EG Küche Brandraum Decke'),{floor:'EG',name:'Küche'});
+  assert.deepEqual(R.splitRoom('EG','EG Küche Wand B'),{floor:'EG',name:'Küche'});
+  assert.deepEqual(R.splitRoom('','Haus A 1OG Bad Decke'),{floor:'1. OG',name:'Haus A Bad'},'Gebäude bleibt Teil des Raums');
+  assert.deepEqual(R.splitRoom('1. OG','1OG Kinderzimmer 2 Referenz unbelastet Wand A'),{floor:'1. OG',name:'Kinderzimmer 2'});
+  assert.deepEqual(R.splitRoom('','1. OG Gäste WC Fenster/Fensterbank'),{floor:'1. OG',name:'Gäste WC'});
+  assert.deepEqual(R.splitRoom('','EG Flur Verdacht Kleber/Teer Boden'),{floor:'EG',name:'Flur'});
+  assert.deepEqual(R.splitRoom('','EG Wohnzimmer mit Ruß Ansicht'),{floor:'EG',name:'Wohnzimmer'},'Beaufschlagung und Oberflächenart gehören nicht zum Raum');
+  assert.deepEqual(R.splitRoom('','EG Zimmer mit Balkon'),{floor:'EG',name:'Zimmer mit Balkon'},'„mit“ nur vor Belag, Ruß, Kondensat, Staub');
+  assert.deepEqual(R.splitRoom('EG','1OG Bad Decke'),{floor:'EG',name:'1. OG Bad'},'anderes Geschoss als der Plan bleibt sichtbar');
+  assert.deepEqual(R.splitRoom('','EG · Küche · Brandraum · Decke'),{floor:'EG',name:'Küche'},'„ · “ wird auch verstanden');
+  assert.deepEqual(R.splitRoom('','Küche Decke'),{floor:'',name:'Küche Decke'},'ohne Geschoss wie bisher');
+  assert.deepEqual(R.splitRoom('','EG Brandraum'),{floor:'EG',name:'Brandraum'},'nur ein Wort nach dem Geschoss: ist der Raum');
+  assert.deepEqual(R.splitRoom('','EG Wohnzimmer Schrank oben'),{floor:'EG',name:'Wohnzimmer Schrank oben'},'freies Bauteil: wie bisher, im Raumbuch zusammenführbar');
+  assert.deepEqual(R.splitRoom('','1UG Keller'),{floor:'',name:'1UG Keller'},'unbekannte Schreibweise wie bisher');
+  const p=projekt();p.markers=[m('P1','EG Küche Brandraum Decke','480'),m('P2','EG Küche Brandraum Wand B','210'),m('P3','EG Küche','90'),m('P4','EG Flur Wand A','38')];p.pending=[];
+  const s=R.raumbuchStand(p);
+  assert.deepEqual(s.rows.map(r=>[r.name,r.probes.map(x=>x.label).join(',')]),[['Küche','P1,P2,P3'],['Flur','P4']],'alle Küchenproben in einem Raum');
+});
+ok('ältere Eingaben unter dem vollen Namen wandern zum Raum (Maßnahme, Bemerkung)', ()=>{
+  const p=projekt();p.markers=[m('P1','EG Küche Brandraum Decke','480'),m('P2','EG Küche Brandraum Wand B','210'),m('P4','EG Flur Wand A','38')];p.pending=[];
+  p.raumbuch={rooms:[
+    {floor:'EG',name:'Küche Brandraum Decke',massnahme:'Reinigung'},            // so gespeichert vor 1.34
+    {floor:'EG',name:'Küche Brandraum Wand B',massnahme:'Anstrich',bemerkung:'Foto 12'},
+    {floor:'EG',name:'· Küche · Brandraum · Decke',bemerkung:'Foto 12'},       // Punkt-Schreibweise
+    {floor:'EG',name:'Abstellraum',status:'nicht_begangen'}]};                  // ohne Probe: bleibt
+  const vorher=JSON.stringify(p);
+  let s=R.raumbuchStand(p);
+  assert.equal(JSON.stringify(p),vorher,'Berechnen ändert das Projekt nicht');
+  assert.deepEqual(s.rows.map(r=>r.name),['Küche','Flur','Abstellraum'],'keine leeren Zeilen unter dem alten Namen');
+  const k=s.rows[0];assert.equal(k.massnahme,'Reinigung; Anstrich');assert.equal(k.bemerkung,'Foto 12','gleicher Text nur einmal');
+  assert.equal(s.rows[2].bewertung,'nicht begangen / nicht zugänglich');
+  // Erste Änderung schreibt die Übertragung fest; danach gilt, was beim Raum steht
+  R.setEintrag(p,k,{massnahme:'Reinigung, danach Anstrich'});
+  assert.deepEqual(p.raumbuch.rooms.map(e=>e.name).sort(),['Abstellraum','Küche']);
+  s=R.raumbuchStand(p);assert.equal(s.rows[0].massnahme,'Reinigung, danach Anstrich');assert.equal(s.rows[0].bemerkung,'Foto 12');
+  // Eingabe, die schon beim Raum steht, geht vor
+  const q=projekt();q.markers=[m('P1','EG Küche Decke','480')];q.pending=[];
+  q.raumbuch={rooms:[{floor:'EG',name:'Küche',massnahme:'neu'},{floor:'EG',name:'Küche Decke',massnahme:'alt',bemerkung:'nur alt'}]};
+  const t=R.raumbuchStand(q).rows[0];assert.equal(t.massnahme,'neu; alt');assert.equal(t.bemerkung,'nur alt');
+});
 ok('Räume, Befund, Bewertung nach VdS-Referenz, Reihenfolge', ()=>{
   const s=R.raumbuchStand(projekt());
   assert.deepEqual(s.rows.map(r=>r.name),['Küche','Flur','Wohnen','Bad','Kü.']);

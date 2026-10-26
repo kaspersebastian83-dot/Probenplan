@@ -23,7 +23,33 @@ function floorPrefix(name:string){const m=FLOOR_RE.exec(name.trim());if(!m)retur
   const f=m[1].toUpperCase().replace(/\s+/g,'').replace(/^(\d+)\.?(OG|UG)$/,'$1. $2');return {floor:f,rest:name.trim().slice(m[0].length).trim()};}
 /** Geschoss und Raumname: Der Plan gibt das Geschoss vor (ein gleichlautender Präfix im Namen entfällt);
  *  ohne benannten Plan wird ein Präfix wie „EG“ als Geschoss gelesen. */
+/** Wischprobenbezeichnung nach AidKit (ab 1.34): von groß nach klein, mit Leerzeichen wie in LabelKit –
+ *  „Gebäude Geschoss Raum Zusatz Bauteil“, z. B. „EG Küche Brandraum Decke“ oder „Haus A 1OG Bad Wand B“.
+ *  Im Raumbuch ist der Raum = Gebäude (falls vorhanden) + Raum; Zusatz und Bauteil gehören zur Probe, nicht zum Raum.
+ *  Erkannt wird das Ende des Raumnamens an den Wörtern aus dem AidKit-Baukasten (Zusätze, Bauteile, Beaufschlagung,
+ *  Oberflächenart). Ohne eigenes Geschoss-Wort oder wenn vor dem ersten solchen Wort kein Raum steht: null, alles wie bisher.
+ *  „ · “ als Trenner wird ebenfalls verstanden. */
+const ENDE_WORT=new Set(['brandraum','brandbereich','brandherd','referenz','unbelastet','ref','verdacht','kleber','teer','bitumen','freimessung',
+  'decke','boden','wand','fenster','fensterbank','tür','türzarge','zarge','heizkörper','möbel','einbauten','elektro','leitungen',
+  'gereinigt','verrußt','aufsicht','ansicht','untersicht']);
+const NACH_MIT=new Set(['belag','ruß','russ','kondensat','staub']);
+function istEnde(w:string[],i:number){
+  const x=w[i].toLowerCase().replace(/[,;:]+$/,''),erst=x.split('/')[0];
+  if(ENDE_WORT.has(x)||ENDE_WORT.has(erst))return true;
+  if(x==='mit'&&NACH_MIT.has((w[i+1]||'').toLowerCase()))return true;
+  if(x==='leicht'&&/^verru(ß|ss)t$/i.test(w[i+1]||''))return true;
+  return false;
+}
+function wortRaum(raw:string):{floor:string;name:string}|null{
+  const w=raw.replace(/·/g,' ').replace(/(\d+)\s*\.\s*(OG|UG)(?=\s|$)/gi,'$1.$2').split(/\s+/).filter(Boolean);
+  const i=w.findIndex(x=>{const p=floorPrefix(x);return !!p&&!p.rest;});if(i<0)return null;
+  const rest=w.slice(i+1);let j=rest.findIndex((_,k)=>istEnde(rest,k));if(j<0)j=rest.length;
+  if(j===0)return null;
+  return {floor:floorPrefix(w[i])!.floor,name:[...w.slice(0,i),...rest.slice(0,j)].join(' ')};
+}
 export function splitRoom(sheetFloor:string,raw:string):{floor:string;name:string}{
+  const wort=wortRaum(raw.trim());
+  if(wort){if(!sheetFloor)return wort;return {floor:sheetFloor,name:norm(wort.floor)===norm(sheetFloor)?wort.name:`${wort.floor} ${wort.name}`};}
   const name=raw.trim(),pre=floorPrefix(name);
   if(sheetFloor){if(pre&&pre.rest&&norm(pre.floor)===norm(sheetFloor))return {floor:sheetFloor,name:pre.rest};return {floor:sheetFloor,name};}
   if(pre&&pre.rest)return {floor:pre.floor,name:pre.rest};
@@ -53,9 +79,38 @@ function ratings(rated:Rated|null){
 const order=(a:string,b:string)=>a.localeCompare(b,'de',{numeric:true});
 const labelNo=(l:string)=>{const m=/(\d+)/.exec(l);return m?Number(m[1]):1e9;};
 
+/** Eingaben aus der Zeit vor 1.34 stehen unter dem vollen Namen, z. B. „EG“ / „Küche Brandraum Decke“. Hat dieser Name
+ *  keine Proben mehr, wohl aber der Raum nach der Handbuch-Regel („Küche“), gehören Maßnahme und Bemerkung dorthin:
+ *  leere Felder werden gefüllt, abweichende Texte mit „; “ angehängt; Eingaben, die schon beim Raum stehen, gehen vor.
+ *  Gibt dieselbe Liste zurück, wenn nichts zu übertragen ist. */
+function migriereEintraege(p:Project):RaumEintrag[]{
+  const rb=p.raumbuch;if(!rb?.rooms.length)return rb?.rooms||[];
+  const beprobt=new Set(raumbuchStand({...p,raumbuch:{rooms:[],...(rb.alias?{alias:rb.alias}:{})}}).rows.filter(r=>r.sampled).map(r=>r.key));
+  const keyOf=(e:{floor:string;name:string})=>resolve(rb.alias,roomKey(e.floor,e.name));
+  const ziel=(e:RaumEintrag)=>{
+    if(beprobt.has(keyOf(e)))return null;
+    const w=wortRaum(`EG ${e.name}`);if(!w)return null;
+    const c={floor:e.floor,name:w.name};return keyOf(c)!==keyOf(e)&&beprobt.has(keyOf(c))?c:null;
+  };
+  const alt=rb.rooms.map(e=>({e,c:ziel(e)}));if(!alt.some(x=>x.c))return rb.rooms;
+  const out:RaumEintrag[]=alt.filter(x=>!x.c).map(x=>({...x.e}));
+  for(const {e,c} of alt){
+    if(!c)continue;
+    const i=out.findIndex(x=>keyOf(x)===keyOf(c)),t:RaumEintrag=i>=0?out[i]:{floor:c.floor,name:c.name};
+    for(const f of ['massnahme','bemerkung'] as const){const v=e[f];if(!v)continue;if(!t[f])t[f]=v;else if(!t[f]!.split('; ').includes(v))t[f]=`${t[f]}; ${v}`.slice(0,500);}
+    if(i<0&&(t.massnahme||t.bemerkung))out.push(t);
+  }
+  return out;
+}
+/** Übertragene Eingaben im Projekt festschreiben, bevor das Raumbuch geändert wird. */
+function migriereGespeichert(p:Project){
+  if(!p.raumbuch)return;const rooms=migriereEintraege(p);if(rooms!==p.raumbuch.rooms)p.raumbuch={...p.raumbuch,rooms};
+}
+
 /** Raumbuch aus dem Projekt berechnen (Projekt bleibt unverändert). */
 export function raumbuchStand(source:Project):RaumbuchStand{
   const p=clone(source);if(hasValues(p))prepare(p);
+  if(p.raumbuch?.rooms.length){const rooms=migriereEintraege(p);if(rooms!==p.raumbuch.rooms)p.raumbuch={...p.raumbuch,rooms};}
   const parameter=p.results?.parameter||'',rb:Raumbuch=p.raumbuch||{rooms:[]},alias=rb.alias;
   const rows=new Map<string,RaumZeile>(),ohneRaum:string[]=[],firstName=new Map<string,string>();
   // Ein einzelner Plan hat keinen Blattnamen: Geschoss dann aus dem Plannamen („EG.pdf“, „1. OG Grundriss.svg“), sonst keins.
@@ -119,6 +174,7 @@ export function aehnlich(rows:RaumZeile[]):[RaumZeile,RaumZeile][]{
 
 /** Eingabe zu einem Raum speichern (Maßnahme, Bemerkung, Status); leere Einträge ohne Status verschwinden. */
 export function setEintrag(p:Project,row:{floor:string;name:string;sampled:boolean;brandherd?:boolean},patch:Partial<Omit<RaumEintrag,'floor'|'name'>>){
+  migriereGespeichert(p);
   const rb:Raumbuch=p.raumbuch||{rooms:[]},key=resolve(rb.alias,roomKey(row.floor,row.name));
   const idx=rb.rooms.findIndex(e=>resolve(rb.alias,roomKey(e.floor,e.name))===key);
   const cur:RaumEintrag=idx>=0?{...rb.rooms[idx]}:{floor:row.floor,name:row.name};
@@ -129,18 +185,21 @@ export function setEintrag(p:Project,row:{floor:string;name:string;sampled:boole
 }
 /** Raum ohne Probe hinzufügen (Status Sichtprüfung unauffällig). */
 export function addRaum(p:Project,floor:string,name:string){
+  migriereGespeichert(p);
   const f=floor.trim().slice(0,40),n=name.trim().slice(0,80);if(!n)throw Error('Bitte einen Raumnamen eingeben.');
   const key=roomKey(f,n);if(raumbuchStand(p).rows.some(r=>r.key===resolve(p.raumbuch?.alias,key)))throw Error(`„${n}“ steht bereits im Raumbuch.`);
   p.raumbuch={rooms:[...(p.raumbuch?.rooms||[]),{floor:f,name:n,status:'unauffaellig'}],...(p.raumbuch?.alias?{alias:p.raumbuch.alias}:{})};
 }
 /** Raum ohne Probe entfernen. */
 export function removeRaum(p:Project,floor:string,name:string){
+  migriereGespeichert(p);
   if(!p.raumbuch)return;const key=resolve(p.raumbuch.alias,roomKey(floor,name));
   const rooms=p.raumbuch.rooms.filter(e=>resolve(p.raumbuch!.alias,roomKey(e.floor,e.name))!==key);
   p.raumbuch={rooms,...(p.raumbuch.alias?{alias:p.raumbuch.alias}:{})};if(!rooms.length&&!p.raumbuch.alias)delete p.raumbuch;
 }
 /** Schreibweise „von“ in den Raum „nach“ zusammenführen; Eingaben von „von“ füllen nur leere Felder von „nach“. */
 export function mergeRaum(p:Project,von:RaumZeile,nach:RaumZeile){
+  migriereGespeichert(p);
   if(von.key===nach.key)return;
   const alias={...(p.raumbuch?.alias||{})};
   for(const [k,v] of Object.entries(alias))if(v===von.key)alias[k]=nach.key;
