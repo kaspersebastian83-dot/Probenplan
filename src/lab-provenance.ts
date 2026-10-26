@@ -38,12 +38,14 @@ export function originFromReport(report:LabReport,id=crypto.randomUUID()):LabOri
 /** Trägt die Zeile Laborergebnisse (Messwerte, Labornummer oder Prüfberichtsnummer)? LabelKit-Zeilen tragen keine. */
 const hasLabResult=(r:LabData|undefined)=>!!(r&&(r.werte?.length||r.labNr||r.bericht));
 const wertKey=(w:Wert)=>`${w.p}\u0000${w.u}`;
-/** „Aktualisieren“ ergänzt die Labordaten: Messwerte je Parameter+Einheit – der neue Bericht ersetzt denselben Parameter
- *  (vorläufig → endgültig), andere Parameter (z. B. aus einem zweiten Prüfbericht) bleiben. Eine Zeile ohne Laborergebnis
- *  (LabelKit) lässt Messwerte, Labornummer und Bericht-Herkunft unverändert; fehlende Angaben leeren nichts. */
+/** „Aktualisieren“ ergänzt die Labordaten. Eine Zeile ohne Laborergebnis (LabelKit) lässt Messwerte, Labornummer und
+ *  Bericht-Herkunft unverändert; fehlende Angaben leeren nichts. Derselbe Prüfbericht (gleiche Nummer, z. B. vorläufig →
+ *  endgültig) ersetzt Messwerte je Parameter+Einheit, andere Parameter bleiben. Ein anderer Prüfbericht ersetzt die Messwerte
+ *  ganz – die Probe kennt nur eine Herkunft (reportId), Werte zweier Berichte darunter gäben eine falsche Quelle an. */
 export function mergeLab(old:LabData|undefined,row:LabData):LabData{
  const keep=!hasLabResult(row)&&hasLabResult(old),incoming=row.werte?.length?row.werte:undefined,keys=new Set((incoming||[]).map(wertKey));
- const werte=incoming?[...(old?.werte||[]).filter(w=>!keys.has(wertKey(w))).map(w=>({...w})),...incoming.map(w=>({...w}))]:old?.werte?old.werte.map(w=>({...w})):row.werte?.map(w=>({...w}));
+ const gleicherBericht=!!old?.bericht&&!!row.bericht&&old.bericht.trim().toUpperCase()===row.bericht.trim().toUpperCase();
+ const werte=incoming?[...(gleicherBericht?old?.werte||[]:[]).filter(w=>!keys.has(wertKey(w))).map(w=>({...w})),...incoming.map(w=>({...w}))]:old?.werte?old.werte.map(w=>({...w})):row.werte?.map(w=>({...w}));
  const src=keep?old!:row,art=row.art??old?.art,labNr=keep?old!.labNr:row.labNr??old?.labNr,datum=row.datum??old?.datum;
  return {ref:row.ref,desc:row.desc,...(art!==undefined?{art}:{}),...(labNr!==undefined?{labNr}:{}),...(datum!==undefined?{datum}:{}),...(src.bericht!==undefined?{bericht:src.bericht}:{}),...(src.reportId!==undefined?{reportId:src.reportId}:{}),...(werte?{werte}:{})};
 }

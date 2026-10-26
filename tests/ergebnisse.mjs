@@ -49,11 +49,11 @@ ok('fehlende P-Nummer wird aus der Probenreferenz gebildet; Übernahme legt eige
   // dasselbe für eine noch nicht platzierte Probe
   const o=update(first(b),lk);assert.deepEqual(o.pending[0].werte,[{p:SUM,r:'120',u:'µg/m²'}]);assert.equal(o.pending[0].bericht,'AR-1');assert.equal(o.pending[0].reportId,o.labReports[0].id);assert.equal(o.pending[0].typ,'PAK');
  });
- ok('B: eine Probe in zwei Prüfberichten (PAK in AR-1, Chlorid in AR-2) – beide Werte bleiben',()=>{
+ ok('B: eine Probe in zwei verschiedenen Prüfberichten – Werte und Herkunft des neuen Berichts, keine fremde Quelle',()=>{
   const [b1,b2]=datei([bericht('b1','AR-1',[{p:SUM,r:'120',u:'µg/m²'}]),bericht('b2','AR-2',[{p:CL,r:'7,5',u:'µg/cm²'}])]);
-  const q=update(place(first(b1)),imp(b2));assert.deepEqual(valueOf(q.markers[0],SUM),{p:SUM,r:'120',u:'µg/m²'});assert.deepEqual(valueOf(q.markers[0],CL),{p:CL,r:'7,5',u:'µg/cm²'});
-  assert.equal(q.markers[0].lab.reportId,q.labReports[1].id,'Herkunft des zuletzt importierten Berichts');assert.equal(q.markers[0].lab.bericht,'AR-2');
-  const o=update(first(b1),imp(b2));assert.deepEqual(o.pending[0].werte.map(w=>w.p),[SUM,CL]);
+  const q=update(place(first(b1)),imp(b2));assert.equal(valueOf(q.markers[0],SUM),undefined,'AR-1-Wert nicht unter der Herkunft AR-2');assert.deepEqual(valueOf(q.markers[0],CL),{p:CL,r:'7,5',u:'µg/cm²'});
+  assert.equal(q.markers[0].lab.reportId,q.labReports[1].id);assert.equal(q.markers[0].lab.bericht,'AR-2');
+  const o=update(first(b1),imp(b2));assert.deepEqual(o.pending[0].werte.map(w=>w.p),[CL]);
  });
  ok('vorläufig → endgültig: der endgültige Bericht ersetzt dieselben Parameter, Herkunft wird endgültig',()=>{
   const [v,e]=datei([bericht('v','AR-3',[{p:SUM,r:'120',u:'µg/m²'},{p:'Benzo[a]pyren',r:'9',u:'µg/m²'}],{vorlaeufig:true}),bericht('e','AR-3',[{p:SUM,r:'95',u:'µg/m²'},{p:'Benzo[a]pyren',r:'8',u:'µg/m²'}])]);
