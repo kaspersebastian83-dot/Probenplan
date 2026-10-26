@@ -33,6 +33,18 @@ ok('Geschoss aus Plan oder Raumnamen, Präfix entfällt', ()=>{
   assert.deepEqual(R.splitRoom('','Egon-Zimmer'),{floor:'',name:'Egon-Zimmer'},'„Eg…“ ist kein Geschoss');
   assert.equal(R.norm('Küche '),R.norm('Kueche'));assert.equal(R.norm('EG-Flur'),R.norm('eg flur'));
 });
+ok('Wischprobenbezeichnung „Gebäude · Geschoss · Raum · Zusatz · Bauteil“ (AidKit): Raum ohne Zusatz und Bauteil', ()=>{
+  assert.deepEqual(R.splitRoom('','EG · Küche · Brandraum · Decke'),{floor:'EG',name:'Küche'});
+  assert.deepEqual(R.splitRoom('EG','EG · Küche · Wand B'),{floor:'EG',name:'Küche'});
+  assert.deepEqual(R.splitRoom('','Haus A · 1OG · Bad · Decke'),{floor:'1. OG',name:'Haus A · Bad'},'Gebäude bleibt Teil des Raums');
+  assert.deepEqual(R.splitRoom('1. OG','1OG · Kinderzimmer 2 · Referenz unbelastet · Wand A'),{floor:'1. OG',name:'Kinderzimmer 2'});
+  assert.deepEqual(R.splitRoom('EG','1OG · Bad · Decke'),{floor:'EG',name:'1. OG · Bad'},'anderes Geschoss als der Plan bleibt sichtbar');
+  assert.deepEqual(R.splitRoom('','Küche · Decke'),{floor:'',name:'Küche · Decke'},'ohne Geschoss wie bisher');
+  assert.deepEqual(R.splitRoom('','EG · Küche'),{floor:'EG',name:'Küche'});
+  const p=projekt();p.markers=[m('P1','EG · Küche · Brandraum · Decke','480'),m('P2','EG · Küche · Brandraum · Wand B','210'),m('P3','EG Küche','90'),m('P4','EG · Flur · Wand A','38')];p.pending=[];
+  const s=R.raumbuchStand(p);
+  assert.deepEqual(s.rows.map(r=>[r.name,r.probes.map(x=>x.label).join(',')]),[['Küche','P1,P2,P3'],['Flur','P4']],'alle Küchenproben in einem Raum – auch alte Schreibweise „EG Küche“');
+});
 ok('Räume, Befund, Bewertung nach VdS-Referenz, Reihenfolge', ()=>{
   const s=R.raumbuchStand(projekt());
   assert.deepEqual(s.rows.map(r=>r.name),['Küche','Flur','Wohnen','Bad','Kü.']);

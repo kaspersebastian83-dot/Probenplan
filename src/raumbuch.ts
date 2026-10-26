@@ -23,7 +23,19 @@ function floorPrefix(name:string){const m=FLOOR_RE.exec(name.trim());if(!m)retur
   const f=m[1].toUpperCase().replace(/\s+/g,'').replace(/^(\d+)\.?(OG|UG)$/,'$1. $2');return {floor:f,rest:name.trim().slice(m[0].length).trim()};}
 /** Geschoss und Raumname: Der Plan gibt das Geschoss vor (ein gleichlautender Präfix im Namen entfällt);
  *  ohne benannten Plan wird ein Präfix wie „EG“ als Geschoss gelesen. */
+/** Wischprobenbezeichnung nach AidKit (ab 1.34): „Gebäude · Geschoss · Raum · Zusatz · Bauteil“, z. B. „EG · Küche · Brandraum · Decke“.
+ *  Im Raumbuch ist der Raum = Gebäude (falls vorhanden) + Raum; Zusatz und Bauteil gehören zur Probe, nicht zum Raum.
+ *  Nur wenn ein Teil genau ein Geschoss ist und danach ein Raum folgt – sonst null und alles wie bisher. */
+function punktRaum(raw:string):{floor:string;name:string}|null{
+  if(!raw.includes('·'))return null;
+  const teile=raw.split('·').map(t=>t.trim()).filter(Boolean);
+  const i=teile.findIndex(t=>{const p=floorPrefix(t);return !!p&&!p.rest;});
+  if(i<0||i+1>=teile.length)return null;
+  return {floor:floorPrefix(teile[i])!.floor,name:[...teile.slice(0,i),teile[i+1]].join(' · ')};
+}
 export function splitRoom(sheetFloor:string,raw:string):{floor:string;name:string}{
+  const punkt=punktRaum(raw.trim());
+  if(punkt){if(!sheetFloor)return punkt;return {floor:sheetFloor,name:norm(punkt.floor)===norm(sheetFloor)?punkt.name:`${punkt.floor} · ${punkt.name}`};}
   const name=raw.trim(),pre=floorPrefix(name);
   if(sheetFloor){if(pre&&pre.rest&&norm(pre.floor)===norm(sheetFloor))return {floor:sheetFloor,name:pre.rest};return {floor:sheetFloor,name};}
   if(pre&&pre.rest)return {floor:pre.floor,name:pre.rest};

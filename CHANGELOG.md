@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.34.0 – 26. Oktober 2026
+
+- Raumbuch versteht die Wischprobenbezeichnung aus dem Handbuch („Gebäude · Geschoss · Raum · Zusatz · Bauteil“, z. B. „EG · Küche · Brandraum · Decke“): Geschoss aus seinem Teil, Raum = Gebäude (falls vorhanden) + Raum. Zusatz und Bauteil bleiben bei der Probe – alle Proben einer Küche stehen in einer Zeile, auch zusammen mit der alten Schreibweise „EG Küche“. Bezeichnungen ohne „·“ wie bisher.
+- Kurzanleitung „Raumbuch“ nennt das.
+
 ## 1.33.0 – 26. Oktober 2026
 
 - Hilfe-Links ins Handbuch (AidKit), immer im selben Fenster und direkt am Kapitel: in der Kurzanleitung („?“) oben „📘 Handbuch – PlanKit Schritt für Schritt“; in den Wandansichten „📘 Probenbezeichnung Bohrkerne“ und „📘 Bohrkerne Schritt für Schritt“. Nur Links.
