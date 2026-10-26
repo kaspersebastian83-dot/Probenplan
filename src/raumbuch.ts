@@ -23,19 +23,33 @@ function floorPrefix(name:string){const m=FLOOR_RE.exec(name.trim());if(!m)retur
   const f=m[1].toUpperCase().replace(/\s+/g,'').replace(/^(\d+)\.?(OG|UG)$/,'$1. $2');return {floor:f,rest:name.trim().slice(m[0].length).trim()};}
 /** Geschoss und Raumname: Der Plan gibt das Geschoss vor (ein gleichlautender Präfix im Namen entfällt);
  *  ohne benannten Plan wird ein Präfix wie „EG“ als Geschoss gelesen. */
-/** Wischprobenbezeichnung nach AidKit (ab 1.34): „Gebäude · Geschoss · Raum · Zusatz · Bauteil“, z. B. „EG · Küche · Brandraum · Decke“.
+/** Wischprobenbezeichnung nach AidKit (ab 1.34): von groß nach klein, mit Leerzeichen wie in LabelKit –
+ *  „Gebäude Geschoss Raum Zusatz Bauteil“, z. B. „EG Küche Brandraum Decke“ oder „Haus A 1OG Bad Wand B“.
  *  Im Raumbuch ist der Raum = Gebäude (falls vorhanden) + Raum; Zusatz und Bauteil gehören zur Probe, nicht zum Raum.
- *  Nur wenn ein Teil genau ein Geschoss ist und danach ein Raum folgt – sonst null und alles wie bisher. */
-function punktRaum(raw:string):{floor:string;name:string}|null{
-  if(!raw.includes('·'))return null;
-  const teile=raw.split('·').map(t=>t.trim()).filter(Boolean);
-  const i=teile.findIndex(t=>{const p=floorPrefix(t);return !!p&&!p.rest;});
-  if(i<0||i+1>=teile.length)return null;
-  return {floor:floorPrefix(teile[i])!.floor,name:[...teile.slice(0,i),teile[i+1]].join(' · ')};
+ *  Erkannt wird das Ende des Raumnamens an den Wörtern aus dem AidKit-Baukasten (Zusätze, Bauteile, Beaufschlagung,
+ *  Oberflächenart). Ohne eigenes Geschoss-Wort oder wenn vor dem ersten solchen Wort kein Raum steht: null, alles wie bisher.
+ *  „ · “ als Trenner wird ebenfalls verstanden. */
+const ENDE_WORT=new Set(['brandraum','brandbereich','brandherd','referenz','unbelastet','ref','verdacht','kleber','teer','bitumen','freimessung',
+  'decke','boden','wand','fenster','fensterbank','tür','türzarge','zarge','heizkörper','möbel','einbauten','elektro','leitungen',
+  'gereinigt','verrußt','aufsicht','ansicht','untersicht']);
+const NACH_MIT=new Set(['belag','ruß','russ','kondensat','staub']);
+function istEnde(w:string[],i:number){
+  const x=w[i].toLowerCase().replace(/[,;:]+$/,''),erst=x.split('/')[0];
+  if(ENDE_WORT.has(x)||ENDE_WORT.has(erst))return true;
+  if(x==='mit'&&NACH_MIT.has((w[i+1]||'').toLowerCase()))return true;
+  if(x==='leicht'&&/^verru(ß|ss)t$/i.test(w[i+1]||''))return true;
+  return false;
+}
+function wortRaum(raw:string):{floor:string;name:string}|null{
+  const w=raw.replace(/·/g,' ').replace(/(\d+)\s*\.\s*(OG|UG)(?=\s|$)/gi,'$1.$2').split(/\s+/).filter(Boolean);
+  const i=w.findIndex(x=>{const p=floorPrefix(x);return !!p&&!p.rest;});if(i<0)return null;
+  const rest=w.slice(i+1);let j=rest.findIndex((_,k)=>istEnde(rest,k));if(j<0)j=rest.length;
+  if(j===0)return null;
+  return {floor:floorPrefix(w[i])!.floor,name:[...w.slice(0,i),...rest.slice(0,j)].join(' ')};
 }
 export function splitRoom(sheetFloor:string,raw:string):{floor:string;name:string}{
-  const punkt=punktRaum(raw.trim());
-  if(punkt){if(!sheetFloor)return punkt;return {floor:sheetFloor,name:norm(punkt.floor)===norm(sheetFloor)?punkt.name:`${punkt.floor} · ${punkt.name}`};}
+  const wort=wortRaum(raw.trim());
+  if(wort){if(!sheetFloor)return wort;return {floor:sheetFloor,name:norm(wort.floor)===norm(sheetFloor)?wort.name:`${wort.floor} ${wort.name}`};}
   const name=raw.trim(),pre=floorPrefix(name);
   if(sheetFloor){if(pre&&pre.rest&&norm(pre.floor)===norm(sheetFloor))return {floor:sheetFloor,name:pre.rest};return {floor:sheetFloor,name};}
   if(pre&&pre.rest)return {floor:pre.floor,name:pre.rest};
