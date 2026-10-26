@@ -2,7 +2,7 @@
 // eins mit unbekannter Probe-Nr., eins aussortiert). Prüft Inhalt, Bilder, Prüfprotokoll, Ablage in „Mitteilungen“ und
 // dass nichts überschrieben wird. Nur Chromium (Ordnerzugriff). ANLAGE_DUMP=<Ordner> legt die .docx zur Sichtprüfung ab.
 import {chromium,openExport} from './runtime.mjs';
-import {labXML,labRows} from './lab-fixtures.mjs';
+import {labXML,labRows,labErgebnisse} from './lab-fixtures.mjs';
 import assert from 'node:assert/strict';
 import {writeFile} from 'node:fs/promises';
 import {readFileSync} from 'node:fs';
@@ -24,10 +24,10 @@ const fs=(page,action,...args)=>page.evaluate(async([action,args])=>{
  const dir=async path=>{let d=archiv;for(const p of path)d=await d.getDirectoryHandle(p,{create:true});return d;};
  const write=async(d,n,data)=>{const w=await(await d.getFileHandle(n,{create:true})).createWritable();await w.write(data);await w.close();};
  const hex=async b=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',b))].map(n=>n.toString(16).padStart(2,'0')).join('');
- if(action==='setup'){const [name,svg,xml]=args;for await(const [n] of archiv.entries())await archiv.removeEntry(n,{recursive:true});
+ if(action==='setup'){const [name,svg,xml,erg]=args;for await(const [n] of archiv.entries())await archiv.removeEntry(n,{recursive:true});
   const proj=await dir([name]);for(const sub of ['Pläne','Laborergebnisse','Laboraufträge','Fotos'])await proj.getDirectoryHandle(sub,{create:true});
   await write(proj,'_Projekt.json',JSON.stringify({format:'mosaik-projekt',version:1,objekt:'EFH, Musterweg 7',auftraggeber:'Beispiel AG',schadendatum:'2026-10-02'}));
-  await write(await dir([name,'Pläne']),'Grundriss EG.svg',svg);await write(await dir([name,'Laborergebnisse']),'AR-999.xml',xml);
+  await write(await dir([name,'Pläne']),'Grundriss EG.svg',svg);await write(await dir([name,'Laborergebnisse']),'AR-999.xml',xml);if(erg)await write(await dir([name,'Laborergebnisse']),'_Ergebnisse.json',erg);
   // Fotos: echte JPEGs (querformatig), Prüfsummen wie FotoKit sie speichert
   const fotos=await dir([name,'Fotos']),bilder={},jpeg=async(label,color)=>{const c=new OffscreenCanvas(1200,800),g=c.getContext('2d');g.fillStyle=color;g.fillRect(0,0,1200,800);g.fillStyle='#fff';g.font='120px sans-serif';g.fillText(label,80,450);return new Uint8Array(await (await c.convertToBlob({type:'image/jpeg',quality:.8})).arrayBuffer());};
   const add=async(file,label,probe,extra={})=>{const b=await jpeg(label,'#3a6ea5');await write(fotos,file,b);bilder[file]={beschreibung:`Foto ${label}`,probe,original:{name:`IMG_${file}`,aufnahme:'2026-10-14 10:42'},sha256:{wert:await hex(b),bytes:b.length},...extra};};
@@ -46,13 +46,13 @@ const fs=(page,action,...args)=>page.evaluate(async([action,args])=>{
 const browser=await chromium.launch();
 try{
  const context=await browser.newContext({viewport:{width:1366,height:768},acceptDownloads:true}),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.goto(base);await fs(page,'setup',NAME,svg,labXML(rows));
+ await page.goto(base);await fs(page,'setup',NAME,svg,labXML(rows),labErgebnisse(rows));
  // Skala wie aus FotoKit (gemeinsamer Browser-Speicher)
  await page.evaluate(([k])=>localStorage.setItem('bu-scales',JSON.stringify({[k]:{name:'PAK Wischproben',cats:[{name:'gering',from:0},{name:'mittel',from:5},{name:'hoch',from:50}]}})),[`${PARAM}|${UNIT}`]);
  await page.goto(`${base}/?projekt=${encodeURIComponent(NAME)}`);await page.locator('#project-badge:not([hidden])').waitFor();
  await page.locator('#folder-plans button',{hasText:'Grundriss EG.svg'}).click();await page.locator('#welcome').waitFor({state:'hidden'});
  await page.keyboard.press('p');await tap(page,.2,.3);await tap(page,.25,.7);await tap(page,.7,.5);await page.keyboard.press('v');
- await page.locator('#lab-import').click();await page.locator('#lab-folder-dialog [data-lab-file]',{hasText:'AR-999.xml'}).click();await page.locator('#lab-review').waitFor();await page.locator('#lab-update-all:visible').click();
+ await page.locator('#lab-import').click();await page.locator('#lab-folder-dialog [data-ergebnis]',{hasText:'AR-999.xml'}).click();await page.locator('#lab-review').waitFor();await page.locator('#lab-update-all:visible').click();
  await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});
  await page.locator('#saved',{hasText:/gespeichert/}).waitFor();
 

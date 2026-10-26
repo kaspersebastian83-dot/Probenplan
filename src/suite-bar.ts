@@ -1,11 +1,11 @@
 // @ts-nocheck
-/* ===== MOSAIK-LEISTE v1 – in allen Apps der Familie identisch halten (LabelKit, FotoKit, PlanKit, BelegKit) =====
+/* ===== MOSAIK-LEISTE v1 – in allen Apps der Familie identisch halten (LabelKit, FotoKit, ResultKit, PlanKit, BelegKit) =====
    Links steht der Name der App-Suite „Spektron“ (Arbeitsname war „Mosaik“; interne Kennungen bleiben).
-   Schmale Leiste oben: Projekt (mit Wechsel zu den zuletzt benutzten), die vier Arbeitsschritte mit Haken und nächstem Schritt,
+   Schmale Leiste oben: Projekt (mit Wechsel zu den zuletzt benutzten), die fünf Arbeitsschritte mit Haken und nächstem Schritt,
    „Weiter“-Knopf. Ohne geöffnetes Projekt: „Mit <letztes Projekt> weitermachen“.
    Teilt sich mit den anderen Apps nur den Browser-Speicher: IndexedDB „mosaik-suite“ / „kv“, Schlüssel „archiv“ (Ordner-Handle)
    und „zuletzt“ (Liste der zuletzt geöffneten Projektnamen). Liest den Ordner nur, schreibt nie hinein und fragt nie selbst
-   nach Ordnerrechten – ohne Recht (oder ohne Ordnerzugriff, z. B. Safari) fehlen nur die Haken. Aufruf: MosaikLeiste.start('label'|'fotos'|'plan'|'beleg'[, {kompakt: true}]),
+   nach Ordnerrechten – ohne Recht (oder ohne Ordnerzugriff, z. B. Safari) fehlen nur die Haken. Aufruf: MosaikLeiste.start('label'|'fotos'|'ergebnis'|'plan'|'beleg'[, {kompakt: true}]),
    danach MosaikLeiste.aktualisieren() nach dem Öffnen oder Wechseln eines Projekts.
    Optional opt.projektName: Funktion, die die bestätigte Projektzuordnung statt der angeforderten URL liefert (FotoKit).
    Optional opt.version: Version der App (Text oder Funktion) für „💬 Rückmeldung“ rechts in der Leiste und im Projektmenü – öffnet
@@ -16,10 +16,11 @@
   var APPS = [
     ['label', 'LabelKit',  'labelkit',       '../labelkit/',       '#5469b8'],
     ['fotos', 'FotoKit',   'bildumbenenner', '../Bildumbenenner/', '#2f87a6'],
+    ['ergebnis', 'ResultKit', 'resultkit',   '../resultkit/',      '#7a5ca8'],
     ['plan',  'PlanKit',   'plankit',        '../Probenplan/',     '#4179b2'],
     ['beleg', 'BelegKit',  'aufwandkit',     '../aufwandkit/',     '#2f7d6d']
   ];
-  var ZENTRALE = '../Projektzentrale/', MAX = 6, RUECKMELDUNG = '../rueckmeldung/', RM_APP = { label: 'labelkit', fotos: 'fotokit', plan: 'plankit', beleg: 'belegkit' };
+  var ZENTRALE = '../Projektzentrale/', MAX = 6, RUECKMELDUNG = '../rueckmeldung/', RM_APP = { label: 'labelkit', fotos: 'fotokit', ergebnis: 'resultkit', plan: 'plankit', beleg: 'belegkit' };
   var ich = '', kompakt = false, projektName = null, version = null, name = '', stand = null, zuletzt = [], bar = null, pop = null, timer = 0, lauf = 0;
   var nfc = function(s){ try{ return String(s).normalize('NFC'); }catch(e){ return String(s); } };
   /* Kurzfassung von SPEKTRON-ORDNERNAME v1 (Projektzentrale): Kürzel am Ende des Ordnernamens anhand der Mitarbeiterliste */
@@ -123,7 +124,7 @@
       try{ for await (var e of arch.values()) if (e.kind === 'directory' && nfc(e.name) === nfc(name)){ proj = e; break; } }catch(e2){}
     }
     if (!proj) return null;
-    var s = { label: false, fotos: false, plan: false, beleg: false, objekt: '', anzeige: '', person: '' }, zust = null;
+    var s = { label: false, fotos: false, ergebnis: false, plan: false, beleg: false, objekt: '', anzeige: '', person: '' }, zust = null;
     var activeData = window.SpektronProjectData && window.SpektronProjectData(name);
     if (activeData){ var activeObjekt = typeof activeData.data.objekt === 'string' ? activeData.data.objekt : activeData.data.daten && activeData.data.daten.objekt; if (typeof activeObjekt === 'string') s.objekt = activeObjekt.trim(); zust = activeData.data.zustaendig; }
     else try{
@@ -136,6 +137,7 @@
       var la = await unterordner(proj, 'Laboraufträge');
       if (la) for await (var f of la.values()) if (f.kind === 'file' && /_Daten\.json$/i.test(f.name)){ s.label = true; break; }
     }catch(e5){}
+    try{ var le = await unterordner(proj, 'Laborergebnisse'); if (le) s.ergebnis = await le.getFileHandle('_Ergebnisse.json').then(function(){ return true; }, function(){ return false; }); }catch(e8){}   // ResultKit: geprüfte Ergebnisse übernommen
     try{
       var pl = await unterordner(proj, 'Pläne');
       if (pl) for await (var g of pl.values()) if (g.kind === 'file' && /\.probenplan$/i.test(g.name) && !/ \((vorher|Wiederherstellung|Speicherkandidat|Kopie)\b[^)]*\)\.probenplan$/i.test(g.name)){ s.plan = true; break; }
@@ -192,8 +194,12 @@
       '#mosaikLeistePop a{display:block;padding:8px 10px;border-radius:7px;color:inherit;text-decoration:none}#mosaikLeistePop a:hover,#mosaikLeistePop a:focus-visible{background:#eaf1f6;outline:0}' +
       '#mosaikLeistePop a.aktuell{font-weight:650;background:#f2f6f9}#mosaikLeistePop hr{border:0;border-top:1px solid #e2e9ee;margin:5px 4px}' +
       '#mosaikLeiste.ml-kompakt{height:24px;font-size:12px;padding:0 8px}#mosaikLeiste.ml-kompakt .ml-home,#mosaikLeiste.ml-kompakt .ml-proj,#mosaikLeiste.ml-kompakt .ml-step,#mosaikLeiste.ml-kompakt .ml-weiter,#mosaikLeiste.ml-kompakt .ml-rm{height:20px;padding:0 7px}#mosaikLeiste.ml-kompakt .ml-step i{width:14px;height:14px;font-size:9px}#mosaikLeistePop{top:30px}' +
+      '#mosaikLeiste.ml-eng .ml-marke,#mosaikLeiste.ml-eng .ml-obj,#mosaikLeiste.ml-eng .ml-rm span{display:none}' +   // passt nicht: erst Marke, Objekt/Person, Rückmeldungstext …
+      '#mosaikLeiste.ml-enger .ml-step span,#mosaikLeiste.ml-enger .ml-home span{display:none}#mosaikLeiste.ml-enger .ml-step.hier span{display:inline}' +   // … dann die Schrittnamen (außer der eigenen App) …
+      '#mosaikLeiste.ml-engst .ml-step.hier span,#mosaikLeiste.ml-engst .ml-weiter span{display:none}#mosaikLeiste.ml-engst .ml-step{padding:0 5px}#mosaikLeiste.ml-engst .ml-proj{flex:0 1 auto;min-width:0}#mosaikLeiste.ml-engst .ml-proj b{overflow:hidden;text-overflow:ellipsis;min-width:0}' +   // … zuletzt wie auf dem Handy
       '@media (max-width:860px){#mosaikLeiste .ml-marke,#mosaikLeiste .ml-obj,#mosaikLeiste .ml-step span,#mosaikLeiste .ml-rm span{display:none}#mosaikLeiste .ml-step.hier span{display:inline}}' +
-      '@media (max-width:560px){#mosaikLeiste .ml-home span,#mosaikLeiste .ml-weiter span{display:none}#mosaikLeiste .ml-rm{display:none}#mosaikLeiste .ml-step.hier span{display:none}}' +
+      '@media (max-width:560px){#mosaikLeiste .ml-home span,#mosaikLeiste .ml-weiter span{display:none}#mosaikLeiste .ml-rm{display:none}#mosaikLeiste .ml-step.hier span{display:none}' +
+      '#mosaikLeiste{gap:4px;padding:0 6px}#mosaikLeiste .ml-steps{gap:0}#mosaikLeiste .ml-step{padding:0 5px}#mosaikLeiste .ml-proj{flex:0 1 auto;min-width:0;padding:0 6px}#mosaikLeiste .ml-proj b{overflow:hidden;text-overflow:ellipsis;min-width:0}}' +   // fünf Schritte passen auch auf 360 px
       '@media print{#mosaikLeiste,#mosaikLeistePop{display:none!important}}';
     document.head.appendChild(st);
   }
@@ -264,6 +270,14 @@
       }
     }
     bar.appendChild(rmLink('ml-rm'));
+    passen();
+  }
+  /* Lange Projektnamen, Objekt und Person: Passt die Leiste nicht in die Breite, erst die Schrittnamen ausblenden, dann mehr – nie waagrecht scrollen */
+  function passen(){
+    if (!bar) return;
+    bar.classList.remove('ml-eng', 'ml-enger', 'ml-engst');
+    var zuBreit = function(){ return bar.scrollWidth > bar.clientWidth + 1; };
+    ['ml-eng', 'ml-enger', 'ml-engst'].some(function(k){ if (!zuBreit()) return true; bar.classList.add(k); return false; });
   }
   async function aktualisieren(){
     var n = urlName();
@@ -293,6 +307,7 @@
       window.addEventListener('focus', aktualisieren);
       document.addEventListener('visibilitychange', function(){ if (!document.hidden) aktualisieren(); });
       window.addEventListener('popstate', aktualisieren);
+      window.addEventListener('resize', function(){ clearTimeout(passen.t); passen.t = setTimeout(passen, 100); });
       document.addEventListener('click', function(ev){ if (pop && !pop.contains(ev.target)) schliessePop(); });
       document.addEventListener('keydown', function(ev){ if (ev.key === 'Escape' && pop){ var b = bar.querySelector('.ml-proj'); schliessePop(); if (b) b.focus(); } });
       timer = setInterval(function(){ if (!document.hidden) aktualisieren(); }, 20000);

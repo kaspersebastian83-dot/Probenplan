@@ -1,7 +1,7 @@
 // Wandansichten der Bohrkerne: Projektordner mit LabelKit-Datei (Wandblatt-Bohrkerne) und Prüfbericht (MKW), Dialog,
 // Vorschau, Word-Anlage und CSV in „Mitteilungen“. Synthetische Daten. Nur Chromium (Ordnerzugriff).
 import {chromium} from './runtime.mjs';
-import {labXML} from './lab-fixtures.mjs';
+import {labXML,labErgebnisse} from './lab-fixtures.mjs';
 import assert from 'node:assert/strict';
 const base=process.env.TEST_URL||'http://localhost:4173';
 const NAME='26.0142 Teststadt',C40='Kohlenwasserstoffe C10-C40',C22='Kohlenwasserstoffe C10-C22',U='mg/kg TS';
@@ -27,19 +27,30 @@ try{
  // Projektordner im Origin Private File System; „Ordner öffnen“ bekommt ihn über den Dateidialog
  await context.addInitScript(name=>{window.showDirectoryPicker=async()=>(await (await navigator.storage.getDirectory()).getDirectoryHandle('Mosaik Archivordner')).getDirectoryHandle(name);},NAME);
  await page.goto(base);
- await page.evaluate(async([name,svg,daten,xml])=>{
+ await page.evaluate(async([name,svg,daten,xml,erg])=>{
   const root=await navigator.storage.getDirectory();for await(const [n] of root.entries())await root.removeEntry(n,{recursive:true});
   const archiv=await root.getDirectoryHandle('Mosaik Archivordner',{create:true}),proj=await archiv.getDirectoryHandle(name,{create:true});
   const put=async(sub,n,data)=>{const d=await proj.getDirectoryHandle(sub,{create:true});const w=await(await d.getFileHandle(n,{create:true})).createWritable();await w.write(data);await w.close();};
-  await put('Pläne','Grundriss EG.svg',svg);await put('Laboraufträge','26.0142_24.10.2026_Daten.json',JSON.stringify(daten));await put('Laborergebnisse','AR-999.xml',xml);
- },[NAME,svg,daten,labXML(rows,{vorlaeufig:true})]);
+  await put('Pläne','Grundriss EG.svg',svg);await put('Laboraufträge','26.0142_24.10.2026_Daten.json',JSON.stringify(daten));await put('Laborergebnisse','AR-999.xml',xml);await put('Laborergebnisse','_Ergebnisse.json',erg);
+ },[NAME,svg,daten,labXML(rows,{vorlaeufig:true}),labErgebnisse(rows,{vorlaeufig:true})]);
  // Skala für MKW (synthetisch) wie aus FotoKit
  await page.evaluate(([k])=>localStorage.setItem('bu-scales',JSON.stringify({[k]:{name:'Testskala MKW (synthetisch)',cats:[{name:'gering',from:0},{name:'erhöht',from:1000},{name:'stark',from:5000}]}})),[`${C40}|${U}`]);
  await page.locator('#open-folder').click();
  await page.locator('#folder-plans button',{hasText:'Grundriss EG.svg'}).click();await page.locator('#welcome').waitFor({state:'hidden'});
- await page.locator('#lab-import').click();await page.locator('#lab-folder-dialog [data-lab-file]',{hasText:'AR-999.xml'}).click();await page.locator('#lab-review').waitFor();
+ await page.locator('#lab-import').click();await page.locator('#lab-folder-dialog [data-ergebnis]',{hasText:'AR-999.xml'}).click();await page.locator('#lab-review').waitFor();
  assert.match(await page.locator('#lab-review').textContent(),/Vorläufiger Prüfbericht AR-999-2099-000001-01/,'Hinweis beim Import');
  await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});
+ // Im Projekt: Messwerte nur aus ResultKit – Dialog zeigt den übernommenen Stand, eine Laborbericht-Datei wird abgewiesen
+ await page.locator('#lab-import').click();const dlg=page.locator('#lab-folder-dialog');await dlg.locator('[data-ergebnis]').waitFor();
+ assert.match(await dlg.locator('[data-ergebnis]').textContent(),/AR-999-2099-000001-01 · vorläufig.*bereits im Plan/s);
+ assert.match(await dlg.locator('.lab-resultkit').textContent(),/Seit der Übernahme in ResultKit hat sich der Ordner geändert/);
+ assert.equal(new URL(await dlg.locator('a.hilfe-link').getAttribute('href'),page.url()).hash,`#projekt=${encodeURIComponent(NAME)}`);
+ await dlg.locator('button.close').click();
+ await page.locator('#lab-files').setInputFiles({name:'AR-1.xml',mimeType:'application/xml',buffer:Buffer.from(labXML(rows))});
+ await page.locator('#toast.error',{hasText:'in ResultKit importiert'}).waitFor();assert.equal(await page.locator('#lab-review').isVisible(),false);
+ // Ergebnisdatei eines anderen Projekts wird nicht angeboten
+ await page.evaluate(async([name,erg])=>{const d=await (await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Mosaik Archivordner')).getDirectoryHandle(name)).getDirectoryHandle('Laborergebnisse');const w=await (await d.getFileHandle('_Ergebnisse.json')).createWritable();await w.write(erg);await w.close();},[NAME,labErgebnisse(rows,{projekt:'26.9999'})]);
+ await page.locator('#lab-import').click();await dlg.locator('.lab-resultkit.warn',{hasText:'gehört zu Projekt 26.9999'}).waitFor();assert.equal(await dlg.locator('[data-ergebnis]').count(),0);await dlg.locator('button.close').click();
  await page.locator('#results-toggle').click();await page.locator('#result-vorlaeufig:not([hidden])').waitFor();assert.match(await page.locator('#result-vorlaeufig').textContent(),/vorläufigem Prüfbericht AR-999/);await page.locator('#results-toggle').click();
 
  await check('Dialog: Kerne aus LabelKit, MKW C10–C40 vorgeschlagen, Vorschau je Fläche, Hinweise',async()=>{
