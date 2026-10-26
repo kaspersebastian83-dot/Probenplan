@@ -79,9 +79,38 @@ function ratings(rated:Rated|null){
 const order=(a:string,b:string)=>a.localeCompare(b,'de',{numeric:true});
 const labelNo=(l:string)=>{const m=/(\d+)/.exec(l);return m?Number(m[1]):1e9;};
 
+/** Eingaben aus der Zeit vor 1.34 stehen unter dem vollen Namen, z. B. „EG“ / „Küche Brandraum Decke“. Hat dieser Name
+ *  keine Proben mehr, wohl aber der Raum nach der Handbuch-Regel („Küche“), gehören Maßnahme und Bemerkung dorthin:
+ *  leere Felder werden gefüllt, abweichende Texte mit „; “ angehängt; Eingaben, die schon beim Raum stehen, gehen vor.
+ *  Gibt dieselbe Liste zurück, wenn nichts zu übertragen ist. */
+function migriereEintraege(p:Project):RaumEintrag[]{
+  const rb=p.raumbuch;if(!rb?.rooms.length)return rb?.rooms||[];
+  const beprobt=new Set(raumbuchStand({...p,raumbuch:{rooms:[],...(rb.alias?{alias:rb.alias}:{})}}).rows.filter(r=>r.sampled).map(r=>r.key));
+  const keyOf=(e:{floor:string;name:string})=>resolve(rb.alias,roomKey(e.floor,e.name));
+  const ziel=(e:RaumEintrag)=>{
+    if(beprobt.has(keyOf(e)))return null;
+    const w=wortRaum(`EG ${e.name}`);if(!w)return null;
+    const c={floor:e.floor,name:w.name};return keyOf(c)!==keyOf(e)&&beprobt.has(keyOf(c))?c:null;
+  };
+  const alt=rb.rooms.map(e=>({e,c:ziel(e)}));if(!alt.some(x=>x.c))return rb.rooms;
+  const out:RaumEintrag[]=alt.filter(x=>!x.c).map(x=>({...x.e}));
+  for(const {e,c} of alt){
+    if(!c)continue;
+    const i=out.findIndex(x=>keyOf(x)===keyOf(c)),t:RaumEintrag=i>=0?out[i]:{floor:c.floor,name:c.name};
+    for(const f of ['massnahme','bemerkung'] as const){const v=e[f];if(!v)continue;if(!t[f])t[f]=v;else if(!t[f]!.split('; ').includes(v))t[f]=`${t[f]}; ${v}`.slice(0,500);}
+    if(i<0&&(t.massnahme||t.bemerkung))out.push(t);
+  }
+  return out;
+}
+/** Übertragene Eingaben im Projekt festschreiben, bevor das Raumbuch geändert wird. */
+function migriereGespeichert(p:Project){
+  if(!p.raumbuch)return;const rooms=migriereEintraege(p);if(rooms!==p.raumbuch.rooms)p.raumbuch={...p.raumbuch,rooms};
+}
+
 /** Raumbuch aus dem Projekt berechnen (Projekt bleibt unverändert). */
 export function raumbuchStand(source:Project):RaumbuchStand{
   const p=clone(source);if(hasValues(p))prepare(p);
+  if(p.raumbuch?.rooms.length){const rooms=migriereEintraege(p);if(rooms!==p.raumbuch.rooms)p.raumbuch={...p.raumbuch,rooms};}
   const parameter=p.results?.parameter||'',rb:Raumbuch=p.raumbuch||{rooms:[]},alias=rb.alias;
   const rows=new Map<string,RaumZeile>(),ohneRaum:string[]=[],firstName=new Map<string,string>();
   // Ein einzelner Plan hat keinen Blattnamen: Geschoss dann aus dem Plannamen („EG.pdf“, „1. OG Grundriss.svg“), sonst keins.
@@ -145,6 +174,7 @@ export function aehnlich(rows:RaumZeile[]):[RaumZeile,RaumZeile][]{
 
 /** Eingabe zu einem Raum speichern (Maßnahme, Bemerkung, Status); leere Einträge ohne Status verschwinden. */
 export function setEintrag(p:Project,row:{floor:string;name:string;sampled:boolean;brandherd?:boolean},patch:Partial<Omit<RaumEintrag,'floor'|'name'>>){
+  migriereGespeichert(p);
   const rb:Raumbuch=p.raumbuch||{rooms:[]},key=resolve(rb.alias,roomKey(row.floor,row.name));
   const idx=rb.rooms.findIndex(e=>resolve(rb.alias,roomKey(e.floor,e.name))===key);
   const cur:RaumEintrag=idx>=0?{...rb.rooms[idx]}:{floor:row.floor,name:row.name};
@@ -155,18 +185,21 @@ export function setEintrag(p:Project,row:{floor:string;name:string;sampled:boole
 }
 /** Raum ohne Probe hinzufügen (Status Sichtprüfung unauffällig). */
 export function addRaum(p:Project,floor:string,name:string){
+  migriereGespeichert(p);
   const f=floor.trim().slice(0,40),n=name.trim().slice(0,80);if(!n)throw Error('Bitte einen Raumnamen eingeben.');
   const key=roomKey(f,n);if(raumbuchStand(p).rows.some(r=>r.key===resolve(p.raumbuch?.alias,key)))throw Error(`„${n}“ steht bereits im Raumbuch.`);
   p.raumbuch={rooms:[...(p.raumbuch?.rooms||[]),{floor:f,name:n,status:'unauffaellig'}],...(p.raumbuch?.alias?{alias:p.raumbuch.alias}:{})};
 }
 /** Raum ohne Probe entfernen. */
 export function removeRaum(p:Project,floor:string,name:string){
+  migriereGespeichert(p);
   if(!p.raumbuch)return;const key=resolve(p.raumbuch.alias,roomKey(floor,name));
   const rooms=p.raumbuch.rooms.filter(e=>resolve(p.raumbuch!.alias,roomKey(e.floor,e.name))!==key);
   p.raumbuch={rooms,...(p.raumbuch.alias?{alias:p.raumbuch.alias}:{})};if(!rooms.length&&!p.raumbuch.alias)delete p.raumbuch;
 }
 /** Schreibweise „von“ in den Raum „nach“ zusammenführen; Eingaben von „von“ füllen nur leere Felder von „nach“. */
 export function mergeRaum(p:Project,von:RaumZeile,nach:RaumZeile){
+  migriereGespeichert(p);
   if(von.key===nach.key)return;
   const alias={...(p.raumbuch?.alias||{})};
   for(const [k,v] of Object.entries(alias))if(v===von.key)alias[k]=nach.key;

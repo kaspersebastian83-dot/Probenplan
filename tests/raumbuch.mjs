@@ -52,6 +52,28 @@ ok('Wischprobenbezeichnung „Gebäude Geschoss Raum Zusatz Bauteil“ (AidKit):
   const s=R.raumbuchStand(p);
   assert.deepEqual(s.rows.map(r=>[r.name,r.probes.map(x=>x.label).join(',')]),[['Küche','P1,P2,P3'],['Flur','P4']],'alle Küchenproben in einem Raum');
 });
+ok('ältere Eingaben unter dem vollen Namen wandern zum Raum (Maßnahme, Bemerkung)', ()=>{
+  const p=projekt();p.markers=[m('P1','EG Küche Brandraum Decke','480'),m('P2','EG Küche Brandraum Wand B','210'),m('P4','EG Flur Wand A','38')];p.pending=[];
+  p.raumbuch={rooms:[
+    {floor:'EG',name:'Küche Brandraum Decke',massnahme:'Reinigung'},            // so gespeichert vor 1.34
+    {floor:'EG',name:'Küche Brandraum Wand B',massnahme:'Anstrich',bemerkung:'Foto 12'},
+    {floor:'EG',name:'· Küche · Brandraum · Decke',bemerkung:'Foto 12'},       // Punkt-Schreibweise
+    {floor:'EG',name:'Abstellraum',status:'nicht_begangen'}]};                  // ohne Probe: bleibt
+  const vorher=JSON.stringify(p);
+  let s=R.raumbuchStand(p);
+  assert.equal(JSON.stringify(p),vorher,'Berechnen ändert das Projekt nicht');
+  assert.deepEqual(s.rows.map(r=>r.name),['Küche','Flur','Abstellraum'],'keine leeren Zeilen unter dem alten Namen');
+  const k=s.rows[0];assert.equal(k.massnahme,'Reinigung; Anstrich');assert.equal(k.bemerkung,'Foto 12','gleicher Text nur einmal');
+  assert.equal(s.rows[2].bewertung,'nicht begangen / nicht zugänglich');
+  // Erste Änderung schreibt die Übertragung fest; danach gilt, was beim Raum steht
+  R.setEintrag(p,k,{massnahme:'Reinigung, danach Anstrich'});
+  assert.deepEqual(p.raumbuch.rooms.map(e=>e.name).sort(),['Abstellraum','Küche']);
+  s=R.raumbuchStand(p);assert.equal(s.rows[0].massnahme,'Reinigung, danach Anstrich');assert.equal(s.rows[0].bemerkung,'Foto 12');
+  // Eingabe, die schon beim Raum steht, geht vor
+  const q=projekt();q.markers=[m('P1','EG Küche Decke','480')];q.pending=[];
+  q.raumbuch={rooms:[{floor:'EG',name:'Küche',massnahme:'neu'},{floor:'EG',name:'Küche Decke',massnahme:'alt',bemerkung:'nur alt'}]};
+  const t=R.raumbuchStand(q).rows[0];assert.equal(t.massnahme,'neu; alt');assert.equal(t.bemerkung,'nur alt');
+});
 ok('Räume, Befund, Bewertung nach VdS-Referenz, Reihenfolge', ()=>{
   const s=R.raumbuchStand(projekt());
   assert.deepEqual(s.rows.map(r=>r.name),['Küche','Flur','Wohnen','Bad','Kü.']);

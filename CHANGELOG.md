@@ -4,6 +4,7 @@
 
 - Raumbuch versteht die Wischprobenbezeichnung aus dem Handbuch, von groß nach klein mit Leerzeichen wie in LabelKit („Gebäude Geschoss Raum Zusatz Bauteil“, z. B. „EG Küche Brandraum Decke“, „Haus A 1OG Bad Wand B“): Geschoss aus seinem Wort, Raum = Gebäude (falls vorhanden) + Raum bis zum ersten Wort aus dem Handbuch-Baukasten (Zusatz wie Brandraum/Referenz/Freimessung, Bauteil wie Decke/Wand/Boden, Beaufschlagung, Oberflächenart). Zusatz und Bauteil bleiben bei der Probe – alle Proben einer Küche stehen in einer Zeile, auch zusammen mit „EG Küche“. Ohne Geschoss-Wort oder ohne solches Wort wie bisher; „ · “ als Trenner wird ebenfalls verstanden.
 - Kurzanleitung „Raumbuch“ nennt das.
+- Ältere Raumbuch-Eingaben unter dem vollen Namen (z. B. „EG“ / „Küche Brandraum Decke“) wandern mit: Maßnahme und Bemerkung erscheinen beim Raum („Küche“), wenn dort jetzt die Proben stehen – leere Felder gefüllt, abweichende Texte mit „; “ angehängt. Keine leeren Zeilen unter dem alten Namen. Festgeschrieben wird das bei der nächsten Änderung im Raumbuch; Räume ohne Probe bleiben unverändert.
 
 ## 1.33.0 – 26. Oktober 2026
 
