@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.37.1 – 26. Oktober 2026
+
+- Liefert das Labor denselben Parameter je Probe und je Fläche (Eurofins: „Chlorid (Cl)“ in µg/Probe und berechnet in mg/m²; die Reihenfolge in der XML wechselt von Probe zu Probe), nehmen Ergebniskarte, Raumbuch und Anlage immer den Wert je Fläche – wie ResultKit. Vorher konnte eine Probe mit dem Wert je Probe grau bleiben. Im Skalenbereich erscheint keine leere Skala mehr für „µg/Probe“.
+
 ## 1.37.0 – 26. Oktober 2026
 
 - **Chlorid wird bewertet** – wie in ResultKit und FotoKit: VdS 2357 nennt 5–10 µg/cm² als korrosionschemisch relevante Größenordnung. Ergebniskarte, Anlage und Wandansicht färben Chlorid grün (< 5 µg/cm²), amber (5 – < 10) und rot (≥ 10), unabhängig von der gewählten Nutzung. Ältere Berichte in mg/m² werden mit umgerechneten Grenzen bewertet (1 µg/cm² = 10 mg/m²).

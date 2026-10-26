@@ -83,7 +83,11 @@ export function hasValues(p:Project){return werte(p).length>0;}
 /** Alle Parameter in Berichtsreihenfolge, auch reine BG-/unklare Ergebnisse. */
 export function parameters(p:Project){const seen:string[]=[];for(const w of werte(p))if(!seen.includes(w.p))seen.push(w.p);return seen;}
 export function defaultParameter(list:string[]){return list.find(x=>/^Summe 16 EPA-PAK.*exkl/i.test(x))||list.find(x=>/^Summe 16 EPA-PAK/i.test(x))||list[0]||'';}
-export function valueOf(m:Marker,parameter:string):Wert|undefined{return m.lab?.werte?.find(w=>w.p===parameter);}
+/** Flächenbezogene Einheit (µg/m², µg/cm², mg/m², µg/100 cm² …). Liefert das Labor denselben Parameter je Probe und je Fläche
+ *  (Eurofins: „Chlorid (Cl)“ in µg/Probe und berechnet in mg/m²; Reihenfolge in der XML wechselt), gilt der Wert je Fläche – wie in ResultKit. */
+export const FLAECHE=/\/\s*(?:\d+\s*)?(?:c|d)?m\s*(?:2|²)\s*$/i;
+export function wertFuer(werte:Wert[]|undefined,parameter:string):Wert|undefined{const c=(werte||[]).filter(w=>w.p===parameter);return c.find(w=>FLAECHE.test(w.u))||c[0];}
+export function valueOf(m:Marker,parameter:string):Wert|undefined{return wertFuer(m.lab?.werte,parameter);}
 /** Index der Kategorie: letzte Kategorie, deren „ab“-Wert erreicht ist (wie in FotoKit). */
 export function rate(scale:Scale|undefined,value:number){if(!scale?.cats.length||!Number.isFinite(value)||value<0)return -1;let index=0;scale.cats.forEach((c,i)=>{if(i>0&&value>=c.from)index=i;});return index;}
 
@@ -106,7 +110,8 @@ export function prepare(p:Project):boolean{
   for(const unit of units(p,p.results.parameter)){const key=scaleKey(p.results.parameter,unit);if(!p.results.scales[key]){const s=fromShared(key);if(s){p.results.scales[key]=s;changed=true;}}}
   return changed;
 }
-export function units(p:Project,parameter:string){const seen:string[]=[];for(const w of werte(p))if(w.p===parameter&&!seen.includes(w.u))seen.push(w.u);return seen;}
+/** Einheiten des bewerteten Parameters – je Probe der Wert, der auch gezeigt und bewertet wird (wertFuer). */
+export function units(p:Project,parameter:string){const seen:string[]=[];for(const w of [...allMarkers(p).map(m=>valueOf(m,parameter)),...(p.pending||[]).map(r=>wertFuer(r.werte,parameter))])if(w&&!seen.includes(w.u))seen.push(w.u);return seen;}
 
 /** Eine Regel für Ergebniskarte, Raumbuch, Anlage und Wandansicht: Ist eine Nutzung gewählt und gibt es für Parameter
  *  und Einheit eine VdS-Referenz, gilt sie – außer sie wurde im Projekt angepasst. Sonst gilt die eigene Skala des Projekts.
