@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.35.0 – 26. Oktober 2026
+
+- Spektron-Leiste oben: rechts „💬 Rückmeldung“ (bei schmalem Fenster nur 💬, auf dem Handy im Projektmenü ▾). Öffnet das Rückmeldeformular in einem eigenen Fenster; Programm, Version und – bei geöffnetem Projekt – die Projektnummer sind schon eingetragen (nur die Nummer, kein Ort). Die Leiste ist in allen Apps gleich.
+
 ## 1.34.0 – 26. Oktober 2026
 
 - Raumbuch versteht die Wischprobenbezeichnung aus dem Handbuch, von groß nach klein mit Leerzeichen wie in LabelKit („Gebäude Geschoss Raum Zusatz Bauteil“, z. B. „EG Küche Brandraum Decke“, „Haus A 1OG Bad Wand B“): Geschoss aus seinem Wort, Raum = Gebäude (falls vorhanden) + Raum bis zum ersten Wort aus dem Handbuch-Baukasten (Zusatz wie Brandraum/Referenz/Freimessung, Bauteil wie Decke/Wand/Boden, Beaufschlagung, Oberflächenart). Zusatz und Bauteil bleiben bei der Probe – alle Proben einer Küche stehen in einer Zeile, auch zusammen mit „EG Küche“. Ohne Geschoss-Wort oder ohne solches Wort wie bisher; „ · “ als Trenner wird ebenfalls verstanden.

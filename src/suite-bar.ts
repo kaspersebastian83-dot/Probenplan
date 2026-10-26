@@ -8,6 +8,8 @@
    nach Ordnerrechten – ohne Recht (oder ohne Ordnerzugriff, z. B. Safari) fehlen nur die Haken. Aufruf: MosaikLeiste.start('label'|'fotos'|'plan'|'beleg'[, {kompakt: true}]),
    danach MosaikLeiste.aktualisieren() nach dem Öffnen oder Wechseln eines Projekts.
    Optional opt.projektName: Funktion, die die bestätigte Projektzuordnung statt der angeforderten URL liefert (FotoKit).
+   Optional opt.version: Version der App (Text oder Funktion) für „💬 Rückmeldung“ rechts in der Leiste und im Projektmenü – öffnet
+   ../rueckmeldung/ im eigenen Fenster mit Programm, Version und Projektnummer (nur die Nummer, kein Ort).
    Projektdaten: window.SpektronProjectData (LabelKit, PlanKit) liefert den aktuellen Stand samt „möglicherweise veraltet“; sonst _Projekt.json direkt. */
 (function(){
   if (window.MosaikLeiste) return;
@@ -17,8 +19,8 @@
     ['plan',  'PlanKit',   'plankit',        '../Probenplan/',     '#4179b2'],
     ['beleg', 'BelegKit',  'aufwandkit',     '../aufwandkit/',     '#2f7d6d']
   ];
-  var ZENTRALE = '../Projektzentrale/', MAX = 6;
-  var ich = '', kompakt = false, projektName = null, name = '', stand = null, zuletzt = [], bar = null, pop = null, timer = 0, lauf = 0;
+  var ZENTRALE = '../Projektzentrale/', MAX = 6, RUECKMELDUNG = '../rueckmeldung/', RM_APP = { label: 'labelkit', fotos: 'fotokit', plan: 'plankit', beleg: 'belegkit' };
+  var ich = '', kompakt = false, projektName = null, version = null, name = '', stand = null, zuletzt = [], bar = null, pop = null, timer = 0, lauf = 0;
   var nfc = function(s){ try{ return String(s).normalize('NFC'); }catch(e){ return String(s); } };
   /* Kurzfassung von SPEKTRON-ORDNERNAME v1 (Projektzentrale): Kürzel am Ende des Ordnernamens anhand der Mitarbeiterliste */
   var maNorm = function(x){ return nfc(x == null ? '' : x).toLowerCase().replace(/[\s.]+/g, ''); };
@@ -144,6 +146,18 @@
     }catch(e7){}
     return s;
   }
+  /* Rückmeldeformular: Programm, Version und – bei geöffnetem Projekt – nur die Projektnummer */
+  function rmHref(){
+    var q = new URLSearchParams(), v = '';
+    q.set('app', RM_APP[ich] || 'suite');
+    try{ v = typeof version === 'function' ? version() : version; }catch(e){ v = ''; }
+    if (v) q.set('version', String(v).trim().replace(/^v/, '').slice(0, 20));
+    var o = name ? ordnerName(name, null) : null;
+    if (o) q.set('projekt', o.nr);
+    return RUECKMELDUNG + '?' + q.toString();
+  }
+  function rmFrisch(el){ el.addEventListener('click', function(){ el.setAttribute('href', rmHref()); }); return el; }   // beim Klick mit aktuellem Projekt und aktueller Version
+  function rmLink(cls){ return rmFrisch(h('a', { class: cls, href: rmHref(), target: 'rueckmeldung', rel: 'noopener', title: 'Fehler oder Wunsch melden – öffnet das Rückmeldeformular, Programm, Version und Projektnummer sind schon eingetragen' }, h('b', { text: '💬', 'aria-hidden': 'true' }), h('span', { text: 'Rückmeldung' }))); }
   function naechster(){
     if (!stand) return null;
     var i0 = APPS.findIndex(function(a){ return a[0] === ich; }), n = APPS.length;
@@ -172,13 +186,14 @@
       '#mosaikLeiste .ml-weiter{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 11px;background:var(--ac);color:#fff;font-weight:650}' +
       '#mosaikLeiste .ml-weiter:hover{filter:brightness(1.12)}' +
       '#mosaikLeiste .ml-hinweis{color:#9fb1be}' +
+      '#mosaikLeiste .ml-rm{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 8px;margin-left:2px;color:#9fb1be}#mosaikLeiste .ml-rm:hover{background:rgba(255,255,255,.1);color:#fff}#mosaikLeiste .ml-rm b{font-weight:400}' +
       '#mosaikLeistePop{position:fixed;top:40px;left:8px;z-index:2147483001;min-width:260px;max-width:min(92vw,420px);background:#fff;color:#1b2a35;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.3);padding:6px;font:13px/1.35 "Segoe UI",system-ui,-apple-system,Arial,sans-serif}' +
       '#mosaikLeistePop h6{margin:6px 10px 4px;font:600 10.5px/1 inherit;letter-spacing:.06em;text-transform:uppercase;color:#6a7c89}' +
       '#mosaikLeistePop a{display:block;padding:8px 10px;border-radius:7px;color:inherit;text-decoration:none}#mosaikLeistePop a:hover,#mosaikLeistePop a:focus-visible{background:#eaf1f6;outline:0}' +
       '#mosaikLeistePop a.aktuell{font-weight:650;background:#f2f6f9}#mosaikLeistePop hr{border:0;border-top:1px solid #e2e9ee;margin:5px 4px}' +
-      '#mosaikLeiste.ml-kompakt{height:24px;font-size:12px;padding:0 8px}#mosaikLeiste.ml-kompakt .ml-home,#mosaikLeiste.ml-kompakt .ml-proj,#mosaikLeiste.ml-kompakt .ml-step,#mosaikLeiste.ml-kompakt .ml-weiter{height:20px;padding:0 7px}#mosaikLeiste.ml-kompakt .ml-step i{width:14px;height:14px;font-size:9px}#mosaikLeistePop{top:30px}' +
-      '@media (max-width:860px){#mosaikLeiste .ml-marke,#mosaikLeiste .ml-obj,#mosaikLeiste .ml-step span{display:none}#mosaikLeiste .ml-step.hier span{display:inline}}' +
-      '@media (max-width:560px){#mosaikLeiste .ml-home span,#mosaikLeiste .ml-weiter span{display:none}#mosaikLeiste .ml-step.hier span{display:none}}' +
+      '#mosaikLeiste.ml-kompakt{height:24px;font-size:12px;padding:0 8px}#mosaikLeiste.ml-kompakt .ml-home,#mosaikLeiste.ml-kompakt .ml-proj,#mosaikLeiste.ml-kompakt .ml-step,#mosaikLeiste.ml-kompakt .ml-weiter,#mosaikLeiste.ml-kompakt .ml-rm{height:20px;padding:0 7px}#mosaikLeiste.ml-kompakt .ml-step i{width:14px;height:14px;font-size:9px}#mosaikLeistePop{top:30px}' +
+      '@media (max-width:860px){#mosaikLeiste .ml-marke,#mosaikLeiste .ml-obj,#mosaikLeiste .ml-step span,#mosaikLeiste .ml-rm span{display:none}#mosaikLeiste .ml-step.hier span{display:inline}}' +
+      '@media (max-width:560px){#mosaikLeiste .ml-home span,#mosaikLeiste .ml-weiter span{display:none}#mosaikLeiste .ml-rm{display:none}#mosaikLeiste .ml-step.hier span{display:none}}' +
       '@media print{#mosaikLeiste,#mosaikLeistePop{display:none!important}}';
     document.head.appendChild(st);
   }
@@ -192,6 +207,7 @@
     if (rest.length){ pop.appendChild(h('h6', { text: 'Zuletzt geöffnet' })); rest.forEach(function(n){ pop.appendChild(h('a', { href: href(app, n), text: n, role: 'menuitem' })); }); }
     pop.appendChild(h('hr'));
     pop.appendChild(h('a', { href: ZENTRALE, target: 'projektzentrale', text: 'Alle Projekte … (Projektzentrale)', role: 'menuitem' }));
+    pop.appendChild(rmFrisch(h('a', { class: 'ml-rm-pop', href: rmHref(), target: 'rueckmeldung', rel: 'noopener', text: '💬 Rückmeldung – Fehler oder Wunsch melden', role: 'menuitem' })));
     document.body.appendChild(pop);
     var r = btn.getBoundingClientRect(); pop.style.left = Math.max(8, Math.min(r.left, innerWidth - pop.offsetWidth - 8)) + 'px'; pop.style.top = (r.bottom + 4) + 'px';
     btn.setAttribute('aria-expanded', 'true');
@@ -247,6 +263,7 @@
         an.onclick = function(ev){ ev.stopPropagation(); oeffnePop(an); }; bar.appendChild(an);
       }
     }
+    bar.appendChild(rmLink('ml-rm'));
   }
   async function aktualisieren(){
     var n = urlName();
@@ -270,6 +287,7 @@
   function start(appId, opt){
     ich = appId; kompakt = !!(opt && opt.kompakt);
     projektName = opt && typeof opt.projektName === 'function' ? opt.projektName : null;
+    version = opt && opt.version != null ? opt.version : null;
     var los = function(){
       aktualisieren();
       window.addEventListener('focus', aktualisieren);
@@ -284,5 +302,5 @@
   window.MosaikLeiste = { start: start, aktualisieren: aktualisieren };
 })();
 /* ===== Ende MOSAIK-LEISTE v1 ===== */
-window.MosaikLeiste.start('plan', {kompakt: true});   // PlanKit: Karte zuerst – schmalere Leiste, dafür niedrigere Kopfzeile
+window.MosaikLeiste.start('plan', {kompakt: true, version: () => (document.getElementById('app-version')?.textContent || '').replace(/^v/, '')});   // PlanKit: Karte zuerst – schmalere Leiste, dafür niedrigere Kopfzeile
 export {};
