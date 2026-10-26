@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.33.0 – 26. Oktober 2026
+
+- Hilfe-Links ins Handbuch (AidKit), immer im selben Fenster und direkt am Kapitel: in der Kurzanleitung („?“) oben „📘 Handbuch – PlanKit Schritt für Schritt“; in den Wandansichten „📘 Probenbezeichnung Bohrkerne“ und „📘 Bohrkerne Schritt für Schritt“. Nur Links.
+- Neuer Test „hilfe-links“: nur feste Handbuch-Adressen (AidKit `hilfe-anker.json`).
+
 ## 1.32.0 – 24. Oktober 2026
 
 - Pflichtangabe wie in Projektzentrale, FotoKit und LabelKit: Die Bezeichnung der Anlage (Anlage Probenahme, Raumbuch, Wandansichten) ist gelb mit „Pflicht“ markiert, solange sie fehlt oder nur „Anlage“ ohne Nummer lautet. Exportieren bleibt möglich.
