@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {readFile,access} from 'node:fs/promises';
 const src=await readFile(new URL('../src/main.ts',import.meta.url),'utf8');
-const FEST=['start','brandschaden','bohrkern-ablauf','app-projektzentrale','app-labelkit','app-fotokit','app-plankit','app-belegkit','app-spesenkit','app-datenarchiv','bohrkern','wischprobe','raumkuerzel'];
+const FEST=['start','brandschaden','bohrkern-ablauf','app-projektzentrale','app-labelkit','app-fotokit','app-resultkit','app-plankit','app-belegkit','app-spesenkit','app-datenarchiv','bohrkern','wischprobe','raumkuerzel'];
 const neben=new URL('../../aidkit/hilfe-anker.json',import.meta.url);
 let anker=FEST,mitListe=false;
 try{await access(neben);anker=Object.keys(JSON.parse(await readFile(neben,'utf8')).anker);mitListe=true;assert.deepEqual([...anker].sort(),[...FEST].sort(),'Liste hier = hilfe-anker.json in AidKit');}catch(e){if(e.code!=='ENOENT')throw e;}
