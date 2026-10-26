@@ -42,17 +42,24 @@ function skalenZusammen(datei, lokal, offen, erst){
   return { skalen: s, offen: o };
 }
 let skalenTimer = null, skalenWartend = [], skalenLaeuft = Promise.resolve();
+/** Nach dem Schreiben: Dateistand in die Arbeitskopie. Was während des Schreibens geändert wurde, bleibt lokal und offen –
+   erledigt sind nur hochgeladene Skalen, die seitdem unverändert sind. */
+function skalenNachHochladen(skalen, hochgeladen, lokalVorher){
+  const lokal = skLesen(SKALEN_LOKAL, {}), offen = skLesen(SKALEN_OFFEN, {}), rest = {};
+  for (const [k, v] of Object.entries(offen)) if (!(k in hochgeladen) || hochgeladen[k] !== v || JSON.stringify(lokal[k]) !== JSON.stringify(lokalVorher[k])) rest[k] = v;
+  skSchreiben(SKALEN_LOKAL, skalenZusammen(skalen, lokal, rest, false).skalen); skSchreiben(SKALEN_OFFEN, rest);
+}
 /** Datei schreiben, wenn Schreibrecht da ist (fragen = nach einem Klick nachfragen dürfen). true = geteilt. */
 function skalenHochladen(fragen){
   skalenLaeuft = skalenLaeuft.then(async () => {
     const a = await skalenArchiv('readwrite', fragen); if (!a) return false;
     try{
-      const d = await skalenDatei(a), z = skalenZusammen(d.skalen, skLesen(SKALEN_LOKAL, {}), skLesen(SKALEN_OFFEN, {}), localStorage.getItem(SKALEN_MERKER) !== '1');
+      const d = await skalenDatei(a), lokal = skLesen(SKALEN_LOKAL, {}), z = skalenZusammen(d.skalen, lokal, skLesen(SKALEN_OFFEN, {}), localStorage.getItem(SKALEN_MERKER) !== '1');
       if (!Object.keys(z.offen).length){ if (d.skalen) skSchreiben(SKALEN_LOKAL, z.skalen); return true; }
       const o = Object.assign({}, d.roh || {}, { format: 'spektron-skalen', version: 1, geaendert: new Date().toISOString(), skalen: z.skalen });
       const w = await (await a.getFileHandle(SKALEN_DATEI, { create: true })).createWritable();
       await w.write(JSON.stringify(o, null, 2)); await w.close();
-      skSchreiben(SKALEN_LOKAL, z.skalen); skSchreiben(SKALEN_OFFEN, {}); localStorage.setItem(SKALEN_MERKER, '1');
+      skalenNachHochladen(z.skalen, z.offen, lokal); localStorage.setItem(SKALEN_MERKER, '1');
       return true;
     }catch(e){ return false; }
   });

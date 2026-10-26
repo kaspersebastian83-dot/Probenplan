@@ -7,7 +7,7 @@ import {renderSheet,sheetLayout,vorlaeufigHinweis} from './sheet';
 import {drawPlanContent} from './export';
 import {clone,floorName,markerSize,sheetCount,sheetProject,type Project} from './model';
 import {hasValues,prepare,rateMarkers} from './results';
-import {vorlaeufigeBerichte,vorlaeufigText} from './lab-provenance';
+import {berichtQuellen,vorlaeufigeBerichte,vorlaeufigText} from './lab-provenance';
 import {fileInfo,fileRevision,findSubdir,listFiles,projectFileName,AUFTRAEGE,LABOR,PLAENE,type ProjectFolder} from './folder';
 
 export const ANNEX_DIR='Mitteilungen',ANNEX_LOG='_Anlagen-Protokoll.txt',FOTOS='Fotos',FOTOKIT_FILE='_Bildumbenenner.json';
@@ -106,7 +106,8 @@ export async function createAnnex(p:Project,folder:ProjectFolder|null,o:AnnexOpt
     const planFile=await fileInfo(folder.plaene,projectFileName(folder));
     sources.push(planFile?{role:'Lage, Proben, Messwerte (PlanKit)',name:`${PLAENE}/${projectFileName(folder)}`,stand:stand(planFile.lastModified),sha:(await fileRevision(planFile))||''}:{role:'PlanKit-Projekt',name:`${PLAENE}/${projectFileName(folder)}`,stand:'–',sha:'nicht gefunden'});
     const lab=await findSubdir(folder.dir,LABOR);
-    for(const r of project.labReports||[])for(const name of [r.sources.xml,r.sources.pdf].filter((x):x is string=>!!x))
+    // Nur Berichte, aus denen Proben im Projekt stammen (ersetzte vorläufige Berichte nicht), je Datei einmal
+    for(const {name,origin:r} of berichtQuellen(project))
       await hashSource(lab,LABOR,name,`Laborbericht ${r.bericht||''} ${r.labor?`(${r.labor})`:''}`.replace(/\s+/g,' ').trim(),sources,missing);
     const auftraege=await findSubdir(folder.dir,AUFTRAEGE),daten=auftraege?(await listFiles(auftraege,/_Daten\.json$/i))[0]:undefined;
     let bk:Map<string,string[]>|undefined;

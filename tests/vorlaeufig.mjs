@@ -11,7 +11,7 @@ registerHooks({
 });
 globalThis.localStorage={getItem:()=>null,setItem(){}};
 const {annexBlocks}=await import('../src/annex.ts');
-const {vorlaeufigText,vorlaeufigeBerichteAufPlan,vorlaeufigeBerichte}=await import('../src/lab-provenance.ts');
+const {vorlaeufigText,vorlaeufigeBerichteAufPlan,vorlaeufigeBerichte,berichtQuellen}=await import('../src/lab-provenance.ts');
 let n=0;const check=(name,fn)=>{fn();n++;console.log(`OK Vorläufig: ${name}`);};
 const text=bl=>bl.filter(b=>b.t==='p').map(b=>b.text).join('\n');
 const img={data:new Uint8Array([1]),ext:'png',widthPx:10,heightPx:10};
@@ -34,5 +34,18 @@ check('Planseite: nur Werte dieser Seite und des dargestellten Parameters (Revie
  assert.deepEqual(vorlaeufigeBerichteAufPlan(p,'BaP').map(r=>r.id),['vorl-bap']);
  assert.deepEqual(vorlaeufigeBerichteAufPlan({...p,markers:[M('P3','vorl-og','PAK')]},'PAK').map(r=>r.id),['vorl-og'],'OG-Seite');
  assert.ok(vorlaeufigeBerichte(p).some(r=>r.id==='vorl'),'projektweit (Dialoge, Prüfprotokoll) zählt auch Offenes');
+});
+check('Quellenverzeichnis der Anlage: nur verwendete Berichte, je Datei einmal (Review 1.38.0)',()=>{
+ const R=(id,xml,o={})=>({id,bericht:'AR-1',labor:'L',auftragsreferenz:'',sources:{xml,pdf:'AR-1.pdf'},...o});
+ const M=(id,rid)=>({id,kind:'sample',label:id,note:'',x:0,y:0,lx:0,ly:0,lab:{ref:id,desc:'',reportId:rid}});
+ // vorläufiger Bericht durch den endgültigen ersetzt (Datei nicht mehr im Ordner), endgültiger zweimal importiert
+ const p={labReports:[R('vorl','AR-1-vorlaeufig.xml',{vorlaeufig:true}),R('fin','AR-1.xml'),R('fin2','AR-1.xml'),R('lk',undefined)],markers:[M('P1','fin')],sheets:[{name:'EG'},{name:'OG',markers:[M('P2','fin2')]}],active:0,pending:[{reportId:'fin'}]};
+ p.labReports[3].sources={};
+ assert.deepEqual(berichtQuellen(p).map(q=>[q.name,q.origin.id]),[['AR-1.xml','fin'],['AR-1.pdf','fin']]);
+ assert.deepEqual(berichtQuellen({...p,markers:[],sheets:undefined,pending:[{reportId:'vorl'}]}).map(q=>q.name),['AR-1-vorlaeufig.xml','AR-1.pdf']);
+});
+check('Schadendatum „nicht bekannt“ aus der Projektzentrale (schadendatum: \'unbekannt\')',()=>{
+ const zeile=pd=>annexBlocks(input({projectData:pd})).filter(b=>b.t==='table').flatMap(b=>b.rows).map(r=>r.cells.map(c=>c.text)).find(c=>c[0]==='Schadendatum');
+ assert.deepEqual(zeile({schadendatum:'unbekannt'}),['Schadendatum','nicht bekannt']);assert.deepEqual(zeile({schadendatum:'2026-10-02'}),['Schadendatum','02.10.2026']);
 });
 console.log(`${n} Prüfungen „vorläufig“ bestanden`);

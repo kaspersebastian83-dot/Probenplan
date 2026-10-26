@@ -1,5 +1,12 @@
 # Änderungen
 
+## 1.38.0 – 26. Oktober 2026
+
+- „Alle Konflikte: Aktualisieren“ **ergänzt** jetzt wirklich Labordaten und Messwerte, statt sie zu ersetzen: Ein erneuter Import der LabelKit-Probenerfassung behält Messwerte, Labornummer und Prüfbericht. Steht eine Probe in zwei Prüfberichten (z. B. PAK in AR-1, Chlorid in AR-2), bleiben beide Werte. Derselbe Parameter in derselben Einheit wird ersetzt – der endgültige Bericht ersetzt also weiter die Werte des vorläufigen.
+- Gemeinsame Bewertungsskalen: Wird eine Skala geändert, während eine andere gerade in den Archivordner geschrieben wird, bleibt die Änderung erhalten und wird nachgereicht (vorher fiel sie auf den alten Stand zurück).
+- Anlage Probenahme: Im Herkunftsnachweis stehen nur noch die Prüfberichte, aus denen Proben im Projekt stammen, jede Datei einmal. Ersetzte vorläufige oder mehrfach importierte Berichte führen nicht mehr zur falschen Warnung „Laborbericht-Dateien nicht gefunden“.
+- Schadendatum „nicht bekannt“ aus der Projektzentrale erscheint in der Anlage als „nicht bekannt“.
+
 ## 1.37.1 – 26. Oktober 2026
 
 - Liefert das Labor denselben Parameter je Probe und je Fläche (Eurofins: „Chlorid (Cl)“ in µg/Probe und berechnet in mg/m²; die Reihenfolge in der XML wechselt von Probe zu Probe), nehmen Ergebniskarte, Raumbuch und Anlage immer den Wert je Fläche – wie ResultKit. Vorher konnte eine Probe mit dem Wert je Probe grau bleiben. Im Skalenbereich erscheint keine leere Skala mehr für „µg/Probe“.
