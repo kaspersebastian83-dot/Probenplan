@@ -1149,7 +1149,9 @@ function saveToFolder(explicit:boolean){
      if(choice==='Andere Fassung laden'){await reloadFromFolder();return;}
      if(choice==='Meine Fassung als Kopie sichern'){const copy=await writeProjectCopy(f,'Kopie',JSON.stringify(snapshot));await reloadFromFolder();toast(`Ihre Fassung liegt als „${copy}“ in „${PLAENE}“.`);return;}
      // Die Fassung des Kollegen wird gleich überschrieben: vorher dauerhaft sichern (nie automatisch gelöscht)
-     if(e.current)await writeProjectCopy(f,ERSETZEN_KOPIE,e.current);
+     // frisch lesen (eine File-Momentaufnahme wird ungültig, sobald die Datei erneut geändert wurde); hat sie sich inzwischen
+     // wieder geändert, fragt die nächste Runde ohnehin erneut – gesichert wird genau die Fassung, die überschrieben wird
+     {const cur=await fileInfo(f.plaene,projectFileName(f));if(cur&&await fileRevision(cur)===e.revision)await writeProjectCopy(f,ERSETZEN_KOPIE,await cur.text());}
      expected=e.revision; // If changed again while deciding, ask again; never silently overwrite it.
     }
    }

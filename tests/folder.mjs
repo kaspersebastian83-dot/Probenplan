@@ -104,6 +104,7 @@ try{
   await page.locator('#ask-dialog').waitFor({state:'visible'});assert.equal(JSON.parse(await fs(page,'read',[NAME,'Pläne'],FILE)).report,'External B');
   await page.locator('#ask-actions button',{hasText:'Meine Fassung übernehmen'}).click();await page.locator('#saved',{hasText:/^✓ In „Pläne“ gespeichert$/}).waitFor();assert.equal((await saved(page)).markers.length,2);
   const names=await fs(page,'list',[NAME,'Pläne']),backups=await Promise.all(names.filter(n=>n.includes('(vorher ')).map(n=>fs(page,'read',[NAME,'Pläne'],n)));assert.ok(backups.some(t=>JSON.parse(t).report==='External B'));
+  const dauerhaft=await Promise.all(names.filter(n=>n.includes('(Kopie vor dem Ersetzen ')).map(n=>fs(page,'read',[NAME,'Pläne'],n)));assert.ok(dauerhaft.some(t=>JSON.parse(t).report==='External B'),'überschriebene Fassung des Kollegen dauerhaft gesichert');
   assert.equal(JSON.parse(await fs(page,'read',[NAME],'_Projekt.json')).objekt,'Wohnhaus Musterstraße 1');
  });
  await check('Damaged primary is recovered only by explicit selection; its original bytes are backed up',async()=>{
