@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.37.0 – 26. Oktober 2026
+
+- **Chlorid wird bewertet** – wie in ResultKit und FotoKit: VdS 2357 nennt 5–10 µg/cm² als korrosionschemisch relevante Größenordnung. Ergebniskarte, Anlage und Wandansicht färben Chlorid grün (< 5 µg/cm²), amber (5 – < 10) und rot (≥ 10), unabhängig von der gewählten Nutzung. Ältere Berichte in mg/m² werden mit umgerechneten Grenzen bewertet (1 µg/cm² = 10 mg/m²).
+- Die Chlorid-Referenz lässt sich wie die PAK-Referenz im Projekt anpassen („Angepasst aus …“) und zurücksetzen.
+
 ## 1.36.0 – 26. Oktober 2026
 
 - Laborergebnisse im Projekt kommen aus **ResultKit**: „Proben übernehmen …“ zeigt jeden dort geprüften und übernommenen Prüfbericht (`Laborergebnisse/_Ergebnisse.json`) zur Auswahl – mit „vorläufig“ und „bereits im Plan“. Danach die gewohnte Prüftabelle, „Alle Konflikte: Aktualisieren“ ergänzt die LabelKit-Proben um Labordaten und Messwerte.
