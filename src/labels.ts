@@ -14,6 +14,8 @@ export type Shown = Marker & {auto?:boolean;box?:ValueBox};
 
 export const autoLabels=(plan:Plan)=>plan.autoLabels!==false;
 export const valueLabels=(plan:Plan)=>plan.valueLabels===true;
+/** Oberflächenart (Untersicht/Ansicht/Aufsicht) als Balken an Probenstelle bzw. Schild – Standard an, je Plan abschaltbar. */
+export const surfaceBars=(plan:Plan)=>plan.surfaceBars!==false;
 const pinned=(m:Marker)=>Math.hypot(m.x-m.lx,m.y-m.ly)>.01;
 
 /* ---------- Tinte: wo der Plan selbst Text, Wände, Schraffur hat ---------- */
@@ -97,7 +99,7 @@ let cache:{key:string;out:Shown[]}|null=null;
 export function labeled(p:Project,rated?:Rated|null):Project{
   const auto=autoLabels(p.plan),values=!!rated&&valueLabels(p.plan);
   if(!auto&&!values)return p;
-  const key=[auto,values,markerSize(p),inkReady(p.plan)?inkKey(p.plan):'-',p.plan.width,p.plan.height,rated?.parameter||'',
+  const key=[auto,values,surfaceBars(p.plan),markerSize(p),inkReady(p.plan)?inkKey(p.plan):'-',p.plan.width,p.plan.height,rated?.parameter||'',
     ...p.markers.map(m=>`${m.id}|${m.label}|${m.x}|${m.y}|${m.lx}|${m.ly}|${m.shape||''}|${m.kind}|${m.surface||''}|${values?`${rated!.fill.get(m.id)}|${valueOf(m,rated!.parameter)?.r||''}|${categoryOf(rated!,m.label)}`:''}`)].join(';');
   if(cache?.key===key)return {...p,markers:cache.out};
   const out=place(p,auto,values?rated!:null,inks.get(inkKey(p.plan))||null);
@@ -107,7 +109,7 @@ function place(p:Project,auto:boolean,rated:Rated|null,ink:Ink|null):Shown[]{
   const r=markerSize(p),shown:Shown[]=p.markers.map(m=>{const b=rated?box(p,m,rated):undefined;return b?{...m,box:b}:{...m};});
   const rects=new Map<string,R>(),leaders:number[][]=[];
   const rectAt=(m:Shown,x:number,y:number):R=>{const {hw,hh}=half(p,m);return {x0:x-hw,y0:y-hh,x1:x+hw,y1:y+hh};};
-  const points=shown.map(m=>({id:m.id,x:m.x,y:m.y,rad:m.kind==='fire'?r*1.4:m.surface?r*1.05:r*.55}));   // Flächenbalken braucht Platz
+  const points=shown.map(m=>({id:m.id,x:m.x,y:m.y,rad:m.kind==='fire'?r*1.4:m.surface&&surfaceBars(p.plan)?r*1.05:r*.55}));   // Flächenbalken braucht Platz
   // Feste Schilder zuerst: von Hand versetzte, Brandherde, und alles ohne Automatik
   const free:Shown[]=[];
   for(const m of shown){
@@ -175,13 +177,13 @@ export function shownSVG(p:Project,m:Shown,selected=false,minSize=0,fill?:string
 }
 /** Oberflächenart an der Probenstelle (Wertkästchen): Balken oben/links/unten am farbigen Punkt. */
 function pointBar(p:Project,m:Shown,pr:number,c:string){
-  if(m.kind!=='sample'||!m.surface||m.surface==='other')return '';
+  if(m.kind!=='sample'||!m.surface||m.surface==='other'||!surfaceBars(p.plan))return '';
   const t=pr*.5,box:Record<Exclude<Surface,'other'>,[number,number,number,number]>={ceiling:[m.x-pr,m.y-pr-t*1.6,pr*2,t],floor:[m.x-pr,m.y+pr+t*.6,pr*2,t],wall:[m.x-pr-t*1.6,m.y-pr,t,pr*2]};
   const [x,y,w,h]=box[m.surface];return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${t*.3}" fill="${c}" stroke="#ffffff" stroke-width="${t*.4}" paint-order="stroke" pointer-events="none"/>`;
 }
 /** Oberflächenart am Schild: Balken oben (Untersicht), links (Ansicht), unten (Aufsicht). */
 function surfaceBar(p:Project,m:Shown,minSize=0,fill?:string){
-  if(m.kind!=='sample'||!m.surface||m.surface==='other')return '';
+  if(m.kind!=='sample'||!m.surface||m.surface==='other'||!surfaceBars(p.plan))return '';
   const r=Math.max(markerSize(p),minSize),k=r/markerSize(p),{hw,hh}=half(p,m),w=hw*k,h=hh*k,t=r*.3,c=fill||'#17665e';
   const box:Record<Exclude<Surface,'other'>,[number,number,number,number]>={ceiling:[m.lx-w*.75,m.ly-h-t*1.1,w*1.5,t],floor:[m.lx-w*.75,m.ly+h+t*.1,w*1.5,t],wall:[m.lx-w-t*1.1,m.ly-h*.75,t,h*1.5]};
   const [x,y,bw,bh]=box[m.surface];return `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="${t*.3}" fill="${c}" stroke="#ffffff" stroke-width="${t*.35}" paint-order="stroke" pointer-events="none"/>`;

@@ -6,7 +6,7 @@ import './style.css';
 import './theme.css';
 import './layout.css';
 import './suite-bar';
-import {labeled,shownSVG,ensureInk,inkTried,autoLabels,valueLabels,type Shown} from './labels';
+import {labeled,shownSVG,ensureInk,inkTried,autoLabels,valueLabels,surfaceBars,type Shown} from './labels';
 import {addMarker,addSheet,bounds,clone,createProject,escape,floorName,History,markerScale,markerSize,markerSVG,MARKER_SCALE,metersPerUnit,northAngle,stepMarkerScale,moveSheet,removeSheet,renameSheet,sheetCount,sheetProject,switchSheet,validLabel,MAX_SHEETS,shapeOf,typeOf,typeFromArt,SHAPES,type Shape,type Project,type Marker,trialOn,SURFACES,type Surface,allMarkers,MAX_RAUM,RAUM_STATUS,type RaumStatus} from './model';
 import {raumbuchStand,setEintrag,addRaum,removeRaum,mergeRaum,pruefhinweise,raumbuchBlocks,raumbuchCSV,raumbuchName,STATUS_TEXT,FOOTNOTE_MENGEN,type RaumZeile,type RaumbuchStand} from './raumbuch';
 import {build as buildDocx} from './docx';
@@ -783,7 +783,7 @@ document.querySelector('.panel-scroll')!.insertAdjacentHTML('afterbegin','<secti
 let sizeUndoAt=0,sizeTimer=0;
 // ---- Beschriftung (ab 1.19) ----
 // Schilder automatisch platzieren und Messwerte am Plan: je Plan schaltbar, gespeichert im Plan (nur Abweichungen vom Standard).
-document.getElementById('size-section')!.insertAdjacentHTML('afterend','<section class="size-section" id="label-section" hidden><div class="section-heading"><h2>Beschriftung</h2></div><label class="check-row"><input type="checkbox" id="auto-labels"> Schilder automatisch platzieren</label><p class="tiny">Die Probenstelle bleibt exakt; nur das Schild weicht Text, Linien und anderen Schildern aus (mit Hinweislinie). Von Hand gezogene Schilder bleiben, wo sie sind.</p><label class="check-row"><input type="checkbox" id="value-labels"> Messwerte am Plan</label><p class="tiny" id="value-labels-note">In der Ergebniskarte: Wertkästchen je Probe mit Wert wie im Prüfbericht, Einheit und Kategorie.</p><div class="size-row"><button id="labels-reset" class="tb" title="Alle von Hand versetzten Schilder dieses Plans wieder automatisch platzieren">Schilder neu anordnen</button></div></section>');
+document.getElementById('size-section')!.insertAdjacentHTML('afterend','<section class="size-section" id="label-section" hidden><div class="section-heading"><h2>Beschriftung</h2></div><label class="check-row"><input type="checkbox" id="auto-labels"> Schilder automatisch platzieren</label><p class="tiny">Die Probenstelle bleibt exakt; nur das Schild weicht Text, Linien und anderen Schildern aus (mit Hinweislinie). Von Hand gezogene Schilder bleiben, wo sie sind.</p><label class="check-row"><input type="checkbox" id="surface-bars"> Oberflächenart am Plan</label><p class="tiny">Balken an der Probenstelle: oben Untersicht, links Ansicht, unten Aufsicht – auch in Legende und Export.</p><label class="check-row"><input type="checkbox" id="value-labels"> Messwerte am Plan</label><p class="tiny" id="value-labels-note">In der Ergebniskarte: Wertkästchen je Probe mit Wert wie im Prüfbericht, Einheit und Kategorie.</p><div class="size-row"><button id="labels-reset" class="tb" title="Alle von Hand versetzten Schilder dieses Plans wieder automatisch platzieren">Schilder neu anordnen</button></div></section>');
 /** Die Oberflächenart (früher Testfunktion „Probenfläche“) ist seit 1.23 Standard; weitere Testfunktionen gibt es derzeit nicht. */
 function updateTrialUI(){}
 /* ---------- Raumbuch (ab 1.24) ----------
@@ -934,14 +934,15 @@ async function wandExport(kind:'docx'|'csv'){
 }
 $('wand-word').onclick=()=>void wandExport('docx');
 $('wand-csv').onclick=()=>void wandExport('csv');
-function updateLabelUI(){const s=$('label-section');s.hidden=!project;if(!project)return;input('auto-labels').checked=autoLabels(project.plan);input('value-labels').checked=valueLabels(project.plan);
+function updateLabelUI(){const s=$('label-section');s.hidden=!project;if(!project)return;input('auto-labels').checked=autoLabels(project.plan);input('value-labels').checked=valueLabels(project.plan);input('surface-bars').checked=surfaceBars(project.plan);
   const manual=project.markers.filter(m=>m.kind==='sample'&&Math.hypot(m.x-m.lx,m.y-m.ly)>.01).length;$<HTMLButtonElement>('labels-reset').disabled=!manual;$('labels-reset').textContent=manual?`Schilder neu anordnen (${manual} von Hand)`:'Schilder neu anordnen';
   $('value-labels-note').textContent=hasValues(project)?'In der Ergebniskarte: Wertkästchen je Probe mit Wert wie im Prüfbericht, Einheit und Kategorie.':'Erst nach dem Import von Messwerten sichtbar (Ergebniskarte).';}
-function setLabelOption(kind:'auto'|'values',on:boolean){if(!project||cropping)return;
-  mutate(p=>{if(kind==='auto'){if(on)delete p.plan.autoLabels;else p.plan.autoLabels=false;}else{if(on)p.plan.valueLabels=true;else delete p.plan.valueLabels;}});
+function setLabelOption(kind:'auto'|'values'|'surface',on:boolean){if(!project||cropping)return;
+  mutate(p=>{if(kind==='surface'){if(on)delete p.plan.surfaceBars;else p.plan.surfaceBars=false;}else if(kind==='auto'){if(on)delete p.plan.autoLabels;else p.plan.autoLabels=false;}else{if(on)p.plan.valueLabels=true;else delete p.plan.valueLabels;}});
   if(kind==='values'&&on&&!showResults&&hasValues(project))toast('Messwerte erscheinen in der Ergebniskarte („Ergebnisse“, Taste K) und im Export „Ergebniskarte“.');}
 input('auto-labels').onchange=()=>setLabelOption('auto',input('auto-labels').checked);
 input('value-labels').onchange=()=>setLabelOption('values',input('value-labels').checked);
+input('surface-bars').onchange=()=>setLabelOption('surface',input('surface-bars').checked);
 input('values-export').onchange=()=>setLabelOption('values',input('values-export').checked);
 $('labels-reset').onclick=()=>{if(!project)return;const n=project.markers.filter(m=>m.kind==='sample'&&Math.hypot(m.x-m.lx,m.y-m.ly)>.01).length;if(!n)return;
   mutate(p=>{for(const m of p.markers)if(m.kind==='sample'){m.lx=m.x;m.ly=m.y;}});toast(`${n} Schild${n===1?'':'er'} wieder automatisch platziert. Rückgängig mit Strg+Z.`);};

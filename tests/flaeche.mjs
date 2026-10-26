@@ -38,6 +38,14 @@ for(const engine of engines){
    const [ce,wa,fl]=pts.map(([x,y])=>b.find(r=>Math.hypot(r.x-x,r.y-y)<80));
    assert.ok(ce&&ce.y<pts[0][1]&&ce.w>ce.h,'Untersicht: waagerechter Balken oben');assert.ok(wa&&wa.x<pts[1][0]&&wa.h>wa.w,'Ansicht: senkrechter Balken links');assert.ok(fl&&fl.y>pts[2][1]&&fl.w>fl.h,'Aufsicht: waagerechter Balken unten');
   });
+  await check(`${engine}: Balken standardmäßig an, je Plan abschaltbar (Beschriftung → „Oberflächenart am Plan“)`,async()=>{
+   const setze=on=>page.locator('#surface-bars').evaluate((el,on)=>{el.checked=on;el.dispatchEvent(new Event('change',{bubbles:true}));},on);
+   assert.equal(await page.locator('#surface-bars').isChecked(),true,'Standard: an');
+   await setze(false);await page.waitForFunction(()=>![...document.querySelectorAll('#marks rect[pointer-events="none"][rx]')].some(r=>r.getAttribute('stroke')==='#ffffff'));
+   let s=await savedProject(page);assert.equal(s.plan.surfaceBars,false);assert.deepEqual(s.markers.map(m=>m.surface),['ceiling','wall','floor'],'Oberflächenart bleibt an den Proben');
+   await setze(true);await page.waitForFunction(()=>[...document.querySelectorAll('#marks rect[pointer-events="none"][rx]')].filter(r=>r.getAttribute('stroke')==='#ffffff').length===3);
+   s=await savedProject(page);assert.equal(s.plan.surfaceBars,undefined,'an = Standard, nichts gespeichert');
+  });
   await check(`${engine}: Wertkästchen nennt die Oberflächenart`,async()=>{
    await blur(page);await page.keyboard.press('v');await page.locator('#value-labels').check();await page.locator('#results-toggle').click();
    await page.locator('#marks text',{hasText:'Untersicht · hoch'}).waitFor();assert.ok((await page.locator('#marks').textContent()).includes('Ansicht · gering'));

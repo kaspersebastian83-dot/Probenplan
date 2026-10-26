@@ -50,7 +50,7 @@ export interface Area { id:string; label:string; name:string; color:string; opac
 export interface Preparation { sourceWidth:number; sourceHeight:number; rotation:0|90|180|270; crop:Rect; angle?:number }
 /** Maßstab je Plan: eine gemessene Strecke in Planeinheiten und ihre wahre Länge in Metern. Drehen/Zuschneiden ändern die Einheit nicht. */
 export interface Calibration { units:number; meters:number }
-export interface Plan { name: string; width: number; height: number; data: string; vector: boolean; markerScale?:number; autoLabels?:false; valueLabels?:true; sketch?:Sketch; calibration?:Calibration; north?:number; preparation?:Preparation; pdf?:{page:number; totalPages:number; renderLongSide:number} }
+export interface Plan { name: string; width: number; height: number; data: string; vector: boolean; markerScale?:number; autoLabels?:false; valueLabels?:true; /** Oberflächenart als Balken am Plan (Standard an; gespeichert nur „aus“) */surfaceBars?:false; sketch?:Sketch; calibration?:Calibration; north?:number; preparation?:Preparation; pdf?:{page:number; totalPages:number; renderLongSide:number} }
 // Mehrere Pläne (Geschosse) ab Format 5: Der aktive Plan steht wie bisher in plan/markers/areas,
 // in sheets[active] nur Kennung und Name. Alle anderen Pläne liegen vollständig in sheets.
 export interface Sheet { id:string; name:string; plan?:Plan; markers?:Marker[]; areas?:Area[] }

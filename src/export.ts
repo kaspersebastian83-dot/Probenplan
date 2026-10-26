@@ -30,7 +30,7 @@ function legendBlocks(p:Project,rated?:Rated|null){
     if(rated.unrated.length)blocks.push({name:'Ohne Bewertung',variants:[{color:UNRATED,opacity:1,outline:'#1d2a33',dash:[],round:true,text:`${rated.unrated.join(', ')} – kein Wert für ${shortParameter(rated.parameter)} oder keine anwendbare Skala / Zahl nicht eindeutig`}]});
   }
   const ml=markerLegend(p);if(ml)blocks.push(ml);
-  {const used=(['ceiling','wall','floor'] as Surface[]).map(s=>({s,labels:p.markers.filter(m=>m.kind==='sample'&&m.surface===s).map(m=>m.label)})).filter(x=>x.labels.length);
+  if(p.plan.surfaceBars!==false){const used=(['ceiling','wall','floor'] as Surface[]).map(s=>({s,labels:p.markers.filter(m=>m.kind==='sample'&&m.surface===s).map(m=>m.label)})).filter(x=>x.labels.length);
     if(used.length)blocks.push({name:'Oberflächenart',variants:used.map(x=>({color:'#5b6773',opacity:1,outline:'#5b6773',dash:[],round:true,surface:x.s,text:`${SURFACE_NAMES[x.s]}: ${x.labels.sort((a,b)=>a.localeCompare(b,'de',{numeric:true})).join(', ')}`}))});}
   for(const c of areaCategories(p.areas||[]))blocks.push({name:c.name,variants:c.variants.map(v=>{const pal=palette(v.color);return {color:v.color,opacity:v.opacity,outline:pal.outline,dash:pal.dash,round:false,text:`${v.labels.join(', ')} · ${Math.round(v.opacity*100)} %`};})});
   return blocks;

@@ -61,7 +61,7 @@ function dataURL(svg:string){const bytes=new TextEncoder().encode(svg);let bin='
 /** Plan aus der Skizze; Einstellungen des bisherigen Plans (Punktgröße, Beschriftung, Norden) bleiben. Maßstab 1 m = 100 Einheiten. */
 export function sketchPlan(s:Sketch,keep?:Plan):Plan{
   return {name:keep?.name||'Skizze',width:s.width,height:s.height,data:dataURL(sketchSVG(s)),vector:true,sketch:cloneSketch(s),calibration:{units:100,meters:1},
-    ...(keep?.markerScale!==undefined?{markerScale:keep.markerScale}:{}),...(keep?.autoLabels!==undefined?{autoLabels:keep.autoLabels}:{}),...(keep?.valueLabels!==undefined?{valueLabels:keep.valueLabels}:{}),...(keep?.north!==undefined?{north:keep.north}:{})};
+    ...(keep?.markerScale!==undefined?{markerScale:keep.markerScale}:{}),...(keep?.autoLabels!==undefined?{autoLabels:keep.autoLabels}:{}),...(keep?.valueLabels!==undefined?{valueLabels:keep.valueLabels}:{}),...(keep?.surfaceBars!==undefined?{surfaceBars:keep.surfaceBars}:{}),...(keep?.north!==undefined?{north:keep.north}:{})};
 }
 
 /* ---------- Räume ---------- */
