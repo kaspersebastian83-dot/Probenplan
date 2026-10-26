@@ -1,6 +1,6 @@
 # PlanKit (früher Probenplan)
 
-Aktuelle Version **1.35.0** – alle Änderungen in `CHANGELOG.md`. Schritt für Schritt mit Übungen im [Handbuch](https://kaspersebastian83-dot.github.io/aidkit/#app-plankit). Schritt ③ der Büro-App-Suite **Spektron** (Projektzentrale, LabelKit, FotoKit, PlanKit, BelegKit, SpesenKit; Übersicht im [README der Projektzentrale](https://github.com/kaspersebastian83-dot/Projektzentrale#readme)).
+Aktuelle Version **1.36.0** – alle Änderungen in `CHANGELOG.md`. Schritt für Schritt mit Übungen im [Handbuch](https://kaspersebastian83-dot.github.io/aidkit/#app-plankit). Schritt ③ der Büro-App-Suite **Spektron** (Projektzentrale, LabelKit, FotoKit, PlanKit, BelegKit, SpesenKit; Übersicht im [README der Projektzentrale](https://github.com/kaspersebastian83-dot/Projektzentrale#readme)).
 
 PlanKit gehört zur Familie von LabelKit und FotoKit und sieht genauso aus. Webadresse, Repository, Startdatei und das Dateiformat `.probenplan` behalten den bisherigen Namen – bestehende Projekte, Lesezeichen und installierte Apps funktionieren unverändert weiter.
 
@@ -101,6 +101,8 @@ Die **Liste** rechts (Markierungen, Laborproben, Schadensflächen mit den Detail
 Die SVG wird beim Export neu gerendert. Eingebettete Schriften und Rasterbilder bleiben erhalten. Eine PNG-/JPG-Vorlage bleibt dagegen eine Rastervorlage; höhere Ausgabeauflösung ergänzt dort keine Details. Beide Formate haben einen weißen Hintergrund, JPG verwendet hohe Qualität. Die Legende unterscheidet runde Probenmarker und rautenförmige Brandherdmarker auch ohne Farbe. **Notizen werden nur im Projekt gespeichert, nicht im Bild abgedruckt.**
 
 ### Proben übernehmen (Laborbericht oder LabelKit)
+
+**Im Projektordner (ab 1.36)** kommen Messwerte nur noch aus **ResultKit**: Laborberichte dort importieren, prüfen und „Ergebnisse übernehmen“; PlanKit bietet unter „Proben übernehmen …“ dann jeden Prüfbericht aus `Laborergebnisse/_Ergebnisse.json` an (gleiche Prüftabelle wie bisher). XML/PDF direkt nur noch bei einem freien Plan ohne Projektordner.
 
 Zuerst einen Grundriss laden. **„Proben übernehmen …“** akzeptiert die LabelKit-Probenerfassung (`…_Daten.json`, Proben vorab ohne Messwerte) sowie eine Eurofins-XML, eine PDF oder beide gemeinsam; Dateien lassen sich auch auf die App ziehen. XML ist die bevorzugte Quelle. Eine Prüftabelle zeigt P-Nummer, Referenz, Beschreibung, Probenart, Labor-Nr. und Probenahmedatum. Alle Texte sind bearbeitbar; Zeilen können hinzugefügt, entfernt und mit ↑/↓ sortiert werden. Änderungen werden erst mit **„Übernehmen“** ins Projekt geschrieben. Bei unbekannten Referenzen die P-Nummer ergänzen. Mengenabweichungen, Referenz-/Beschreibungsunterschiede und eine abweichende Gutachtennummer erscheinen als Warnungen. Zusätzliche PDF-Proben fehlen nicht stillschweigend, sondern bleiben zur Prüfung erhalten. Doppelte P-Nummern verhindern die Übernahme, bis sie korrigiert sind.
 

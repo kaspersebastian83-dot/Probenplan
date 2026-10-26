@@ -19,3 +19,7 @@
 .hilfe-link{font-size:12px;font-weight:600;color:var(--accent,#2f6fbf);text-decoration:none;border:1px solid var(--line,#d6dee6);border-radius:999px;padding:3px 10px;background:var(--panel,#fff);white-space:nowrap}
 .hilfe-link:hover,.hilfe-link:focus-visible{border-color:var(--accent,#2f6fbf);text-decoration:underline}
 @media print{.hilfe-verweis{display:none!important}}
+/* Laborergebnisse aus ResultKit im Dialog „Proben übernehmen“ */
+.lab-resultkit{font-size:12px;margin:14px 0 4px;padding:8px 10px;border-radius:6px;background:#f3f1f8;color:#4a3f63}
+.lab-resultkit.warn{background:#fff4dc;color:#6b4d00}
+.lab-resultkit-link{margin:12px 0 0}

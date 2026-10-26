@@ -4,7 +4,7 @@ import {applyLabImport,originFromReport,projectLabRows,sourceFilename,sourceText
 import {copyLab,validLab} from './import';
 import {blankReport,readLabFiles,reportWarnings,type LabReport} from './labreport';
 import {download} from './storage';
-interface Hooks {project:()=>Project|null;labelkitProject:()=>string|null;blocked:()=>boolean;busy:(value:boolean)=>void;mutate:(fn:(p:Project)=>void)=>void;point:(e:{clientX:number;clientY:number})=>Point;mode:(mode:string)=>void;error:(e:unknown)=>void;selected:(id:string)=>void}
+interface Hooks {project:()=>Project|null;labelkitProject:()=>string|null;/** Im Projektordner: Laborberichte kommen aus ResultKit */resultkit?:()=>string|null;blocked:()=>boolean;busy:(value:boolean)=>void;mutate:(fn:(p:Project)=>void)=>void;point:(e:{clientX:number;clientY:number})=>Point;mode:(mode:string)=>void;error:(e:unknown)=>void;selected:(id:string)=>void}
 const el=<K extends keyof HTMLElementTagNameMap>(tag:K,text='')=>{const e=document.createElement(tag);e.textContent=text;return e;};
 const button=(text:string,fn:()=>void)=>{const b=el('button',text);b.type='button';b.onclick=fn;return b;};
 const shapeSelect=(value:string,placeholder?:string)=>{const s=el('select');if(placeholder)s.append(new Option(placeholder,''));for(const f of SHAPES)s.append(new Option(`${SHAPE_SYMBOL[f]} ${SHAPE_NAMES[f]}`,f));s.value=value;return s;};
@@ -42,6 +42,7 @@ export class LabUI {
   if(this.review.open){this.hooks.error(Error('Bitte die aktuelle Laborprüfung zuerst übernehmen oder abbrechen.'));return;}
   this.loading=true;this.hooks.busy(true);this.open.textContent='Bericht wird gelesen …';
   try{
+   if(this.hooks.resultkit?.()&&files.some(f=>/\.(xml|pdf)$/i.test(f.name)))throw Error('Laborberichte werden im Projekt in ResultKit importiert und geprüft (Spektron-Leiste ③ ResultKit). Danach hier „Proben übernehmen …“ und den Prüfbericht wählen.');
    const json=files.find(f=>/\.json$/i.test(f.name));
    if(json&&files.length>1)throw Error('Die LabelKit-Probenerfassung (JSON) bitte einzeln übernehmen – nicht zusammen mit einem Laborbericht.');
    if(json){
