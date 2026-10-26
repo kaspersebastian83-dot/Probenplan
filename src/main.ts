@@ -1240,6 +1240,8 @@ $('lab-import').onclick=async()=>{
    const stand=await Promise.all([...files.map(async f=>({name:f.name,file:await f.handle.getFile()})),...(erfassungen[0]?[{name:`${AUFTRAEGE}/${erfassungen[0].name}`,file:await erfassungen[0].handle.getFile()}]:[])]);
    veraltet=ergebnisse.stand!==standKennung(stand.map(x=>({name:x.name,size:x.file.size,t:x.file.lastModified})));}}catch(e){ergebnisFehler=e instanceof Error?e.message:String(e);}
   if(folder!==target)return;
+  // Datei aus einem anderen Projekt (kopiert oder liegen geblieben): nichts davon anbieten.
+  if(ergebnisse&&ergebnisse.projekt&&ergebnisse.projekt!==target.nr){ergebnisFehler=`„${ERGEBNIS_DATEI}“ gehört zu Projekt ${ergebnisse.projekt}, geöffnet ist ${target.nr}. Bitte in ResultKit im richtigen Projekt übernehmen.`;ergebnisse=null;}
   const entries=ergebnisse?.berichte||[],im=new Set((project.labReports||[]).map(r=>`${r.bericht}|${r.vorlaeufig?1:0}`));
   const resultkit=`../resultkit/#projekt=${encodeURIComponent(target.name)}`;
   const stand=ergebnisFehler?`<p class="lab-resultkit warn">${escape(ergebnisFehler)}</p>`:!ergebnisse?`<p class="lab-resultkit${files.length?' warn':''}">${files.length?`In „${escape(LABOR)}“ liegen Prüfberichte, die noch nicht in ResultKit geprüft und übernommen sind.`:'Noch keine Laborergebnisse aus ResultKit.'} Laborberichte werden in ResultKit importiert und geprüft – danach stehen sie hier zur Auswahl.</p>`

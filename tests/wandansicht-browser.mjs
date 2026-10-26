@@ -48,6 +48,9 @@ try{
  await dlg.locator('button.close').click();
  await page.locator('#lab-files').setInputFiles({name:'AR-1.xml',mimeType:'application/xml',buffer:Buffer.from(labXML(rows))});
  await page.locator('#toast.error',{hasText:'in ResultKit importiert'}).waitFor();assert.equal(await page.locator('#lab-review').isVisible(),false);
+ // Ergebnisdatei eines anderen Projekts wird nicht angeboten
+ await page.evaluate(async([name,erg])=>{const d=await (await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Mosaik Archivordner')).getDirectoryHandle(name)).getDirectoryHandle('Laborergebnisse');const w=await (await d.getFileHandle('_Ergebnisse.json')).createWritable();await w.write(erg);await w.close();},[NAME,labErgebnisse(rows,{projekt:'26.9999'})]);
+ await page.locator('#lab-import').click();await dlg.locator('.lab-resultkit.warn',{hasText:'gehört zu Projekt 26.9999'}).waitFor();assert.equal(await dlg.locator('[data-ergebnis]').count(),0);await dlg.locator('button.close').click();
  await page.locator('#results-toggle').click();await page.locator('#result-vorlaeufig:not([hidden])').waitFor();assert.match(await page.locator('#result-vorlaeufig').textContent(),/vorläufigem Prüfbericht AR-999/);await page.locator('#results-toggle').click();
 
  await check('Dialog: Kerne aus LabelKit, MKW C10–C40 vorgeschlagen, Vorschau je Fläche, Hinweise',async()=>{

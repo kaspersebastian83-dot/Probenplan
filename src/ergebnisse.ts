@@ -23,7 +23,7 @@ export function liesErgebnisse(inhalt:string):Ergebnisse{
   const proben=(Array.isArray(b.proben)?b.proben:[]).filter(obj).slice(0,1000).map((p):LabSample=>({label:text(p.label,12),ref:text(p.ref,160),desc:text(p.desc),
    ...(p.art?{art:text(p.art,160)}:{}),...(p.labNr?{labNr:text(p.labNr,160)}:{}),...(p.datum?{datum:text(p.datum,10)}:{}),...(p.typ?{typ:text(p.typ,40)}:{}),
    ...(Array.isArray(p.werte)?{werte:p.werte.filter(obj).slice(0,300).map(w=>({p:text(w.p,200),r:text(w.r,40),u:text(w.u,40)}))}:{})}));
-  return {id:text(b.id,80)||`b${i+1}`,bericht:text(b.bericht,160),labor:text(b.labor,160),auftragsreferenz:text(b.auftragsreferenz,160),...(b.batch?{batch:text(b.batch,160)}:{}),
+  return {id:text(b.id,80)||`b${i+1}`,bericht:text(b.bericht,160),labor:text(b.labor,500),auftragsreferenz:text(b.auftragsreferenz,2000),...(b.batch?{batch:text(b.batch,160)}:{}),
    sources:{...(sources.xml?{xml:text(sources.xml,255)}:{}),...(sources.pdf?{pdf:text(sources.pdf,255)}:{})},...(b.vorlaeufig===true?{vorlaeufig:true as const}:{}),proben};});
  return {projekt:text(v.projekt,20),uebernommen:text(v.uebernommen,40),vollstaendig:v.vollstaendig===true,stand:text(v.stand,1e6),berichte,offen:Array.isArray(v.offen)?v.offen.map(x=>text(x,160)):[]};
 }
