@@ -26,7 +26,8 @@ export interface AnnexInput {
 
 const W=9070;   // Textbreite in twips (A4, Ränder 25 mm)
 const t=(v:unknown)=>v==null?'':String(v).trim();
-const deDate=(v:string)=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(t(v));return m?`${m[3]}.${m[2]}.${m[1]}`:t(v);};
+// Projektzentrale: Schadendatum „nicht bekannt“ wird als 'unbekannt' gespeichert – nie als Datum lesen.
+const deDate=(v:string)=>{if(t(v)==='unbekannt')return 'nicht bekannt';const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(t(v));return m?`${m[3]}.${m[2]}.${m[1]}`:t(v);};
 const clock=(iso:string)=>{const d=new Date(iso);if(isNaN(+d))return iso;const z=(n:number)=>String(n).padStart(2,'0');return `${z(d.getDate())}.${z(d.getMonth()+1)}.${d.getFullYear()} ${z(d.getHours())}:${z(d.getMinutes())} Uhr`;};
 const order=(a:string,b:string)=>a.localeCompare(b,'de',{numeric:true});
 /** „P1, p 2; Probe 3“ → ['P1','P2','P3'] (wie FotoKit). Bohrkern-IDs („EG-WZ-B-7“, „EG-WZ-B-7-T2“) über die

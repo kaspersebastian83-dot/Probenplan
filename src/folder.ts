@@ -136,7 +136,7 @@ export async function saveFolderProject(f:ProjectFolder,text:string,expected:str
 }
 
 /** Keep the "Pläne" folder tidy: of the automatic copies ("(vorher …)" and "(Speicherkandidat …)") only the
- * newest KEEP_RECENT of each kind stay. Recovery files, manual copies and names without a readable time stay untouched. */
+ * newest KEEP_RECENT of each kind stay. "(Kopie vor dem Ersetzen …)" (before a plan is replaced), recovery files, manual copies and names without a readable time stay untouched. */
 export const KEEP_RECENT=5;
 export async function pruneBackups(f:ProjectFolder){
  try{

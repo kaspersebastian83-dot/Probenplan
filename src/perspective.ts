@@ -93,7 +93,7 @@ export async function warpImage(plan:Plan,q:Quad,size:{width:number;height:numbe
 /** Projekt auf den entzerrten Plan umstellen: Plan ersetzen, Markierungen/Flächen umrechnen, Maßstab und Norden entfernen. */
 export function perspectiveProject(project:Project,q:Quad,image:{data:string;width:number;height:number}){
   const h=homography(q,rect(image.width,image.height)),clamp=(v:number,max:number)=>Math.min(max,Math.max(0,v));
-  const old=project.plan,plan:Plan={name:old.name,width:image.width,height:image.height,data:image.data,vector:false,...(old.markerScale!==undefined?{markerScale:old.markerScale}:{}),...(old.autoLabels!==undefined?{autoLabels:old.autoLabels}:{}),...(old.valueLabels!==undefined?{valueLabels:old.valueLabels}:{})};
+  const old=project.plan,plan:Plan={name:old.name,width:image.width,height:image.height,data:image.data,vector:false,...(old.markerScale!==undefined?{markerScale:old.markerScale}:{}),...(old.autoLabels!==undefined?{autoLabels:old.autoLabels}:{}),...(old.valueLabels!==undefined?{valueLabels:old.valueLabels}:{}),...(old.surfaceBars!==undefined?{surfaceBars:old.surfaceBars}:{})};
   const lost={calibration:!!old.calibration,north:old.north!==undefined};
   project.plan=plan;
   for(const m of project.markers){const p=applyH(h,{x:m.x,y:m.y}),l=applyH(h,{x:m.lx,y:m.ly}),moved=Math.hypot(m.x-m.lx,m.y-m.ly)>.01;
