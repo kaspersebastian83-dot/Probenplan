@@ -76,9 +76,12 @@ try{
   const file=JSON.parse(await fs(page,'read',[NAME,'Pläne'],FILE));assert.deepEqual(file.markers.map(m=>m.label),['P77']);
  });
  await check('Neuer Grundriss ersetzt den Plan nur mit Sicherungskopie',async()=>{
-  await page.locator('#file').setInputFiles({name:'Neu.svg',mimeType:'image/svg+xml',buffer:Buffer.from(svg)});await page.locator('#replace-dialog').waitFor();assert.match(await page.locator('#replace-dialog p').textContent(),/vorher/);
+  await page.locator('#file').setInputFiles({name:'Neu.svg',mimeType:'image/svg+xml',buffer:Buffer.from(svg)});await page.locator('#replace-dialog').waitFor();assert.match(await page.locator('#replace-dialog p').textContent(),/Kopie vor dem Ersetzen.*nie automatisch gelöscht/);
+  const vorher=JSON.parse(await fs(page,'read',[NAME,'Pläne'],FILE));
   await page.locator('#replace-yes').click();await page.waitForTimeout(1000);const names=await fs(page,'list',[NAME,'Pläne']);
   assert.ok(names.some(n=>/^Probenplan 26\.0123 Köln \(vorher .*\)\.probenplan$/.test(n)),names.join(', '));assert.equal((await saved(page)).markers.length,0);
+  const kopie=names.find(n=>/^Probenplan 26\.0123 Köln \(Kopie vor dem Ersetzen .*\)\.probenplan$/.test(n));assert.ok(kopie,'dauerhafte Kopie vor dem Ersetzen: '+names.join(', '));
+  assert.deepEqual(JSON.parse(await fs(page,'read',[NAME,'Pläne'],kopie)).markers.map(m=>m.label),vorher.markers.map(m=>m.label),'Kopie enthält die bisherige Fassung');
  });
  await check('Interrupted close preserves the main file, browser draft and recovery candidate',async()=>{
   const before=await fs(page,'read',[NAME,'Pläne'],FILE);

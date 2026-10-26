@@ -59,9 +59,11 @@ try{
  // Old backups beyond the newest 5 are pruned, also legacy UTC names.
  const legacy=`Probenplan ${name} (vorher 2000-01-01T00-00-00-000Z-legacy).probenplan`;
  await writeFile(join(plaene.path,legacy),JSON.stringify({...alt,report:'LEGACY EINZIGARTIG'}));
+ const vorErsetzen=`Probenplan ${name} (Kopie vor dem Ersetzen 1999-01-01 00-00-00-000 alt).probenplan`;await writeFile(join(plaene.path,vorErsetzen),JSON.stringify({...alt,report:'VOR DEM ERSETZEN'}));
  for(let i=0;i<45;i++)await writeFile(join(plaene.path,`Probenplan ${name} (vorher 2026-10-20 12-00-${String(i).padStart(2,'0')}-000 test).probenplan`),textB);
  await A.m.pruneBackups(folder);assert.equal(await readFile(join(plaene.path,candidateA),'utf8'),textA);
- const left=(await readdir(plaene.path)).filter(n=>n.includes('(vorher '));assert.equal(left.length,5,'only the 5 newest backups stay');assert.ok(!left.includes(legacy),'old backups are pruned');
+ const left=(await readdir(plaene.path)).filter(n=>n.includes('(vorher '));assert.equal(left.length,5,'only the 5 newest backups stay');
+ assert.ok((await readdir(plaene.path)).includes(vorErsetzen),'a copy taken before replacing the plan is never pruned, however old');assert.ok(!left.includes(legacy),'old backups are pruned');
  // UTF-8 replacement characters are not proof of identical bytes in damaged files.
  const badBackup=`Probenplan ${name} (vorher 1999-01-01T00-00-00-000Z-invalid).probenplan`;
  const decodedCopy=await A.m.writeProjectCopy(folder,'Speicherkandidat','\ufffd');
