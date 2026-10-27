@@ -77,6 +77,8 @@ ok('Plan hinter ResultKit: ersetzter Bericht, neuer Bericht, gleiche Nummer endg
  // auf dem Stand / Plan ohne Werte aus Prüfberichten / bewusst nicht mehr verwendet, aber bekannt
  assert.equal(hinterText(planHinterResultKit([o('AR-3')],[o('AR-3')],datei([['AR-3']]))),'');
  assert.equal(hinterText(planHinterResultKit([],[],datei([['AR-3']]))),'','nur LabelKit-Proben: kein Hinweis');
+ const labelkit={id:'lk',bericht:'',labor:'LabelKit (Probenerfassung)',auftragsreferenz:'26.0601',sources:{}};
+ assert.equal(hinterText(planHinterResultKit([labelkit],[labelkit],datei([['AR-3']]))),'','Probenerfassung aus LabelKit (ohne Berichtsnummer) zählt nicht als Laborwert');
  assert.equal(hinterText(planHinterResultKit([o('AR-3')],[o('AR-3'),o('AR-4')],datei([['AR-3'],['AR-4']]))),'');
  // vorläufiger Bericht gilt in ResultKit noch (nur teilweise ersetzt): kein Hinweis für ihn
  assert.deepEqual(planHinterResultKit([o('AR-5',true)],[o('AR-5',true),o('AR-6')],datei([['AR-5',true],['AR-6']],[{bericht:'AR-5',durch:['AR-6']}])).ersetzt,[]);

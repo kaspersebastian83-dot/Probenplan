@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.40.1 – 27. Oktober 2026
+
+- Warnleiste „Neuerer Laborstand in ResultKit“ erschien schon, wenn der Plan nur die Probenerfassung aus LabelKit enthielt (noch keine Messwerte). Die LabelKit-Herkunft hat keine Prüfberichtsnummer und zählt jetzt nicht mehr als Laborwert – die Leiste kommt erst, wenn Werte aus einem Prüfbericht im Plan stehen. Gefunden vom neuen Integrationstest „Spektron-Kette“ (ResultKit).
+
 ## 1.40.0 – 27. Oktober 2026
 
 - **Warnleiste „Neuerer Laborstand in ResultKit“:** Im Projektordner prüft PlanKit beim Öffnen, beim Zurückkommen ins Fenster und alle 20 Sekunden `Laborergebnisse/_Ergebnisse.json`. Stammen Werte im Plan aus einem Prüfbericht, den ResultKit inzwischen als ersetzt führt (z. B. vorläufig → endgültig), oder hat ResultKit einen Bericht übernommen, den der Plan noch nicht kennt, erscheint oben eine Leiste mit dem Knopf **„Proben übernehmen …“**. Dort wie gewohnt den Bericht wählen und „Alle Konflikte: Aktualisieren“ – platzierte Proben bleiben, wo sie sind. Nichts wird still geändert.
