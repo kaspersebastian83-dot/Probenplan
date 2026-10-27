@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.39.0 – 27. Oktober 2026
+
+- **Skizze immer erreichbar**: In der Werkzeugleiste links steht jetzt immer „✎ Skizze“. Ohne Plan beginnt damit eine neue Skizze, sonst kommt eine Skizze als weiterer Plan dazu (z. B. ein Geschoss ohne Grundriss); auf einer Skizze bearbeitet „✎ Skizze“ wie bisher die Skizze. Auf der Startseite ist „✎ Kein Plan? Skizze zeichnen“ deutlicher und erklärt in einer Zeile, was eine Skizze kann.
+
 ## 1.38.0 – 26. Oktober 2026
 
 - **Dauerhafte Kopie vor dem Ersetzen**: Wird der Plan im Projektordner ersetzt (neuer Grundriss, neue Skizze) oder nach einer Rückfrage „Meine Fassung übernehmen“ gewählt, legt PlanKit vorher eine Kopie der bisherigen Fassung als „Probenplan <Projekt> (Kopie vor dem Ersetzen …).probenplan“ in „Pläne“ an. Diese Kopien werden nie automatisch gelöscht (die Bereinigung behält weiter nur die 5 neuesten „(vorher …)“- und „(Speicherkandidat …)“-Kopien). Scheitert die Kopie, wird der Plan nicht ersetzt. Hinweistexte entsprechend berichtigt.
