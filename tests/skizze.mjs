@@ -15,6 +15,10 @@ for(const engine of engines){
   const context=await browser.newContext({viewport:{width:1440,height:900},acceptDownloads:true}),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(base);
 
+  await check(`${engine}: ohne Plan ist „✎ Skizze“ oben und auf der Startseite sichtbar`,async()=>{
+   assert.ok(await page.locator('#sketch-tb').isVisible());assert.ok(await page.locator('#sketch-tb').isEnabled());assert.match(await page.locator('#sketch-tb').getAttribute('title'),/Kein Plan vorhanden/);
+   assert.ok(await page.locator('#welcome-sketch').isVisible());
+  });
   await check(`${engine}: „Kein Plan? Skizze zeichnen“ öffnet eine leere Skizze mit Maßstab`,async()=>{
    await page.locator('#welcome-sketch').click();await page.locator('#sketch-actions').waitFor();
    assert.equal(await page.locator('[data-sketch-tool="room"]').getAttribute('aria-pressed'),'true');
@@ -66,6 +70,8 @@ for(const engine of engines){
    assert.equal(await page.locator('#rotate-right').isDisabled(),true);assert.equal(await page.locator('#warp-start').isDisabled(),true);
    assert.equal(await page.locator('#sketch-edit').isVisible(),true);
    assert.deepEqual([s.plan.width,s.plan.height],[880,950],'Zeichenfläche auf den Inhalt zugeschnitten (1 m Rand)');
+   assert.match(await page.locator('#sketch-tb').getAttribute('title'),/Skizze bearbeiten/);
+   await page.locator('#sketch-tb').click();await page.locator('#sketch-actions').waitFor();await page.locator('#sketch-done').click();assert.equal(await page.locator('#sketch-actions').isVisible(),false);
    if(process.env.SHOT){await page.waitForTimeout(500);await page.screenshot({path:process.env.SHOT+'-2.png'});}
    // Planbild enthält Raumnamen und Fläche
    const svgText=await page.evaluate(d=>new TextDecoder().decode(Uint8Array.from(atob(d.split(',')[1]),c=>c.charCodeAt(0))),s.plan.data);assert.match(svgText,/Wohnen/);assert.match(svgText,/Küche/);assert.match(svgText,/Treppe/);assert.match(svgText,/rotate\(30\)/);assert.match(svgText,/16,4 m²/);
