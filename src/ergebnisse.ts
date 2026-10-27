@@ -43,9 +43,11 @@ export function standKennung(dateien:{name:string;size:number;t:number}[]){retur
 /** Liegt der Plan hinter der letzten Übernahme in ResultKit zurück?
  *  ersetzt: Werte im Plan stammen aus einem Bericht, den ResultKit inzwischen als ersetzt führt (z. B. vorläufig → endgültig).
  *  neu: ResultKit hat einen Bericht mit Messwerten, den der Plan noch gar nicht kennt.
- *  Nur für Pläne, die schon Werte aus Prüfberichten zeigen (verwendet) – ein Plan nur mit LabelKit-Proben „liegt nicht zurück“.
+ *  Nur für Pläne, die schon Werte aus Prüfberichten zeigen (verwendet, mit Berichtsnummer) – ein Plan nur mit LabelKit-Proben „liegt nicht zurück“.
  *  bekannt: alle im Plan gespeicherten Herkünfte (auch nicht mehr verwendete), damit bewusst Ausgelassenes nicht immer wieder gemeldet wird. */
 export function planHinterResultKit(verwendet:LabOrigin[],bekannt:LabOrigin[],e:Ergebnisse):{ersetzt:{alt:string;neu:string[]}[];neu:string[]}{
+ // Die Probenerfassung aus LabelKit ist auch eine Herkunft, aber ohne Prüfberichtsnummer und ohne Messwerte – zählt hier nicht.
+ verwendet=verwendet.filter(r=>r.bericht.trim());
  if(!verwendet.length)return {ersetzt:[],neu:[]};
  const name=(code:string,vorl?:boolean)=>`${code||'(ohne Nummer)'}${vorl?' (vorläufig)':''}`;
  const ersetzt:{alt:string;neu:string[]}[]=[],gesehen=new Set<string>();
