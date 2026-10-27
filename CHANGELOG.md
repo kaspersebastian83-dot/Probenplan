@@ -2,7 +2,7 @@
 
 ## 1.39.0 – 27. Oktober 2026
 
-- **Skizze immer erreichbar**: Oben neben „＋ Plan“ steht jetzt „✎ Skizze“. Ohne Plan beginnt damit eine neue Skizze, auf einer Skizze geht es zum Bearbeiten, sonst kommt eine Skizze als weiterer Plan dazu (z. B. ein Geschoss ohne Grundriss). Auf der Startseite ist „✎ Kein Plan? Skizze zeichnen“ deutlicher und erklärt in einer Zeile, was eine Skizze kann.
+- **Skizze immer erreichbar**: In der Werkzeugleiste links steht jetzt immer „✎ Skizze“. Ohne Plan beginnt damit eine neue Skizze, sonst kommt eine Skizze als weiterer Plan dazu (z. B. ein Geschoss ohne Grundriss); auf einer Skizze bearbeitet „✎ Skizze“ wie bisher die Skizze. Auf der Startseite ist „✎ Kein Plan? Skizze zeichnen“ deutlicher und erklärt in einer Zeile, was eine Skizze kann.
 
 ## 1.38.0 – 26. Oktober 2026
 
