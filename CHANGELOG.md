@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.40.0 – 27. Oktober 2026
+
+- **Warnleiste „Neuerer Laborstand in ResultKit“:** Im Projektordner prüft PlanKit beim Öffnen, beim Zurückkommen ins Fenster und alle 20 Sekunden `Laborergebnisse/_Ergebnisse.json`. Stammen Werte im Plan aus einem Prüfbericht, den ResultKit inzwischen als ersetzt führt (z. B. vorläufig → endgültig), oder hat ResultKit einen Bericht übernommen, den der Plan noch nicht kennt, erscheint oben eine Leiste mit dem Knopf **„Proben übernehmen …“**. Dort wie gewohnt den Bericht wählen und „Alle Konflikte: Aktualisieren“ – platzierte Proben bleiben, wo sie sind. Nichts wird still geändert.
+- Pläne nur mit LabelKit-Proben (noch keine Messwerte) melden nichts; bewusst nicht übernommene Berichte, die der Plan schon einmal kannte, auch nicht.
+
 ## 1.39.0 – 27. Oktober 2026
 
 - **Skizze immer erreichbar**: In der Werkzeugleiste links steht jetzt immer „✎ Skizze“. Ohne Plan beginnt damit eine neue Skizze, sonst kommt eine Skizze als weiterer Plan dazu (z. B. ein Geschoss ohne Grundriss); auf einer Skizze bearbeitet „✎ Skizze“ wie bisher die Skizze. Auf der Startseite ist „✎ Kein Plan? Skizze zeichnen“ deutlicher und erklärt in einer Zeile, was eine Skizze kann.

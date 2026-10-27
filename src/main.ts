@@ -10,12 +10,12 @@ import {labeled,shownSVG,ensureInk,inkTried,autoLabels,valueLabels,surfaceBars,t
 import {addMarker,addSheet,bounds,clone,createProject,escape,floorName,History,markerScale,markerSize,markerSVG,MARKER_SCALE,metersPerUnit,northAngle,stepMarkerScale,moveSheet,removeSheet,renameSheet,sheetCount,sheetProject,switchSheet,validLabel,MAX_SHEETS,shapeOf,typeOf,typeFromArt,SHAPES,type Shape,type Project,type Marker,trialOn,SURFACES,type Surface,allMarkers,MAX_RAUM,RAUM_STATUS,type RaumStatus} from './model';
 import {raumbuchStand,setEintrag,addRaum,removeRaum,mergeRaum,pruefhinweise,raumbuchBlocks,raumbuchCSV,raumbuchName,STATUS_TEXT,FOOTNOTE_MENGEN,type RaumZeile,type RaumbuchStand} from './raumbuch';
 import {build as buildDocx} from './docx';
-import {vorlaeufigeBerichte,vorlaeufigText} from './lab-provenance';
+import {vorlaeufigeBerichte,vorlaeufigText,verwendeteBerichte} from './lab-provenance';
 import {kwPaar,wandStand,wandSvg,wandBlocks,wandCSV,wandName,wandHinweise,vorschlag as wandVorschlag,type WandStand,type WandBildDatei} from './wandansicht';
 import {candidates,loadImage,readPlan,validateProject,type Candidate} from './import';
 import {download,restoreLocal,saveLocal} from './storage';
 import {labelkitReport} from './labelkit';
-import {berichtAlsReport,liesErgebnisse,standKennung,ERGEBNIS_DATEI,type Ergebnisse} from './ergebnisse';
+import {berichtAlsReport,liesErgebnisse,standKennung,planHinterResultKit,hinterText,ERGEBNIS_DATEI,type Ergebnisse} from './ergebnisse';
 import {fileInfo,fileRevision,FolderConflict,saveFolderProject,writeProjectCopy,KEEP_RECENT,findSubdir,listFiles,openFolder,parseProjName,permission,pickFolder,projectDirOf,projectFileName,supported as folderSupported,writeFile,archiv,AUFTRAEGE,LABOR,PLAENE,type ProjectFolder} from './folder';
 import {exportImage,exportLayout} from './export';
 import {annexFileName,createAnnex,saveAnnex,saveDocument,ANNEX_DIR} from './annex-run';
@@ -93,7 +93,7 @@ document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Wa
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Raumbuch</h3><p>Liste → „Raumbuch bearbeiten …“: je Raum Befund (Proben mit Messwert und Oberflächenart, Brandherd) und Bewertung nach der Skala der Ergebniskarte – beides berechnet. Sie tragen je Raum Maßnahme und Bemerkung ein; Räume ohne Probe kommen mit Status dazu (Sichtprüfung unauffällig / auffällig, nicht begangen). Der Raum kommt aus LabelKit („Raum / Ort“) oder steht unter „Markierungen“ im Feld „Raum“. Ähnliche Schreibweisen (z. B. „Kü.“ und „Küche“) lassen sich zusammenführen. Ausgabe als Word-Anlage und als Tabelle für Excel (CSV) in „Mitteilungen“. Keine Flächen und Mengen – die Mengenermittlung bleibt beim ausführenden Unternehmen. Der Raum kommt aus „Raum / Ort“ in LabelKit; bei der Bezeichnung nach Handbuch („EG Küche Brandraum Decke“) zählen Geschoss und Raum, Zusatz und Bauteil bleiben bei der Probe. Steht ein eigenes Bauteil dahinter („EG Wohnzimmer Schrank oben“), die Zeilen im Raumbuch zusammenführen.</p><h3>Oberflächenart</h3><p>Aufsicht, Ansicht oder Untersicht je Probe kommt beim „Proben übernehmen“ aus LabelKit (Spalte „Oberflächenart“). Fehlt sie dort, lässt sie sich unter „Markierungen“ wählen; eine Eingabe in PlanKit bleibt auch bei erneutem Import. Am Schild ein Balken unten (Aufsicht), links (Ansicht) oder oben (Untersicht), dazu im Wertkästchen der Ergebniskarte und in der Legende.</p>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Skizze (kein Plan vorhanden)</h3><p>Links in der Werkzeugleiste „✎ Skizze“ (ohne Plan: neue Skizze, sonst als weiterer Plan; auf einer Skizze: bearbeiten), Startseite „Kein Plan? Skizze zeichnen“ oder unten „＋ Skizze“ für ein weiteres Geschoss. <b>Raum</b>: von Ecke zu Ecke aufziehen (Raster 10 cm, Räume rasten an Wänden ein), danach Name, Breite und Tiefe in Metern eintippen. <b>Wand</b>: frei ziehen, auch schräg (15°-Schritte rasten ein, Länge eintippbar). <b>Tür</b>/<b>Fenster</b>: auf eine Wand tippen (Tür 0,90 m mit Aufschlag, Fenster 1,20 m). <b>Text</b>: antippen und eintippen, z. B. „Treppe“. <b>Auswählen</b>: Räume, Wände, Texte ziehen, Ecke unten rechts ändert die Raumgröße, Entf löscht. „Skizze fertig“ schneidet die Zeichenfläche auf die Räume zu; der Maßstab ist automatisch gesetzt. „Skizze“ links bearbeitet sie weiter; Proben bleiben an ihrer Stelle.</p>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Entzerren (Fluchtplan fotografiert)</h3><p>„Entzerren“ (W) links in der Leiste: die vier Ecken des Plans im Foto antippen oder ziehen – 1 oben links, 2 oben rechts, 3 unten rechts, 4 unten links. Die Lupe zeigt die Ecke vergrößert. Seitenverhältnis „wie im Foto“ oder DIN quer/hoch (Fluchtpläne sind meist A3/A4). „Entzerren“ rechnet ein gerades Bild; Proben und Flächen werden mitgerechnet. Ein vorhandener Maßstab und die Nordrichtung werden dabei entfernt und sind neu zu setzen. Rückgängig stellt das Foto wieder her; die Fotodatei selbst bleibt unverändert.</p>');
-document.getElementById('app-version')!.textContent='v1.39.0';
+document.getElementById('app-version')!.textContent='v1.40.0';
 document.querySelector('#help-dialog h2')!.insertAdjacentHTML('afterend','<h3>Neu in PlanKit 1.16.1 · 20.10.2026</h3><p>Projektzentrale und Spektron-Leiste übergeben Projekte jetzt über #projekt im Fragment. Sonderzeichen bleiben erhalten; alte ?projekt-Links funktionieren weiterhin und werden nach dem Laden bereinigt. Projektwechsel laden auch bereits geöffnete App-Fenster neu; eine Warnung vor ungesicherten Eingaben kann den Wechsel abbrechen. Die Anlagenaktion aktion=anlage wird ebenfalls im Fragment übergeben. Installiertes PlanKit nach einer Online-Aktualisierung vollständig schließen und erneut öffnen.</p>');
 const colorOptions=PALETTE.map(c=>`<option value="${c.color}">${c.title} · ${c.suggestion}</option>`).join('');
 document.querySelector('.modes')!.insertAdjacentHTML('beforeend','<button data-mode="area-draw" class="mode" disabled><span class="tool-icon">⬡</span><span>Fläche zeichnen<small>Eckpunkte setzen & abschließen</small></span></button><button data-mode="area-edit" class="mode" disabled><span class="tool-icon">◇</span><span>Fläche bearbeiten<small>Ecken oder ganze Fläche ziehen</small></span></button>');
@@ -463,7 +463,7 @@ window.addEventListener('keydown',e=>{
   else if((e.key==='Delete'||e.key==='Backspace')&&sketching.sel){e.preventDefault();removeSel();}
 });
 function render(){
-  const p=project;labUI?.render(p); $('welcome').hidden=!!p;$('mode-hint').hidden=!p;if(!p){renderSheets();renderResults();updateSizeUI();updateLabelUI();updateTrialUI();updateRaumbuchUI();updateScaleUI();}
+  const p=project;labUI?.render(p);resultkitHinweisZeigen(); $('welcome').hidden=!!p;$('mode-hint').hidden=!p;if(!p){renderSheets();renderResults();updateSizeUI();updateLabelUI();updateTrialUI();updateRaumbuchUI();updateScaleUI();}
   ['save-project','export','export-open','next','report','date'].forEach(id=>($<HTMLButtonElement>(id).disabled=!p));
   document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(b=>b.disabled=!p&&b.dataset.mode!=='navigate');
   $<HTMLButtonElement>('undo').disabled=!history.past.length;$<HTMLButtonElement>('redo').disabled=!history.future.length;
@@ -1097,7 +1097,22 @@ const clock=(t:number)=>new Date(t).toLocaleString('de-DE',{day:'2-digit',month:
 document.querySelector('#app-version')!.insertAdjacentHTML('afterend','<button id="project-badge" class="project-badge" type="button" aria-label="Gemeinsame Projektdaten neu einlesen" hidden></button>');
 $('file-actions').insertAdjacentHTML('afterbegin','<button id="open-folder" class="tb" title="Projektordner wählen (z. B. „26.0123 Köln“) – PlanKit speichert dann direkt in dessen Ordner „Pläne“">📁 Projekt</button>');
 $('open-folder').hidden=!folderSupported();
-document.querySelector('.topbar')!.insertAdjacentHTML('afterend','<div id="project-data-warning" class="project-data-warning" role="alert" hidden><span id="project-data-warning-text"></span><button id="project-data-retry">Erneut einlesen</button></div>');
+document.querySelector('.topbar')!.insertAdjacentHTML('afterend','<div id="project-data-warning" class="project-data-warning" role="alert" hidden><span id="project-data-warning-text"></span><button id="project-data-retry">Erneut einlesen</button></div><div id="resultkit-warning" class="project-data-warning" role="status" hidden><span id="resultkit-warning-text"></span><button id="resultkit-warning-go">Proben übernehmen …</button></div>');
+// ---- Plan hinter ResultKit? „Laborergebnisse/_Ergebnisse.json“ beim Öffnen, beim Zurückkommen ins Fenster und alle 20 s lesen;
+// die Warnleiste vergleicht sie bei jedem Zeichnen mit den Prüfberichten, aus denen der Plan Werte zeigt. Nur Hinweis – nichts wird still geändert.
+let resultkitStand:{folder:ProjectFolder;e:Ergebnisse}|null=null;
+async function resultkitLesen(){
+  const f=folder;if(!f){resultkitStand=null;resultkitHinweisZeigen();return;}
+  let e:Ergebnisse|null=null;
+  try{const dir=await findSubdir(f.dir,LABOR),datei=dir?await fileInfo(dir,ERGEBNIS_DATEI):null;if(datei)e=liesErgebnisse(await datei.text());}catch{e=null;}   // unlesbar: meldet „Proben übernehmen …“ selbst
+  if(folder!==f)return;
+  resultkitStand=e&&(!e.projekt||e.projekt===f.nr)?{folder:f,e}:null;resultkitHinweisZeigen();
+}
+function resultkitHinweisZeigen(){
+  const leiste=document.getElementById('resultkit-warning');if(!leiste)return;
+  const st=resultkitStand,text=st&&project&&st.folder===folder?hinterText(planHinterResultKit(verwendeteBerichte(project),project.labReports||[],st.e)):'';
+  leiste.hidden=!text;if(text&&$('resultkit-warning-text').textContent!==`⚠ ${text}`)$('resultkit-warning-text').textContent=`⚠ ${text}`;
+}
 for(const id of ['project-badge','project-data-retry'])$(id).onclick=()=>void refreshProjectData(true);
 document.querySelector('#welcome-load')!.insertAdjacentHTML('afterend','<div id="folder-prompt" class="folder-prompt" hidden><p id="folder-prompt-text"></p><button id="folder-allow" class="primary">Zugriff erlauben und Projekt öffnen</button></div><div id="folder-plans" class="folder-plans" hidden></div>');
 document.body.insertAdjacentHTML('beforeend','<dialog id="ask-dialog"><h2 id="ask-title"></h2><p id="ask-text"></p><div class="dialog-actions" id="ask-actions"></div></dialog><dialog id="lab-folder-dialog"><form method="dialog"><button class="close" aria-label="Schließen">×</button></form><span class="eyebrow">PROBEN ÜBERNEHMEN</span><h2>Welche Proben übernehmen?</h2><p class="muted">Die Probenerfassung aus LabelKit oder ein in ResultKit geprüfter Prüfbericht mit Messwerten.</p><div id="lab-folder-list"></div><div class="dialog-actions"><button id="lab-folder-other">Andere Datei …</button></div></dialog>');
@@ -1196,8 +1211,9 @@ async function projectDataForExport(){
   const choice=await ask('Gemeinsame Projektdaten möglicherweise veraltet',projectDataWarning(status),['Abbrechen','Für diesen Export ausdrücklich verwenden']);
   return folder===f&&projectReader.state===status&&choice==='Für diesen Export ausdrücklich verwenden';
 }
-window.addEventListener('focus',()=>{void refreshProjectData();});
-setInterval(()=>{if(!document.hidden&&!busy&&folder&&!projectReader.state.checking)void refreshProjectData();},20000);
+window.addEventListener('focus',()=>{void refreshProjectData();void resultkitLesen();});
+setInterval(()=>{if(!document.hidden&&!busy&&folder&&!projectReader.state.checking)void refreshProjectData();if(!document.hidden&&folder)void resultkitLesen();},20000);
+$('resultkit-warning-go').onclick=()=>$('lab-import').click();
 $('save-project').insertAdjacentHTML('afterend','<button id="emergency-copy" class="tb" title="Geöffnete Fassung zusätzlich als Datei herunterladen" hidden>Notfallkopie</button>');
 $('emergency-copy').onclick=()=>{if(project)void download(new Blob([JSON.stringify(project)],{type:'application/json'}),`PlanKit Notfallkopie ${folder?.name||project.report||'Projekt'} ${Date.now()}.probenplan`);};
 async function renderFolderPlans(){
@@ -1232,7 +1248,7 @@ async function enterFolder(dir:Parameters<typeof openFolder>[0]){
   if(entering!==folderOpening)return;
   if(next){if(!next.report)next.report=target.name;await install(next,true,transition);$('saved').textContent=recovered?'Wiederhergestellt – bitte prüfen und „Speichern“ klicken':`✓ Aus „${PLAENE}“ geladen`;}
   else{await preserveUnsavedProject();transition();labUI?.reset();project=null;history.clear();render();$('saved').textContent=`Projekt ${target.name}`;}
-  showFolder();void refreshProjectData();$('folder-prompt').hidden=true;await renderFolderPlans();
+  showFolder();void refreshProjectData();resultkitStand=null;void resultkitLesen();$('folder-prompt').hidden=true;await renderFolderPlans();
   PROJEKT_URL.setzen(target.name);
   (window as any).MosaikLeiste?.aktualisieren();
   toast(next?`Projekt ${target.name}: Probenplan aus „${PLAENE}“ geöffnet.`:`Projekt ${target.name}: noch kein Probenplan – Grundriss wählen.`);
