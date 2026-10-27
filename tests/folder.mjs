@@ -66,6 +66,16 @@ try{
   await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});
   await page.waitForTimeout(900);const file=await saved(page);assert.equal(file.pending.length,8);const p2=file.pending.find(r=>r.label==='P2');assert.ok(p2.labNr&&p2.werte?.length,'P2 mit Labordaten');assert.ok(file.markers[0].lab.werte?.length,'P1 mit Messwerten');
  });
+ await check('Neuerer Stand in ResultKit (Bericht ersetzt): Warnleiste, Knopf öffnet „Proben übernehmen …“; wieder aktuell → weg',async()=>{
+  assert.ok(await page.locator('#resultkit-warning').isHidden(),'Plan auf dem Stand der Übernahme');
+  const roh=JSON.parse(labErgebnisse());const alt=roh.berichte[0].bericht;roh.berichte[0]={...roh.berichte[0],id:'b2',bericht:'AR-1000',sources:{xml:'AR-1000.xml'}};roh.ersetzt=[{bericht:alt,durch:['AR-1000']}];
+  await fs(page,'write',[NAME,'Laborergebnisse'],'_Ergebnisse.json',JSON.stringify(roh));await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+  await page.locator('#resultkit-warning:not([hidden])').waitFor();
+  assert.match(await page.locator('#resultkit-warning-text').textContent(),new RegExp(`${alt} ist in ResultKit ersetzt durch AR-1000\\. Im Plan stehen noch die alten Werte`));
+  await page.locator('#resultkit-warning-go').click();await page.locator('#lab-folder-dialog [data-ergebnis]',{hasText:'AR-1000'}).waitFor();await page.locator('#lab-folder-dialog .close').click();
+  await fs(page,'write',[NAME,'Laborergebnisse'],'_Ergebnisse.json',labErgebnisse());await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+  await page.locator('#resultkit-warning').waitFor({state:'hidden'});
+ });
  await check('Neu laden mit ?projekt= öffnet die Datei aus dem Ordner',async()=>{
   await page.reload();await page.locator('#welcome').waitFor({state:'hidden'});assert.equal(await page.locator('#count').textContent(),'1');assert.match(await page.locator('#saved').textContent(),/Pläne/);
  });

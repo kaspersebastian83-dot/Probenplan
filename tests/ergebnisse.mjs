@@ -9,7 +9,7 @@ registerHooks({
  load(url,context,next){if(url.endsWith('.ts'))return{format:'module',source:stripTypeScriptTypes(readFileSync(fileURLToPath(url),'utf8'),{mode:'transform'}),shortCircuit:true};return next(url,context);}
 });
 // „_Ergebnisse.json“ aus ResultKit lesen und als Laborbericht in die gewohnte Übernahme geben. Synthetische Daten.
-const {liesErgebnisse,berichtAlsReport,standKennung}=await import('../src/ergebnisse.ts');
+const {liesErgebnisse,berichtAlsReport,standKennung,planHinterResultKit,hinterText}=await import('../src/ergebnisse.ts');
 const {applyLabImport}=await import('../src/lab-provenance.ts');
 const {createProject}=await import('../src/model.ts');
 const {labErgebnisse,labRows}=await import('./lab-fixtures.mjs');
@@ -61,5 +61,25 @@ ok('fehlende P-Nummer wird aus der Probenreferenz gebildet; Übernahme legt eige
   assert.equal(q.markers[0].lab.reportId,q.labReports[1].id);assert.equal(q.labReports[1].vorlaeufig,undefined);
  });
 }
+ok('Plan hinter ResultKit: ersetzter Bericht, neuer Bericht, gleiche Nummer endgültig; Plan ohne Laborwerte meldet nichts',()=>{
+ const o=(bericht,vorlaeufig)=>({id:bericht+(vorlaeufig?'v':''),bericht,labor:'Eurofins',auftragsreferenz:'',sources:{},...(vorlaeufig?{vorlaeufig:true}:{})});
+ const datei=(berichte,ersetzt=[])=>{const roh=JSON.parse(labErgebnisse(labRows.slice(0,1)));const b0=roh.berichte[0];
+  roh.berichte=berichte.map(([bericht,vorl],i)=>({...b0,id:'b'+i,bericht,...(vorl?{vorlaeufig:true}:{vorlaeufig:undefined})}));roh.ersetzt=ersetzt;return liesErgebnisse(JSON.stringify(roh));};
+ // vorläufig AR-1-01 im Plan, ResultKit: ersetzt durch AR-1-02
+ let e=datei([['AR-1-02']],[{bericht:'AR-1-01',durch:['AR-1-02']}]);assert.deepEqual(e.ersetzt,[{bericht:'AR-1-01',durch:['AR-1-02']}]);
+ let h=planHinterResultKit([o('AR-1-01',true)],[o('AR-1-01',true)],e);
+ assert.deepEqual(h,{ersetzt:[{alt:'AR-1-01 (vorläufig)',neu:['AR-1-02']}],neu:[]},'AR-1-02 nicht zusätzlich als „neu“');
+ assert.match(hinterText(h),/^Neuerer Laborstand in ResultKit: AR-1-01 \(vorläufig\) ist in ResultKit ersetzt durch AR-1-02\. Im Plan stehen noch die alten Werte\./);
+ // gleiche Nummer, inzwischen endgültig
+ h=planHinterResultKit([o('AR-2',true)],[o('AR-2',true)],datei([['AR-2']]));assert.deepEqual(h.ersetzt,[{alt:'AR-2 (vorläufig)',neu:['AR-2']}]);assert.deepEqual(h.neu,[]);
+ // neuer Bericht (z. B. Chlorid nachgeliefert), Plan kennt ihn nicht
+ h=planHinterResultKit([o('AR-3')],[o('AR-3')],datei([['AR-3'],['AR-4']]));assert.deepEqual(h,{ersetzt:[],neu:['AR-4']});assert.match(hinterText(h),/Prüfbericht AR-4 ist in ResultKit übernommen, aber noch nicht im Plan/);
+ // auf dem Stand / Plan ohne Werte aus Prüfberichten / bewusst nicht mehr verwendet, aber bekannt
+ assert.equal(hinterText(planHinterResultKit([o('AR-3')],[o('AR-3')],datei([['AR-3']]))),'');
+ assert.equal(hinterText(planHinterResultKit([],[],datei([['AR-3']]))),'','nur LabelKit-Proben: kein Hinweis');
+ assert.equal(hinterText(planHinterResultKit([o('AR-3')],[o('AR-3'),o('AR-4')],datei([['AR-3'],['AR-4']]))),'');
+ // vorläufiger Bericht gilt in ResultKit noch (nur teilweise ersetzt): kein Hinweis für ihn
+ assert.deepEqual(planHinterResultKit([o('AR-5',true)],[o('AR-5',true),o('AR-6')],datei([['AR-5',true],['AR-6']],[{bericht:'AR-5',durch:['AR-6']}])).ersetzt,[]);
+});
 ok('Dateistand wie in ResultKit',()=>{assert.equal(standKennung([{name:'b.xml',size:1,t:2},{name:'a.pdf',size:3,t:4}]),'a.pdf|3|4\nb.xml|1|2');});
 console.log(`${n} Prüfungen ResultKit-Übergabe bestanden`);
