@@ -18,7 +18,8 @@ export type Shape = 'circle' | 'square' | 'diamond';
 export const SHAPES:readonly Shape[]=['circle','square','diamond'];
 export const SHAPE_NAMES:Record<Shape,string>={circle:'Kreis',square:'Quadrat',diamond:'Raute'};
 /** raum: Raum / Ort aus LabelKit oder von Hand (Proben und Brandherd) – Grundlage für das Raumbuch. */
-export interface Marker { id: string; kind: Kind; label: string; note: string; x: number; y: number; lx: number; ly: number; lab?:LabData; shape?:Shape; typ?:string; surface?:Surface; raum?:string }
+/** raumSkizze (ab 1.41): Kennung des Skizzenraums, aus dem „raum“ beim Setzen übernommen wurde – nur dann zieht ein Umbenennen des Raums mit. */
+export interface Marker { id: string; kind: Kind; label: string; note: string; x: number; y: number; lx: number; ly: number; lab?:LabData; shape?:Shape; typ?:string; surface?:Surface; raum?:string; raumSkizze?:string }
 export const MAX_RAUM=80;
 /** LabelKit-Probenart („PAK · Wischprobe“) → Typ und Standardform: PAK Kreis, Chlorid Quadrat, Asbest Raute, Sonstige Kreis. */
 const TYPES:[RegExp,string,Shape][]=[[/^pak\b/i,'PAK','circle'],[/^chlorid\b/i,'Chlorid','square'],[/^asbest\b/i,'Asbest','diamond'],[/^sonstige\b/i,'Sonstige','circle']];
