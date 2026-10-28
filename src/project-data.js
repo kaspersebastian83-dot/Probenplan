@@ -12,6 +12,9 @@ function createProjectDataReader(onChange = () => {}, timeout = 10000) {
       if (dir.queryPermission && await dir.queryPermission({mode: 'read'}) !== 'granted') {
         if (!request || !dir.requestPermission || await dir.requestPermission({mode: 'read'}) !== 'granted') return {status: 'permission'};
       }
+      // Spektron-Ordner: _Projekt.json im Projektordner oder künftig in „_Spektron“ (spektron-ordner.js, falls geladen)
+      const so = typeof globalThis !== 'undefined' ? globalThis.SpektronOrdner : null;
+      if (so) { const r = await so.ort(dir, 'projekt'); if (!r.dir) return {status: 'missing'}; dir = r.dir; }
       const original = await (await dir.getFileHandle('_Projekt.json')).getFile();
       const bytes = await original.arrayBuffer();
       let text;

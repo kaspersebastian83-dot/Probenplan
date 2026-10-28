@@ -8,7 +8,8 @@ import {drawPlanContent} from './export';
 import {clone,floorName,markerSize,sheetCount,sheetProject,type Project} from './model';
 import {hasValues,prepare,rateMarkers} from './results';
 import {berichtQuellen,vorlaeufigeBerichte,vorlaeufigText} from './lab-provenance';
-import {fileInfo,fileRevision,findSubdir,listFiles,projectFileName,AUFTRAEGE,LABOR,PLAENE,type ProjectFolder} from './folder';
+import {fileInfo,fileRevision,findSubdir,listFiles,projectFileName,planOrdner,planPfad,AUFTRAEGE,LABOR,type ProjectFolder} from './folder';
+import {ort,ortZumSchreiben} from './so';
 
 export const ANNEX_DIR='Mitteilungen',ANNEX_LOG='_Anlagen-Protokoll.txt',FOTOS='Fotos',FOTOKIT_FILE='_Bildumbenenner.json';
 export interface AnnexOptions {title:string;maxPhotos:number;results:boolean;objekt:string;projectData:Record<string,unknown>;projectDataSource?:File|null;projectDataStale?:boolean;app:string;progress?:(text:string)=>void}
@@ -54,9 +55,10 @@ interface FotoKitImage {beschreibung?:string;abschnitt?:string;probe?:string;dre
 /** Fotos mit Probe-Nr. aus FotoKit: Datei lesen, Prüfsumme neu berechnen und mit FotoKit vergleichen, für die Anlage verkleinern. */
 async function photos(f:ProjectFolder,o:AnnexOptions,samples:AnnexSample[],sources:AnnexSource[],bk?:Map<string,string[]>):Promise<AnnexPhoto[]|null>{
   const dir=await findSubdir(f.dir,FOTOS);if(!dir)return null;
-  const json=await fileInfo(dir,FOTOKIT_FILE);if(!json)return null;
-  let data:{bilder?:Record<string,FotoKitImage>;reihenfolge?:string[]};try{data=JSON.parse(await json.text());}catch{throw Error(`„${FOTOS}/${FOTOKIT_FILE}“ ist nicht lesbar.`);}
-  sources.push({role:'Fotos und Probe-Nr. (FotoKit)',name:`${FOTOS}/${FOTOKIT_FILE}`,stand:stand(json.lastModified),sha:await sha(await json.arrayBuffer())});
+  const fk=await ort(f.dir,'fotokit'),fkDir=fk.wo==='neu'?fk.dir:dir,fkName=`${fk.wo==='neu'?fk.pfad:FOTOS}/${FOTOKIT_FILE}`;   // FotoKit-Datei: „Fotos“ oder künftig „_Spektron/FotoKit“
+  const json=fkDir?await fileInfo(fkDir,FOTOKIT_FILE):null;if(!json)return null;
+  let data:{bilder?:Record<string,FotoKitImage>;reihenfolge?:string[]};try{data=JSON.parse(await json.text());}catch{throw Error(`„${fkName}“ ist nicht lesbar.`);}
+  sources.push({role:'Fotos und Probe-Nr. (FotoKit)',name:fkName,stand:stand(json.lastModified),sha:await sha(await json.arrayBuffer())});
   const rank=new Map((data.reihenfolge||[]).map((n,i)=>[n,i]));
   const entries=Object.entries(data.bilder||{}).filter(([,v])=>v&&!v.aussortiert&&String(v.probe||'').trim())
     .sort(([a],[b])=>(rank.get(a)??1e9)-(rank.get(b)??1e9)||a.localeCompare(b,'de',{numeric:true}));
@@ -103,17 +105,18 @@ export async function createAnnex(p:Project,folder:ProjectFolder|null,o:AnnexOpt
   let fotos:AnnexPhoto[]|null=null;
   if(folder){
     o.progress?.('Quelldateien werden geprüft …');
-    const planFile=await fileInfo(folder.plaene,projectFileName(folder));
-    sources.push(planFile?{role:'Lage, Proben, Messwerte (PlanKit)',name:`${PLAENE}/${projectFileName(folder)}`,stand:stand(planFile.lastModified),sha:(await fileRevision(planFile))||''}:{role:'PlanKit-Projekt',name:`${PLAENE}/${projectFileName(folder)}`,stand:'–',sha:'nicht gefunden'});
+    const planFile=await fileInfo(planOrdner(folder),projectFileName(folder));
+    sources.push(planFile?{role:'Lage, Proben, Messwerte (PlanKit)',name:`${planPfad(folder)}/${projectFileName(folder)}`,stand:stand(planFile.lastModified),sha:(await fileRevision(planFile))||''}:{role:'PlanKit-Projekt',name:`${planPfad(folder)}/${projectFileName(folder)}`,stand:'–',sha:'nicht gefunden'});
     const lab=await findSubdir(folder.dir,LABOR);
     // Nur Berichte, aus denen Proben im Projekt stammen (ersetzte vorläufige Berichte nicht), je Datei einmal
     for(const {name,origin:r} of berichtQuellen(project))
       await hashSource(lab,LABOR,name,`Laborbericht ${r.bericht||''} ${r.labor?`(${r.labor})`:''}`.replace(/\s+/g,' ').trim(),sources,missing);
-    const auftraege=await findSubdir(folder.dir,AUFTRAEGE),daten=auftraege?(await listFiles(auftraege,/_Daten\.json$/i))[0]:undefined;
+    const lk=await ort(folder.dir,'labelkit'),auftraege=lk.dir,daten=auftraege?(await listFiles(auftraege,/_Daten\.json$/i))[0]:undefined;   // „Laboraufträge“ oder künftig „_Spektron/LabelKit“
     let bk:Map<string,string[]>|undefined;
-    if(daten){const file=await daten.handle.getFile(),bytes=await file.arrayBuffer();sources.push({role:'Probenerfassung LabelKit (neueste Datei)',name:`${AUFTRAEGE}/${daten.name}`,stand:stand(file.lastModified),sha:await sha(bytes)});
+    if(daten){const file=await daten.handle.getFile(),bytes=await file.arrayBuffer();sources.push({role:'Probenerfassung LabelKit (neueste Datei)',name:`${lk.wo==='neu'?lk.pfad:AUFTRAEGE}/${daten.name}`,stand:stand(file.lastModified),sha:await sha(bytes)});
       try{bk=bohrkernNummern(JSON.parse(new TextDecoder().decode(bytes)));}catch{/* unlesbar: Bohrkern-IDs auf Fotos bleiben unzugeordnet (Prüfprotokoll nennt sie) */}}
-    const pj=o.projectDataSource===undefined?await fileInfo(folder.dir,'_Projekt.json'):o.projectDataSource;
+    const pjDir=o.projectDataSource===undefined?(await ort(folder.dir,'projekt')).dir:null;
+    const pj=o.projectDataSource===undefined?(pjDir?await fileInfo(pjDir,'_Projekt.json'):null):o.projectDataSource;
     if(pj)sources.push({role:o.projectDataStale?'Projektdaten (möglicherweise veraltet; Verwendung bestätigt)':'Projektdaten (Projektzentrale)',name:'_Projekt.json',stand:stand(pj.lastModified),sha:await sha(await pj.arrayBuffer())});
     if(o.projectDataStale)extra.push({text:'Gemeinsame Projektdaten möglicherweise veraltet',ok:false,detail:'Die erneute Aktualisierung war nicht erfolgreich. Verwendung für diese Anlage ausdrücklich bestätigt.'});
     fotos=await photos(folder,o,samples,sources,bk);
@@ -138,7 +141,8 @@ export async function saveAnnex(folder:ProjectFolder,title:string,data:Uint8Arra
   try{await dir.getFileHandle(name);throw Error(`„${name}“ existiert bereits – nichts überschrieben.`);}catch(e){if((e as DOMException).name!=='NotFoundError')throw e;}
   const fh=await dir.getFileHandle(name,{create:true}),w=await fh.createWritable();await w.write(bytes);await w.close();
   const digest=await sha(bytes);if(await sha(await (await fh.getFile()).arrayBuffer())!==digest)throw Error(`„${name}“ wurde nicht vollständig geschrieben – bitte erneut erstellen.`);
-  try{const ph=await dir.getFileHandle(ANNEX_LOG,{create:true}),old=await ph.getFile();
+  try{const pd=(await ortZumSchreiben(folder.dir,'anlagenProtokoll')).dir;   // bisher „Mitteilungen“, künftig „_Spektron/Protokolle“
+    const ph=await pd.getFileHandle(ANNEX_LOG,{create:true}),old=await ph.getFile();
     const head=old.size?'':'Anlagen-Protokoll (Projektzentrale) – je Zeile: Zeit (UTC) | Anlage | SHA-256 der Anlage | Quelle | SHA-256 der Quelle | Programm\r\n';
     const pw=await ph.createWritable({keepExistingData:true});await pw.write({type:'write',position:old.size,data:head+[created,name,digest,source.name,source.sha,app].join(' | ')+'\r\n'});await pw.close();}
   catch{/* Protokoll ist Zusatz – die Anlage enthält das Prüfprotokoll selbst */}
@@ -155,7 +159,8 @@ export async function saveDocument(folder:ProjectFolder,name:(taken:string[])=>s
   try{await dir.getFileHandle(file);throw Error(`„${file}“ existiert bereits – nichts überschrieben.`);}catch(e){if((e as DOMException).name!=='NotFoundError')throw e;}
   const fh=await dir.getFileHandle(file,{create:true}),w=await fh.createWritable();await w.write(bytes);await w.close();
   const digest=await sha(bytes);if(await sha(await (await fh.getFile()).arrayBuffer())!==digest)throw Error(`„${file}“ wurde nicht vollständig geschrieben – bitte erneut erstellen.`);
-  try{const ph=await dir.getFileHandle(ANNEX_LOG,{create:true}),old=await ph.getFile();
+  try{const pd=(await ortZumSchreiben(folder.dir,'anlagenProtokoll')).dir;   // bisher „Mitteilungen“, künftig „_Spektron/Protokolle“
+    const ph=await pd.getFileHandle(ANNEX_LOG,{create:true}),old=await ph.getFile();
     const head=old.size?'':'Anlagen-Protokoll (Projektzentrale) – je Zeile: Zeit (UTC) | Anlage | SHA-256 der Anlage | Quelle | SHA-256 der Quelle | Programm\r\n';
     const pw=await ph.createWritable({keepExistingData:true});await pw.write({type:'write',position:old.size,data:head+[created,file,digest,sourceName,'–',app].join(' | ')+'\r\n'});await pw.close();}
   catch{/* Protokoll ist Zusatz */}
