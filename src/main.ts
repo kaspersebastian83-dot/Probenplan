@@ -1345,7 +1345,8 @@ $('lab-import').onclick=async()=>{
   const target=folder,dir=await findSubdir(target.dir,LABOR),files=dir?await listFiles(dir,/\.(xml|pdf)$/i):[];
   const auftraege=(await ort(target.dir,'labelkit')).dir,erfassungen=auftraege?(await listFiles(auftraege,/_Daten\.json$/i)).sort((a,b)=>b.lastModified-a.lastModified):[];
   let ergebnisse:Ergebnisse|null=null,ergebnisFehler='',veraltet=false;
-  if(dir)try{const datei=await fileInfo(dir,ERGEBNIS_DATEI);if(datei){ergebnisse=liesErgebnisse(await datei.text());
+  const ergDir=(await ort(target.dir,'resultkit')).dir;   // _Ergebnisse.json: „Laborergebnisse“ oder künftig „_Spektron/ResultKit“; Prüfberichte bleiben in „Laborergebnisse“
+  if(ergDir)try{const datei=await fileInfo(ergDir,ERGEBNIS_DATEI);if(datei){ergebnisse=liesErgebnisse(await datei.text());
    const stand=await Promise.all([...files.map(async f=>({name:f.name,file:await f.handle.getFile()})),...(erfassungen[0]?[{name:`${AUFTRAEGE}/${erfassungen[0].name}`,file:await erfassungen[0].handle.getFile()}]:[])]);
    veraltet=ergebnisse.stand!==standKennung(stand.map(x=>({name:x.name,size:x.file.size,t:x.file.lastModified})));}}catch(e){ergebnisFehler=e instanceof Error?e.message:String(e);}
   if(folder!==target)return;
