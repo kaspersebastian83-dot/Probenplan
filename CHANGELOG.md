@@ -4,7 +4,8 @@
 
 - **Ausschnitt nach dem Laden anbieten:** Nach dem Laden eines Plans (auch „＋ Plan“) fragt PlanKit oben auf der Fläche „Nur einen Teil des Plans?“ – „✂ Ausschnitt wählen“ oder „Ganzen Plan behalten“. Mit der ersten Markierung verschwindet das Angebot; „⌗ Zuschnitt“ links bleibt wie bisher.
 - **Zuschneiden einfacher:** Ausschnitt aufziehen, danach an den acht Anfassern (Ecken und Kanten) anpassen oder innen verschieben, statt neu zu zeichnen. Außerhalb ziehen (oder mittlere Maustaste) bewegt die Ansicht, Mausrad zoomt – so lässt sich ein Gebäude auf einem großen Lageplan erst heranzoomen und dann genau rahmen. „Neu aufziehen“ beginnt von vorn, Enter übernimmt, Esc bricht ab.
-- Während des Zuschneidens steht die Größe des Ausschnitts in Pixeln da, dazu Hinweise, wenn Markierungen außerhalb liegen oder der Ausschnitt eines Planbilds klein ist (im Export ggf. unscharf). Der Plan wird unter der Zuschnittleiste eingepasst, damit der obere Rand erreichbar bleibt.
+- Während des Zuschneidens steht die Größe des Ausschnitts in Pixeln da, dazu Hinweise, wenn Markierungen außerhalb liegen oder der Ausschnitt eines Planbilds klein ist (im Export ggf. unscharf). Der Plan wird unter der Zuschnittleiste eingepasst, damit der obere Rand erreichbar bleibt; nach dem Zuschneiden oder Abbrechen zeigt die Ansicht wieder den ganzen Plan.
+- Das Angebot steht nie im Weg: Es verschwindet, sobald ein Werkzeug gewählt, in den Plan getippt oder links/rechts etwas bedient wird.
 
 ## 1.42.0 – 28. Oktober 2026
 
