@@ -6,8 +6,18 @@
 //  • _Projekt.json im Projektordner: gemeinsame Projektdaten – PlanKit liest sie nur.
 type Mode={mode:'read'|'readwrite'};
 type Handle=FileSystemHandle&{queryPermission?:(m:Mode)=>Promise<PermissionState>;requestPermission?:(m:Mode)=>Promise<PermissionState>};
-type Dir=FileSystemDirectoryHandle&{values():AsyncIterable<FileSystemHandle>;resolve(h:FileSystemHandle):Promise<string[]|null>};
-export interface ProjectFolder {dir:Dir;name:string;nr:string;ort:string;plaene:Dir}
+export type Dir=FileSystemDirectoryHandle&{values():AsyncIterable<FileSystemHandle>;resolve(h:FileSystemHandle):Promise<string[]|null>};
+/** plaene: Bilder und PDFs des Plans. daten/datenPfad: nur gesetzt, wenn die PlanKit-Datei (.probenplan) am neuen Ort
+ *  „_Spektron/PlanKit“ liegt (spektron-ordner.js) – sonst liegt sie wie bisher in „Pläne“. */
+/* Spektron-Ordner (spektron-ordner.js, über main.ts geladen): diese Datei bleibt ohne Importe, damit Tests sie einzeln laden.
+   Fehlt das Modul (z. B. im Einzeltest), gilt wie bisher der Projektordner bzw. „Pläne“. */
+type SoOrt={dir:Dir|null;wo:'neu'|'alt';pfad:string};
+const spektron=()=>(globalThis as unknown as {SpektronOrdner?:{ort(d:Dir,b:string,o?:{anlegen?:boolean}):Promise<SoOrt>}}).SpektronOrdner;
+export interface ProjectFolder {dir:Dir;name:string;nr:string;ort:string;plaene:Dir;daten?:Dir;datenPfad?:string}
+/** Ordner der PlanKit-Datei und ihrer Sicherungen. */
+export const planOrdner=(f:ProjectFolder)=>f.daten||f.plaene;
+/** Pfad der PlanKit-Datei für Quellenvermerke („Pläne“ bzw. „_Spektron/PlanKit“). */
+export const planPfad=(f:ProjectFolder)=>f.datenPfad||PLAENE;
 export interface FolderFile {name:string;handle:FileSystemFileHandle;lastModified:number}
 export const PLAENE='Pläne',LABOR='Laborergebnisse',AUFTRAEGE='Laboraufträge',PJ_FILE='_Projekt.json';
 export const supported=()=>'showDirectoryPicker' in window;
@@ -61,8 +71,9 @@ export async function fileInfo(dir:Dir,name:string){try{const h=await dir.getFil
 export async function writeFile(dir:Dir,name:string,data:Blob|string){const h=await dir.getFileHandle(name,{create:true}),w=await h.createWritable();try{await w.write(data);await w.close();}catch(e){await w.abort().catch(()=>{});throw e;}return (await h.getFile()).lastModified;}
 /** Read errors must propagate; an empty object is only valid JSON or a verified missing file. */
 export async function readProjectData(f:ProjectFolder):Promise<Record<string,unknown>>{
- const file=await fileInfo(f.dir,PJ_FILE);
- if(!file){for await(const h of f.dir.values())if(h.name===PJ_FILE)throw Error('Die vorhandene _Projekt.json ist nicht lesbar.');return {};}
+ const so=spektron(),d=so?(await so.ort(f.dir,'projekt')).dir:f.dir;if(!d)return {};   // _Projekt.json im Projektordner oder künftig in „_Spektron“
+ const file=await fileInfo(d,PJ_FILE);
+ if(!file){for await(const h of d.values())if(h.name===PJ_FILE)throw Error('Die vorhandene _Projekt.json ist nicht lesbar.');return {};}
  const data:unknown=JSON.parse(await file.text());
  if(!data||typeof data!=='object'||Array.isArray(data))throw Error('Ungültige gemeinsame Projektdaten.');
  return data as Record<string,unknown>;
@@ -73,6 +84,8 @@ export async function openFolder(dir:Dir,create:boolean):Promise<ProjectFolder|'
   await personenLaden();
   const p=parseProjName(dir.name);if(!p)throw Error(`„${dir.name}“ ist kein Projektordner (erwartet z. B. „26.0123 Köln“).`);
   let plaene=await findSubdir(dir,PLAENE);if(!plaene){if(!create)return 'no-plaene';plaene=await dir.getDirectoryHandle(PLAENE,{create:true}) as Dir;}
+  const so=spektron(),pk=so?await so.ort(dir,'plankit'):null;   // PlanKit-Datei: „Pläne“ oder künftig „_Spektron/PlanKit“
+  if(so&&pk&&pk.wo==='neu'){const z=pk.dir?pk:await so.ort(dir,'plankit',{anlegen:true});if(!z.dir)throw Error('Ordner für die PlanKit-Datei nicht verfügbar.');return {dir,name:dir.name,nr:p.nr,ort:p.ort,plaene,daten:z.dir,datenPfad:z.pfad};}
   return {dir,name:dir.name,nr:p.nr,ort:p.ort,plaene};
 }
 /** Aus einem gewählten Ordner (Projektordner oder dessen „Pläne“) den Projektordner bestimmen. */
@@ -107,11 +120,11 @@ export function stampTime(rest:string):number|null{
 }
 const uniqueName=(f:ProjectFolder,kind:string)=>`Probenplan ${f.name} (${kind} ${localStamp()} ${crypto.randomUUID()}).probenplan`;
 /** Always use a fresh filename: backups/recovery files are never recycled. */
-export async function writeProjectCopy(f:ProjectFolder,kind:string,data:string|Blob){const name=uniqueName(f,kind);if(await fileInfo(f.plaene,name))throw Error('Der Name einer Sicherungsdatei ist bereits belegt. Bitte erneut versuchen.');const wanted=await fileRevision(new File([data],name));await writeFile(f.plaene,name,data);if(await fileRevision(await fileInfo(f.plaene,name))!==wanted)throw Error('Sicherungsdatei konnte nicht bestätigt werden.');return name;}
+export async function writeProjectCopy(f:ProjectFolder,kind:string,data:string|Blob){const name=uniqueName(f,kind);if(await fileInfo(planOrdner(f),name))throw Error('Der Name einer Sicherungsdatei ist bereits belegt. Bitte erneut versuchen.');const wanted=await fileRevision(new File([data],name));await writeFile(planOrdner(f),name,data);if(await fileRevision(await fileInfo(planOrdner(f),name))!==wanted)throw Error('Sicherungsdatei konnte nicht bestätigt werden.');return name;}
 /** A verified copy of the new content before the main file is replaced; reuse a byte-identical one. */
 async function retainCandidate(f:ProjectFolder,text:string){
  const wanted=await fileRevision(new File([text],'candidate'));
- for(const file of await listFiles(f.plaene,/\.probenplan$/i))if(file.name.startsWith(`Probenplan ${f.name} (Speicherkandidat `)&&await fileRevision(await file.handle.getFile())===wanted)return file.name;
+ for(const file of await listFiles(planOrdner(f),/\.probenplan$/i))if(file.name.startsWith(`Probenplan ${f.name} (Speicherkandidat `)&&await fileRevision(await file.handle.getFile())===wanted)return file.name;
  return writeProjectCopy(f,'Speicherkandidat',text);
 }
 /** Serialize cooperating tabs; detect external changes again immediately before replacement.
@@ -121,14 +134,14 @@ export async function saveFolderProject(f:ProjectFolder,text:string,expected:str
  return navigator.locks.request(`plankit:project:${f.name}`,async()=>{
   if(!await permission(f.dir))throw Error('Schreibzugriff fehlt. Bitte „Speichern“ klicken und den Zugriff erneut erlauben.');
   const candidate=await retainCandidate(f,text);
-  const name=projectFileName(f),current=await fileInfo(f.plaene,name),revision=await fileRevision(current);
+  const name=projectFileName(f),current=await fileInfo(planOrdner(f),name),revision=await fileRevision(current);
   if(revision!==expected)throw new FolderConflict(current,revision);
   // A failed backup must stop the save before touching the canonical project file.
   const backup=current?await writeProjectCopy(f,'vorher',current):null;
-  const latest=await fileInfo(f.plaene,name),latestRevision=await fileRevision(latest);
+  const latest=await fileInfo(planOrdner(f),name),latestRevision=await fileRevision(latest);
   if(latestRevision!==expected)throw new FolderConflict(latest,latestRevision);
-  await writeFile(f.plaene,name,text);
-  const committed=await fileInfo(f.plaene,name),wanted=await fileRevision(new File([text],name));
+  await writeFile(planOrdner(f),name,text);
+  const committed=await fileInfo(planOrdner(f),name),wanted=await fileRevision(new File([text],name));
   if(await fileRevision(committed)!==wanted)throw Error('Die geschriebene Datei konnte nicht bestätigt werden. Der geprüfte Speicherkandidat bleibt erhalten.');
   await pruneBackups(f);
   return {revision:wanted,backup,candidate};
@@ -142,11 +155,11 @@ export async function pruneBackups(f:ProjectFolder){
  try{
   for(const kind of ['vorher','Speicherkandidat']){
    const prefix=`Probenplan ${f.name} (${kind} `,names:string[]=[];
-   for await(const h of f.plaene.values())if(h.kind==='file'&&h.name.startsWith(prefix)&&h.name.endsWith(').probenplan'))names.push(h.name);
+   for await(const h of planOrdner(f).values())if(h.kind==='file'&&h.name.startsWith(prefix)&&h.name.endsWith(').probenplan'))names.push(h.name);
    // Nach Zeitpunkt sortieren (alte UTC- und neue Ortszeit-Namen gemischt)
    const time=new Map(names.map(n=>[n,stampTime(n.slice(prefix.length))]));
    const dated=names.filter(n=>time.get(n)!=null).sort((a,b)=>time.get(b)!-time.get(a)!||b.localeCompare(a));
-   for(const n of dated.slice(KEEP_RECENT))await f.plaene.removeEntry(n).catch(()=>{});
+   for(const n of dated.slice(KEEP_RECENT))await planOrdner(f).removeEntry(n).catch(()=>{});
   }
  }catch{/* pruning is best effort */}
 }

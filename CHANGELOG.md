@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.44.0 – 28. Oktober 2026
+
+- **Vorbereitung „Spektron-Ordner“:** Die App-Daten eines Projekts ziehen später in den Unterordner `_Spektron` (Bilder und PDFs des Plans bleiben in „Pläne“). PlanKit liest und schreibt die PlanKit-Datei, die Projektdaten, die Daten von FotoKit, LabelKit und ResultKit sowie das Anlagen-Protokoll jetzt über `spektron-ordner.js` – bis zum Umzug am bisherigen Ort, es ändert sich nichts.
+
 ## 1.43.0 – 28. Oktober 2026
 
 - **Ausschnitt nach dem Laden anbieten:** Nach dem Laden eines Plans (auch „＋ Plan“) fragt PlanKit oben auf der Fläche „Nur einen Teil des Plans?“ – „✂ Ausschnitt wählen“ oder „Ganzen Plan behalten“. Mit der ersten Markierung verschwindet das Angebot; „⌗ Zuschnitt“ links bleibt wie bisher.

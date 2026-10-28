@@ -16,7 +16,8 @@ import {candidates,loadImage,readPlan,validateProject,type Candidate} from './im
 import {download,restoreLocal,saveLocal} from './storage';
 import {labelkitReport} from './labelkit';
 import {berichtAlsReport,liesErgebnisse,standKennung,planHinterResultKit,hinterText,ERGEBNIS_DATEI,type Ergebnisse} from './ergebnisse';
-import {fileInfo,fileRevision,FolderConflict,saveFolderProject,writeProjectCopy,KEEP_RECENT,findSubdir,listFiles,openFolder,parseProjName,permission,pickFolder,projectDirOf,projectFileName,supported as folderSupported,writeFile,archiv,AUFTRAEGE,LABOR,PLAENE,type ProjectFolder} from './folder';
+import {fileInfo,fileRevision,FolderConflict,saveFolderProject,writeProjectCopy,KEEP_RECENT,findSubdir,listFiles,openFolder,parseProjName,permission,pickFolder,projectDirOf,projectFileName,supported as folderSupported,writeFile,archiv,AUFTRAEGE,LABOR,PLAENE,type ProjectFolder,planOrdner,planPfad} from './folder';
+import {ort} from './so';
 import {exportImage,exportLayout} from './export';
 import {annexFileName,createAnnex,saveAnnex,saveDocument,ANNEX_DIR} from './annex-run';
 import {COMPANY,PAPERS,renderSheet,sheetLayout,type Paper} from './sheet';
@@ -93,7 +94,7 @@ document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Wa
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Raumbuch</h3><p>Liste → „Raumbuch bearbeiten …“: je Raum Befund (Proben mit Messwert und Oberflächenart, Brandherd) und Bewertung nach der Skala der Ergebniskarte – beides berechnet. Sie tragen je Raum Maßnahme und Bemerkung ein; Räume ohne Probe kommen mit Status dazu (Sichtprüfung unauffällig / auffällig, nicht begangen). Der Raum kommt aus LabelKit („Raum / Ort“) oder steht unter „Markierungen“ im Feld „Raum“. Ähnliche Schreibweisen (z. B. „Kü.“ und „Küche“) lassen sich zusammenführen. Ausgabe als Word-Anlage und als Tabelle für Excel (CSV) in „Mitteilungen“. Keine Flächen und Mengen – die Mengenermittlung bleibt beim ausführenden Unternehmen. Der Raum kommt aus „Raum / Ort“ in LabelKit; bei der Bezeichnung nach Handbuch („EG Küche Brandraum Decke“) zählen Geschoss und Raum, Zusatz und Bauteil bleiben bei der Probe. Steht ein eigenes Bauteil dahinter („EG Wohnzimmer Schrank oben“), die Zeilen im Raumbuch zusammenführen.</p><h3>Oberflächenart</h3><p>Aufsicht, Ansicht oder Untersicht je Probe kommt beim „Proben übernehmen“ aus LabelKit (Spalte „Oberflächenart“). Fehlt sie dort, lässt sie sich unter „Markierungen“ wählen; eine Eingabe in PlanKit bleibt auch bei erneutem Import. Am Schild ein Balken unten (Aufsicht), links (Ansicht) oder oben (Untersicht), dazu im Wertkästchen der Ergebniskarte und in der Legende.</p>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Skizze (kein Plan vorhanden)</h3><p>Links in der Werkzeugleiste „✎ Skizze“ (ohne Plan: neue Skizze, sonst als weiterer Plan; auf einer Skizze: bearbeiten), Startseite „Kein Plan? Skizze zeichnen“ oder unten „＋ Skizze“ für ein weiteres Geschoss. <b>Raum</b>: von Ecke zu Ecke aufziehen (Raster 10 cm, Räume rasten an Wänden ein), danach Name, Breite und Tiefe in Metern eintippen. <b>Wand</b>: frei ziehen, auch schräg (15°-Schritte rasten ein, Länge eintippbar). <b>Tür</b>/<b>Fenster</b>: auf eine Wand tippen (Tür 0,90 m mit Aufschlag, Fenster 1,20 m). <b>Text</b>: antippen und eintippen, z. B. „Treppe“. <b>Auswählen</b>: Räume, Wände, Texte ziehen, Ecke unten rechts ändert die Raumgröße, Entf löscht. „Skizze fertig“ schneidet die Zeichenfläche auf die Räume zu; der Maßstab ist automatisch gesetzt. „Skizze“ links bearbeitet sie weiter; Proben bleiben an ihrer Stelle.</p><h3>Schnellskizze (Test)</h3><p>Schneller ohne Maße: „☰ Räume aus Liste“ – Räume eintippen (einer pro Zeile, „Küche Brandraum“ markiert den Brandraum), „Raster erzeugen“, dann die Räume ziehen und anordnen. „Skizze – nicht maßstäblich“ (Standard bei neuen Skizzen): kein Maßstab, keine m², Stempel auf dem Plan. Wird eine Probe in einen Raum gesetzt, steht der Raumname gleich unter „Raum“ (fürs Raumbuch). Abschalten: Haken „Schnellskizze (Test)“ in der Skizzenleiste – die Skizze verhält sich dann wie bisher.</p>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Entzerren (Fluchtplan fotografiert)</h3><p>„Entzerren“ (W) links in der Leiste: die vier Ecken des Plans im Foto antippen oder ziehen – 1 oben links, 2 oben rechts, 3 unten rechts, 4 unten links. Die Lupe zeigt die Ecke vergrößert. Seitenverhältnis „wie im Foto“ oder DIN quer/hoch (Fluchtpläne sind meist A3/A4). „Entzerren“ rechnet ein gerades Bild; Proben und Flächen werden mitgerechnet. Ein vorhandener Maßstab und die Nordrichtung werden dabei entfernt und sind neu zu setzen. Rückgängig stellt das Foto wieder her; die Fotodatei selbst bleibt unverändert.</p>');
-document.getElementById('app-version')!.textContent='v1.43.0';
+document.getElementById('app-version')!.textContent='v1.44.0';
 document.querySelector('#help-dialog h2')!.insertAdjacentHTML('afterend','<h3>Neu in PlanKit 1.16.1 · 20.10.2026</h3><p>Projektzentrale und Spektron-Leiste übergeben Projekte jetzt über #projekt im Fragment. Sonderzeichen bleiben erhalten; alte ?projekt-Links funktionieren weiterhin und werden nach dem Laden bereinigt. Projektwechsel laden auch bereits geöffnete App-Fenster neu; eine Warnung vor ungesicherten Eingaben kann den Wechsel abbrechen. Die Anlagenaktion aktion=anlage wird ebenfalls im Fragment übergeben. Installiertes PlanKit nach einer Online-Aktualisierung vollständig schließen und erneut öffnen.</p>');
 const colorOptions=PALETTE.map(c=>`<option value="${c.color}">${c.title} · ${c.suggestion}</option>`).join('');
 document.querySelector('.modes')!.insertAdjacentHTML('beforeend','<button data-mode="area-draw" class="mode" disabled><span class="tool-icon">⬡</span><span>Fläche zeichnen<small>Eckpunkte setzen & abschließen</small></span></button><button data-mode="area-edit" class="mode" disabled><span class="tool-icon">◇</span><span>Fläche bearbeiten<small>Ecken oder ganze Fläche ziehen</small></span></button>');
@@ -932,7 +933,7 @@ async function raumbuchExport(kind:'docx'|'csv'){
     if(folder&&!await flushFolder())throw Error(`Der Plan ist noch nicht in „${PLAENE}“ gespeichert. Bitte „Speichern“ und erneut versuchen.`);
     const st=raumbuchStand(project);if(!st.rows.length)throw Error('Das Raumbuch ist noch leer.');
     const hints=pruefhinweise(st),created=new Date().toISOString(),app=`PlanKit ${$('app-version').textContent?.replace(/^v/,'')}`;
-    const source=folder?`${PLAENE}/${projectFileName(folder)}`:'PlanKit-Projekt (nicht im Projektordner)';
+    const source=folder?`${planPfad(folder)}/${projectFileName(folder)}`:'PlanKit-Projekt (nicht im Projektordner)';
     const bytes=kind==='docx'?buildDocx({title:`${title}: Raumbuch`,author:app,application:app,created,blocks:raumbuchBlocks(st,{title,nr:folder?.nr||project.report||'',ort:folder?.ort||'',projectData,created,app,source,hinweis:vorlaeufigText(vorlaeufigeBerichte(project))})}):new TextEncoder().encode(raumbuchCSV(st));
     const d=new Date(),z=(n:number)=>String(n).padStart(2,'0'),date=`${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`,nr=folder?.nr||project.report||'Probenplan';
     const hint=hints.length?` · ${hints.length} Hinweis${hints.length===1?'':'e'}: ${hints.map(h=>h.text).join('; ')}`:'';
@@ -952,10 +953,10 @@ function wandKey(){return `plankit-wand-anlage:${folder?.name||''}`;}
 async function wandLaden(){
   if(!project)throw Error('Kein Projekt geöffnet.');
   if(!folder)throw Error('Die Wandansichten brauchen den Projektordner (Bohrkerne aus LabelKit). Bitte das Projekt aus der Projektzentrale öffnen.');
-  const dir=await findSubdir(folder.dir,AUFTRAEGE),f=dir?(await listFiles(dir,/_Daten\.json$/i))[0]:undefined;
+  const lk=await ort(folder.dir,'labelkit'),dir=lk.dir,f=dir?(await listFiles(dir,/_Daten\.json$/i))[0]:undefined,pfad=lk.wo==='neu'?lk.pfad:AUFTRAEGE;   // „Laboraufträge“ oder künftig „_Spektron/LabelKit“
   if(!f)throw Error(`In „${AUFTRAEGE}“ liegt keine LabelKit-Datei (…_Daten.json).`);
-  let daten:unknown;try{daten=JSON.parse(await (await f.handle.getFile()).text());}catch{throw Error(`„${AUFTRAEGE}/${f.name}“ ist nicht lesbar.`);}
-  return {st:wandStand(daten,project),datei:`${AUFTRAEGE}/${f.name}`};
+  let daten:unknown;try{daten=JSON.parse(await (await f.handle.getFile()).text());}catch{throw Error(`„${pfad}/${f.name}“ ist nicht lesbar.`);}
+  return {st:wandStand(daten,project),datei:`${pfad}/${f.name}`};
 }
 function wandFreigeben(){for(const u of wandUrls)URL.revokeObjectURL(u);wandUrls=[];}
 function renderWand(){
@@ -996,7 +997,7 @@ async function wandExport(kind:'docx'|'csv'){
     if(folder&&!await flushFolder())throw Error(`Der Plan ist noch nicht in „${PLAENE}“ gespeichert. Bitte „Speichern“ und erneut versuchen.`);
     wandDaten=await wandLaden();const {st,datei}=wandDaten,p1=$<HTMLSelectElement>('wand-p1').value,p2=$<HTMLSelectElement>('wand-p2').value;
     if(!st.waende.length&&!st.referenz.length)throw Error('Keine Bohrkerne zum Darstellen.');
-    const created=new Date().toISOString(),app=`PlanKit ${$('app-version').textContent?.replace(/^v/,'')}`,source=folder?`${PLAENE}/${projectFileName(folder)}`:'PlanKit-Projekt';
+    const created=new Date().toISOString(),app=`PlanKit ${$('app-version').textContent?.replace(/^v/,'')}`,source=folder?`${planPfad(folder)}/${projectFileName(folder)}`:'PlanKit-Projekt';
     let bytes:Uint8Array;
     if(kind==='docx'){const bilder=new Map<string,WandBildDatei>();for(const w of st.waende){const b=wandSvg(project,w,p1,{titel:false,anteil:kwPaar(p1,p2)});bilder.set(w.key,await svgPng(b.svg,b.width,b.height));}
       bytes=buildDocx({title:`${title}: Bohrkerne – Wandansichten`,author:app,application:app,created,blocks:wandBlocks(project,st,bilder,p1,p2,{title,nr:folder?.nr||project.report||'',ort:folder?.ort||'',projectData,created,app,source,labelkit:datei,hinweis:vorlaeufigText(vorlaeufigeBerichte(project))})});}
@@ -1179,7 +1180,7 @@ let resultkitStand:{folder:ProjectFolder;e:Ergebnisse}|null=null;
 async function resultkitLesen(){
   const f=folder;if(!f){resultkitStand=null;resultkitHinweisZeigen();return;}
   let e:Ergebnisse|null=null;
-  try{const dir=await findSubdir(f.dir,LABOR),datei=dir?await fileInfo(dir,ERGEBNIS_DATEI):null;if(datei)e=liesErgebnisse(await datei.text());}catch{e=null;}   // unlesbar: meldet „Proben übernehmen …“ selbst
+  try{const dir=(await ort(f.dir,'resultkit')).dir,datei=dir?await fileInfo(dir,ERGEBNIS_DATEI):null;if(datei)e=liesErgebnisse(await datei.text());}catch{e=null;}   // „Laborergebnisse“ oder künftig „_Spektron/ResultKit“   // unlesbar: meldet „Proben übernehmen …“ selbst
   if(folder!==f)return;
   resultkitStand=e&&(!e.projekt||e.projekt===f.nr)?{folder:f,e}:null;resultkitHinweisZeigen();
 }
@@ -1195,7 +1196,7 @@ function ask(title:string,text:string,choices:string[]):Promise<string>{return n
 /** No silent 30-file cutoff: all readable versions remain reachable, in pages of 20. */
 async function chooseStoredVersion(target:ProjectFolder,revision:string|null,hasMain:boolean,exclude:string|null){
  const versions:{name:string;handle:FileSystemFileHandle;revision:string|null}[]=[],seen=new Set<string>(),invalid:string[]=[];
- for(const candidate of await listFiles(target.plaene,/\.probenplan$/i)){
+ for(const candidate of await listFiles(planOrdner(target),/\.probenplan$/i)){
   if(candidate.name===projectFileName(target)||candidate.name===exclude)continue;
   try{
    const file=await candidate.handle.getFile(),hash=await fileRevision(file);
@@ -1247,7 +1248,7 @@ function saveToFolder(explicit:boolean){
      // Die Fassung des Kollegen wird gleich überschrieben: vorher dauerhaft sichern (nie automatisch gelöscht)
      // frisch lesen (eine File-Momentaufnahme wird ungültig, sobald die Datei erneut geändert wurde); hat sie sich inzwischen
      // wieder geändert, fragt die nächste Runde ohnehin erneut – gesichert wird genau die Fassung, die überschrieben wird
-     {const cur=await fileInfo(f.plaene,projectFileName(f));if(cur&&await fileRevision(cur)===e.revision)await writeProjectCopy(f,ERSETZEN_KOPIE,await cur.text());}
+     {const cur=await fileInfo(planOrdner(f),projectFileName(f));if(cur&&await fileRevision(cur)===e.revision)await writeProjectCopy(f,ERSETZEN_KOPIE,await cur.text());}
      expected=e.revision; // If changed again while deciding, ask again; never silently overwrite it.
     }
    }
@@ -1256,7 +1257,7 @@ function saveToFolder(explicit:boolean){
 }
 async function reloadFromFolder(){
  if(!folder)return false;
- try{const file=await fileInfo(folder.plaene,projectFileName(folder));if(!file)throw Error('Projektdatei fehlt. Ihre Änderungen bleiben geöffnet.');
+ try{const file=await fileInfo(planOrdner(folder),projectFileName(folder));if(!file)throw Error('Projektdatei fehlt. Ihre Änderungen bleiben geöffnet.');
   const next=await validateProject(JSON.parse(await file.text())),revision=await fileRevision(file);await install(next,true,()=>{folderRevision=revision;folderDirty=false;folderBlocked=false;});$('saved').textContent=`✓ Aus „${PLAENE}“ geladen`;return true;
  }catch(e){fail(e);return false;}
 }
@@ -1304,7 +1305,7 @@ async function enterFolder(dir:Parameters<typeof openFolder>[0]){
   if(opened==='no-plaene'){if(await ask(`Ordner „${PLAENE}“ anlegen?`,`Im Projekt „${dir.name}“ gibt es noch keinen Unterordner „${PLAENE}“.`,['Abbrechen','Anlegen'])!=='Anlegen')return;opened=await openFolder(dir,true) as ProjectFolder;}
   const target=opened;if(!await flushFolder()){if(await ask('Ungespeicherte Änderungen','Vor dem Wechsel muss eine geprüfte Wiederherstellungsdatei Ihrer aktuellen Fassung angelegt werden.',['Abbrechen','Sichern und wechseln'])!=='Sichern und wechseln')return;await preserveUnsavedProject();}
   if(project&&!folder&&!await allowReplace())return;
-  const canonical=await fileInfo(target.plaene,projectFileName(target));let file=canonical,next:Project|null=null,recovered=false,preservedBrowserDraft:string|null=null;
+  const canonical=await fileInfo(planOrdner(target),projectFileName(target));let file=canonical,next:Project|null=null,recovered=false,preservedBrowserDraft:string|null=null;
   if(file){try{next=await validateProject(JSON.parse(await file.text()));}catch{/* Offer explicit recovery below; never overwrite a damaged file automatically. */}}
   const local=await restoreLocal(folderKey(target)).catch(()=>null) as {savedAt:number;project:Project;dirty?:boolean;baseRevision?:string|null}|null;
   const currentRevision=await fileRevision(canonical);
@@ -1342,7 +1343,7 @@ $('lab-import').onclick=async()=>{
   if(!folder||!project){input('lab-files').click();return;}
   // Im Projekt kommen Messwerte nur noch aus ResultKit („Laborergebnisse/_Ergebnisse.json“); LabelKit-Probenerfassung wie bisher.
   const target=folder,dir=await findSubdir(target.dir,LABOR),files=dir?await listFiles(dir,/\.(xml|pdf)$/i):[];
-  const auftraege=await findSubdir(target.dir,AUFTRAEGE),erfassungen=auftraege?(await listFiles(auftraege,/_Daten\.json$/i)).sort((a,b)=>b.lastModified-a.lastModified):[];
+  const auftraege=(await ort(target.dir,'labelkit')).dir,erfassungen=auftraege?(await listFiles(auftraege,/_Daten\.json$/i)).sort((a,b)=>b.lastModified-a.lastModified):[];
   let ergebnisse:Ergebnisse|null=null,ergebnisFehler='',veraltet=false;
   if(dir)try{const datei=await fileInfo(dir,ERGEBNIS_DATEI);if(datei){ergebnisse=liesErgebnisse(await datei.text());
    const stand=await Promise.all([...files.map(async f=>({name:f.name,file:await f.handle.getFile()})),...(erfassungen[0]?[{name:`${AUFTRAEGE}/${erfassungen[0].name}`,file:await erfassungen[0].handle.getFile()}]:[])]);
