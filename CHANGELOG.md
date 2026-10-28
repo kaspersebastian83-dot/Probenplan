@@ -1,5 +1,12 @@
 # Änderungen
 
+## 1.42.0 – 28. Oktober 2026
+
+- **Ergebniskarte „Automatisch – je Probenart“** (neuer Standard): Jede Probe wird nach ihrer Art bewertet – Σ16 EPA-PAK nach der VdS-Referenz der Nutzung, Chlorid nach 5–10 µg/cm², Asbest nach dem Befund im Prüfbericht („Asbest nachgewiesen“ hellrot, sonst grün; Befundtext wie in ResultKit). PAK-, Chlorid- und Asbestproben stehen so farbig auf einer Karte; Legende, Export, Anlage und Raumbuch nennen je Probe ihren Parameter. Ein einzelner Parameter bleibt unter „Bewerteter Parameter“ wählbar. Bestehende Ergebniskarten behalten ihren Parameter – sind mehrere Probenarten im Plan, weist ein Hinweis auf „Automatisch“ hin.
+- **Ergebniskarte schaltet sich selbst ein**, sobald Messwerte im Plan sind (beim Öffnen und nach „Proben übernehmen“). „Ergebnisse“/K schaltet sie wie bisher aus; das gilt dann bis zum nächsten Öffnen des Projekts.
+- **Oberflächenart und Raum aus ResultKit**: Proben aus dem Prüfbericht bringen Oberflächenart und Raum aus LabelKit mit (ab ResultKit 1.5). Bereits platzierte Proben: in ResultKit einmal „Erneut übernehmen“, dann hier „Proben übernehmen …“ → Prüfbericht → „Alle Konflikte: Aktualisieren“ – leere Felder werden gefüllt, Eingaben in PlanKit bleiben. Hat keine Probe eine Oberflächenart, sagt ein Hinweis unter „Beschriftung“, woher sie kommt.
+- Projektdatei: `results.parameter:"*"` für „Automatisch“; ältere PlanKit-Versionen fallen dann auf den ersten Parameter zurück.
+
 ## 1.41.0 – 28. Oktober 2026
 
 - **Schnellskizze (Test, abschaltbar)** – schneller zum Probenplan, wenn kein Grundriss da ist:

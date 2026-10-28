@@ -25,7 +25,7 @@ export function markerLegend(p:Project):{name:string;variants:LegendVariant[]}|n
 function legendBlocks(p:Project,rated?:Rated|null){
   const blocks:{name:string;variants:LegendVariant[]}[]=[];
   if(rated){
-    for(const g of rated.groups)if(g.scale)blocks.push({name:`${shortParameter(rated.parameter)} in ${g.unit}${g.scale.name?` · ${g.scale.name}`:''}`,variants:g.cats.map((c,i)=>({color:c.color,opacity:1,outline:'#1d2a33',dash:[],round:true,text:`${c.name} (${rangeText(g.scale!,i,g.unit)})${c.labels.length?`: ${c.labels.join(', ')}`:''}`}))});
+    for(const g of rated.groups)if(g.scale)blocks.push({name:`${shortParameter(g.parameter)}${g.unit?` in ${g.unit}`:''}${g.scale.name?` · ${g.scale.name}`:''}`,variants:g.cats.map((c,i)=>({color:c.color,opacity:1,outline:'#1d2a33',dash:[],round:true,text:`${c.name} (${rangeText(g.scale!,i,g.unit)})${c.labels.length?`: ${c.labels.join(', ')}`:''}`}))});
     for(const g of qualifierGroups(rated))blocks.push({name:g.name,variants:[{color:g.color,opacity:1,outline:'#1d2a33',dash:[],round:true,text:g.labels.join(', ')}]});
     if(rated.unrated.length)blocks.push({name:'Ohne Bewertung',variants:[{color:UNRATED,opacity:1,outline:'#1d2a33',dash:[],round:true,text:`${rated.unrated.join(', ')} – kein Wert für ${shortParameter(rated.parameter)} oder keine anwendbare Skala / Zahl nicht eindeutig`}]});
   }

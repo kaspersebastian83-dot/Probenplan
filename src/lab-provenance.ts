@@ -1,4 +1,4 @@
-import {allAreas,allMarkers,clone,typeFromArt,shapeForType,type LabData,type LabOrigin,type LabSample,type LabSources,type Project,type Wert} from './model';
+import {AUTO_PARAM,allAreas,allMarkers,clone,typeFromArt,shapeForType,type LabData,type LabOrigin,type LabSample,type LabSources,type Project,type Wert} from './model';
 import type {LabReport} from './labreport';
 
 const idPattern=/^[\w-]{1,80}$/;
@@ -22,7 +22,7 @@ export function berichtQuellen(p:Project):{name:string;origin:LabOrigin}[]{
 /** Vorläufige Berichte nur für die Werte, die eine Planseite zeigt: Proben dieser Seite (p.markers) mit Wert für den dargestellten Parameter.
  *  Nicht platzierte Proben, andere Geschosse und andere Parameter zählen hier nicht. */
 export function vorlaeufigeBerichteAufPlan(p:Project,parameter:string):LabOrigin[]{
- const used=new Set<string>();for(const m of p.markers||[])if(m.lab?.reportId&&(!parameter||(m.lab.werte||[]).some(w=>w.p===parameter)))used.add(m.lab.reportId);
+ const used=new Set<string>();for(const m of p.markers||[])if(m.lab?.reportId&&(!parameter||parameter===AUTO_PARAM||(m.lab.werte||[]).some(w=>w.p===parameter)))used.add(m.lab.reportId);
  return (p.labReports||[]).filter(r=>r.vorlaeufig&&used.has(r.id));
 }
 export const vorlaeufigText=(rs:LabOrigin[])=>rs.length?`Werte aus vorläufigem Prüfbericht ${rs.map(r=>r.bericht||'(ohne Nummer)').join(', ')} – sie können sich mit dem endgültigen Bericht ändern.`:'';

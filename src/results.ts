@@ -3,7 +3,8 @@
 // kaspersebastian83-dot.github.io): je Parameter und Einheit eine Liste von Kategorien mit „ab“-Wert.
 // Für die Karte wird die Skala zusätzlich mit Farben im Projekt gespeichert, damit Kollegen dieselbe Karte sehen.
 import {skalaTeilen} from './skalen-archiv.js';
-import {allMarkers,type Category,type Marker,type Project,type ResultSettings,type Scale,type Wert} from './model';
+import {AUTO_PARAM,allMarkers,type Category,type Marker,type Project,type ResultSettings,type Scale,type Wert} from './model';
+export {AUTO_PARAM};
 
 export const UNRATED='#c3ccd5';
 const AUTO=['#4caf50','#f2c94c','#f2994a','#e0453a','#8e2424'];
@@ -76,17 +77,47 @@ export function chloridScale(parameter:string,unit:string):Scale|undefined{
   {name:'im Bereich der korrosionschemisch relevanten Größenordnung',from:5*f,color:'#f0a030'},{name:'oberhalb der korrosionschemisch relevanten Größenordnung',from:10*f,color:'#e0453a'}]};
 }
 /* ===== Ende KORROSION-CHLORID v1 ===== */
-export function shortParameter(p:string){return p.replace(/^Summe 16 EPA-PAK.*$/i,'Σ16 EPA-PAK').replace(/^Benzo\[a\]pyren$/i,'BaP');}
+export function shortParameter(p:string){if(p===AUTO_PARAM)return 'PAK/Chlorid/Asbest';return p.replace(/^Summe 16 EPA-PAK.*$/i,'Σ16 EPA-PAK').replace(/^Benzo\[a\]pyren$/i,'BaP');}
 
 const werte=(p:Project)=>[...allMarkers(p).flatMap(m=>m.lab?.werte||[]),...(p.pending||[]).flatMap(r=>r.werte||[])];
 export function hasValues(p:Project){return werte(p).length>0;}
 /** Alle Parameter in Berichtsreihenfolge, auch reine BG-/unklare Ergebnisse. */
 export function parameters(p:Project){const seen:string[]=[];for(const w of werte(p))if(!seen.includes(w.p))seen.push(w.p);return seen;}
-export function defaultParameter(list:string[]){return list.find(x=>/^Summe 16 EPA-PAK.*exkl/i.test(x))||list.find(x=>/^Summe 16 EPA-PAK/i.test(x))||list[0]||'';}
+export function defaultParameter(list:string[]){if(list.length)return AUTO_PARAM;return list.find(x=>/^Summe 16 EPA-PAK.*exkl/i.test(x))||list.find(x=>/^Summe 16 EPA-PAK/i.test(x))||list[0]||'';}
 /** Flächenbezogene Einheit (µg/m², µg/cm², mg/m², µg/100 cm² …). Liefert das Labor denselben Parameter je Probe und je Fläche
  *  (Eurofins: „Chlorid (Cl)“ in µg/Probe und berechnet in mg/m²; Reihenfolge in der XML wechselt), gilt der Wert je Fläche – wie in ResultKit. */
 export const FLAECHE=/\/\s*(?:\d+\s*)?(?:c|d)?m\s*(?:2|²)\s*$/i;
-export function wertFuer(werte:Wert[]|undefined,parameter:string):Wert|undefined{const c=(werte||[]).filter(w=>w.p===parameter);return c.find(w=>FLAECHE.test(w.u))||c[0];}
+export function wertFuer(werte:Wert[]|undefined,parameter:string):Wert|undefined{if(parameter===AUTO_PARAM)return hauptwert(werte);const c=(werte||[]).filter(w=>w.p===parameter);return c.find(w=>FLAECHE.test(w.u))||c[0];}
+
+/* ===== Automatisch – je Probenart =====
+   Jede Probe nach ihrem Hauptwert, wie in ResultKits Ergebnisübersicht: Σ16 EPA-PAK (VdS-Referenz nach Nutzung), sonst Chlorid
+   (VdS 5–10 µg/cm²), sonst Asbest (Befund wie im Prüfbericht; „nachgewiesen“ hellrot). So stehen PAK-, Chlorid- und Asbestproben
+   auf einer Karte. Werte werden nie verändert – Asbest zeigt den Befundtext des Berichts. */
+const SUMME=/^(?:Summe|Σ)\s*16\s*EPA[-– ]?PAK/i,CHLORID=/^Chlorid\b/i;
+const ASBEST=/asbest|chrysotil|amosit|krokydolith|tremolit|aktinolith|anthophyllit/i;
+const POSITIV=/nachgewiesen|positiv|enthalten|gefunden|^ja$|chrysotil|amosit|krokydolith|tremolit|aktinolith|anthophyllit/i,NEGATIV=/nicht|kein|negativ|n\.\s*n\.|^<|unter/i;
+const GEHALT=/^asbestgehalt\b/i,ART=/^asbest(?:art)?\b/i;
+/** Asbest-Befund wie in ResultKit (src/uebersicht.ts, asbestBefund – dort gleich halten). */
+export function asbestBefund(werte:Wert[]):{text:string;gefunden:boolean}|null{
+ const a=werte.filter(w=>ASBEST.test(w.p)&&!/^[-–—]?$/.test(w.r.trim()));if(!a.length)return null;
+ const teil=(w:Wert)=>GEHALT.test(w.p.trim())?`${w.r.trim()}${w.u.trim()&&/\d/.test(w.r)?` ${w.u.trim()}`:''}`:ART.test(w.p.trim())?w.r.trim():`${w.p.trim()}: ${w.r.trim()}`;
+ const sortiert=[...a.filter(w=>!GEHALT.test(w.p.trim())),...a.filter(w=>GEHALT.test(w.p.trim()))];
+ const gehaltPositiv=(w:Wert)=>GEHALT.test(w.p.trim())&&/\d/.test(w.r)&&!/^\s*</.test(w.r)&&!NEGATIV.test(w.r.trim());
+ return {text:[...new Set(sortiert.map(teil))].join(' · '),gefunden:a.some(w=>(POSITIV.test(w.r.trim())&&!NEGATIV.test(w.r.trim()))||gehaltPositiv(w))};
+}
+/** Parametername des Asbest-Befunds in der Ergebniskarte (kein Laborparameter – fasst Asbestart und -gehalt zusammen). */
+export const ASBEST_PARAM='Asbest';
+export const ASBEST_SKALA:Scale={name:'Asbest laut Prüfbericht',cats:[{name:'kein Asbest nachgewiesen',from:0,color:'#4caf50'},{name:'Asbest nachgewiesen',from:1,color:'#ef9a9a'}]};
+/** Hauptwert einer Probe für „Automatisch“: Σ16 EPA-PAK (exkl. BG bevorzugt, je Fläche), sonst Chlorid (je Fläche), sonst Asbest-Befund. */
+export function hauptwert(werte:Wert[]|undefined):Wert|undefined{
+ const w=werte||[],flaeche=(c:Wert[])=>c.find(x=>FLAECHE.test(x.u))||c[0];
+ const summen=w.filter(x=>SUMME.test(x.p.trim()));if(summen.length){const exkl=summen.filter(x=>/exkl/i.test(x.p));return flaeche(exkl.length?exkl:summen);}
+ const cl=w.filter(x=>CHLORID.test(x.p.trim()));if(cl.length)return flaeche(cl);
+ const b=asbestBefund(w);if(b)return {p:ASBEST_PARAM,r:b.text.slice(0,40),u:''};
+ return undefined;
+}
+export const istAuto=(parameter:string|undefined)=>parameter===AUTO_PARAM;
+/* ===== Ende Automatisch ===== */
 export function valueOf(m:Marker,parameter:string):Wert|undefined{return wertFuer(m.lab?.werte,parameter);}
 /** Index der Kategorie: letzte Kategorie, deren „ab“-Wert erreicht ist (wie in FotoKit). */
 export function rate(scale:Scale|undefined,value:number){if(!scale?.cats.length||!Number.isFinite(value)||value<0)return -1;let index=0;scale.cats.forEach((c,i)=>{if(i>0&&value>=c.from)index=i;});return index;}
@@ -105,29 +136,35 @@ export function fromShared(key:string):Scale|null{
 export function prepare(p:Project):boolean{
   const list=parameters(p);if(!list.length)return false;let changed=false;
   const fresh=!p.results;
-  if(!p.results||!list.includes(p.results.parameter)){p.results={...p.results,parameter:defaultParameter(list),scales:p.results?.scales||{}};changed=true;}
+  if(!p.results||(p.results.parameter!==AUTO_PARAM&&!list.includes(p.results.parameter))){p.results={...p.results,parameter:defaultParameter(list),scales:p.results?.scales||{}};changed=true;}
   if(fresh){const usage=usageFromNutzung();if(usage)p.results.usage=usage;}
-  for(const unit of units(p,p.results.parameter)){const key=scaleKey(p.results.parameter,unit);if(!p.results.scales[key]){const s=fromShared(key);if(s){p.results.scales[key]=s;changed=true;}}}
+  for(const {key} of paramUnits(p,p.results.parameter)){if(!p.results.scales[key]){const s=fromShared(key);if(s){p.results.scales[key]=s;changed=true;}}}
   return changed;
 }
 /** Einheiten des bewerteten Parameters – je Probe der Wert, der auch gezeigt und bewertet wird (wertFuer). */
+/** Parameter und Einheit je bewerteter Probe (bei „Automatisch“ mehrere Parameter) – je Paar eine Skala. */
+export function paramUnits(p:Project,parameter:string){const seen=new Map<string,{key:string;parameter:string;unit:string}>();
+ for(const w of [...allMarkers(p).map(m=>valueOf(m,parameter)),...(p.pending||[]).map(r=>wertFuer(r.werte,parameter))])if(w){const key=scaleKey(w.p,w.u);if(!seen.has(key))seen.set(key,{key,parameter:w.p,unit:w.u});}
+ return [...seen.values()];}
 export function units(p:Project,parameter:string){const seen:string[]=[];for(const w of [...allMarkers(p).map(m=>valueOf(m,parameter)),...(p.pending||[]).map(r=>wertFuer(r.werte,parameter))])if(w&&!seen.includes(w.u))seen.push(w.u);return seen;}
 
 /** Eine Regel für Ergebniskarte, Raumbuch, Anlage und Wandansicht: Ist eine Nutzung gewählt und gibt es für Parameter
  *  und Einheit eine VdS-Referenz, gilt sie – außer sie wurde im Projekt angepasst. Sonst gilt die eigene Skala des Projekts.
  *  Beide bleiben bearbeitbar; keine Skala wird erfunden. */
 export function scaleFor(settings:ResultSettings|undefined,parameter:string,unit:string):{scale?:Scale;vds?:Scale;angepasst:boolean}{
+  if(parameter===ASBEST_PARAM&&!unit)return {scale:ASBEST_SKALA,angepasst:false};
   const key=scaleKey(parameter,unit),vds=(settings?.usage?vdsScale(parameter,unit,settings.usage):undefined)??chloridScale(parameter,unit);   // Chlorid-Referenz gilt ohne Nutzung
   if(vds){const eigen=settings?.vds?.[key];return {scale:eigen||vds,vds,angepasst:!!eigen};}
   return {scale:settings?.scales[key],angepasst:false};
 }
-export interface Rated {fill:Map<string,string>;groups:{key:string;unit:string;scale:Scale|undefined;cats:(Category&{labels:string[]})[]}[];unrated:string[];below:string[];notDetected:string[];notDetermined:string[];parameter:string}
+export interface Rated {fill:Map<string,string>;groups:{key:string;parameter:string;unit:string;scale:Scale|undefined;cats:(Category&{labels:string[]})[]}[];unrated:string[];below:string[];notDetected:string[];notDetermined:string[];parameter:string}
 /** Farben je Marker und Legende für die Marker des übergebenen (Teil-)Projekts. */
 export function rateMarkers(p:Project,markers:Marker[]=p.markers,settings:ResultSettings|undefined=p.results):Rated{
   const fill=new Map<string,string>(),unrated:string[]=[],below:string[]=[],notDetected:string[]=[],notDetermined:string[]=[],parameter=settings?.parameter||'';const groups=new Map<string,Rated['groups'][number]>();
   for(const m of markers){if(m.kind!=='sample')continue;const w=valueOf(m,parameter);
     if(!w){unrated.push(m.label);fill.set(m.id,UNRATED);continue;}
-    const key=scaleKey(parameter,w.u),scale=scaleFor(settings,parameter,w.u).scale;if(!groups.has(key))groups.set(key,{key,unit:w.u,scale,cats:(scale?.cats||[]).map(c=>({...c,labels:[]}))});
+    const key=scaleKey(w.p,w.u),scale=scaleFor(settings,w.p,w.u).scale;if(!groups.has(key))groups.set(key,{key,parameter:w.p,unit:w.u,scale,cats:(scale?.cats||[]).map(c=>({...c,labels:[]}))});
+    if(w.p===ASBEST_PARAM&&!w.u&&scale){const i=asbestBefund(m.lab?.werte||[])?.gefunden?1:0,g=groups.get(key)!;g.cats[i].labels.push(m.label);fill.set(m.id,g.cats[i].color);continue;}
     const qualifier=labQualifier(w.r);
     if(qualifier==='below'){below.push(m.label);fill.set(m.id,BELOW_LIMIT);continue;}
     if(qualifier==='notDetected'){notDetected.push(m.label);fill.set(m.id,NOT_DETECTED);continue;}
@@ -144,6 +181,6 @@ export function qualifierGroups(rated:Rated){return [
  {name:'Nicht nachgewiesen (n.n.)',color:NOT_DETECTED,labels:rated.notDetected},
  {name:'Nicht bestimmt / Bedeutung prüfen (n.b.)',color:NOT_DETERMINED,labels:rated.notDetermined}
 ].filter(g=>g.labels.length);}
-export function rangeText(scale:Scale,i:number,unit:string){const c=scale.cats[i],next=scale.cats[i+1],n=(v:number)=>v.toLocaleString('de-DE');return next?(i===0?`< ${n(next.from)} ${unit}`:`${n(c.from)} – < ${n(next.from)} ${unit}`):(i===0?`alle Werte`:`≥ ${n(c.from)} ${unit}`);}
+export function rangeText(scale:Scale,i:number,unit:string){if(scale===ASBEST_SKALA||(!unit&&scale.name===ASBEST_SKALA.name))return 'laut Prüfbericht';const c=scale.cats[i],next=scale.cats[i+1],n=(v:number)=>v.toLocaleString('de-DE');return next?(i===0?`< ${n(next.from)} ${unit}`:`${n(c.from)} – < ${n(next.from)} ${unit}`):(i===0?`alle Werte`:`≥ ${n(c.from)} ${unit}`);}
 /** Gut lesbare Schriftfarbe auf einer Füllfarbe. */
 export function ink(color:string){const n=parseInt(color.slice(1),16),r=n>>16,g=n>>8&255,b=n&255;return (r*299+g*587+b*114)/1000>150?'#1d2a33':'#ffffff';}
