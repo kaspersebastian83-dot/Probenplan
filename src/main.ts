@@ -414,7 +414,7 @@ $('sketch-done').onclick=()=>{const s=sketching?.s,n=s?s.rooms.length+s.walls.le
 document.querySelectorAll<HTMLButtonElement>('[data-sketch-tool]').forEach(b=>b.onclick=()=>{if(!sketching)return;sketching.tool=b.dataset.sketchTool as SketchTool;sketching.draft=null;sketching.draftWall=null;renderSketch();});
 const sketchTry=(fn:()=>void,also?:(p:Project)=>void)=>{try{fn();previewSketch();commitSketch(also);}catch(e){if(sketching&&project?.plan.sketch)sketching.s=extendSketch(project.plan.sketch);previewSketch();renderSketch();toast(e instanceof Error?e.message:String(e),true);}};
 const focusField=(id:string)=>setTimeout(()=>{input(id).focus();input(id).select();},0);
-input('sketch-name').onchange=()=>{const r=selRoom(),v=input('sketch-name').value.replace(/\s+/g,' ').trim().slice(0,60);if(r&&v&&v!==r.name){const old=r.name;sketchTry(()=>{r.name=v;},quickSketchOn()?p=>{for(const m of p.markers)if(m.raum===old)m.raum=v;}:undefined);}else renderSketch();};   // Schnellskizze: Proben mit dem alten Raumnamen ziehen mit
+input('sketch-name').onchange=()=>{const r=selRoom(),v=input('sketch-name').value.replace(/\s+/g,' ').trim().slice(0,60);if(r&&v&&v!==r.name){const old=r.name,id=r.id;sketchTry(()=>{r.name=v;},p=>{for(const m of p.markers)if(m.raumSkizze===id&&m.raum===old)m.raum=v;});}else renderSketch();};   // nur Proben, deren Raum aus diesem Skizzenraum stammt – LabelKit und Handeingaben bleiben
 const roomSize=()=>{const r=selRoom();if(r)sketchTry(()=>resizeRoom(sketching!.s,r.id,metersIn('sketch-w'),metersIn('sketch-h')));};
 input('sketch-w').onchange=roomSize;input('sketch-h').onchange=roomSize;
 input('sketch-wl').onchange=()=>{const w=selWall();if(w)sketchTry(()=>setWallLength(sketching!.s,w.id,metersIn('sketch-wl')));};
@@ -565,7 +565,7 @@ input('note').onchange=()=>{const m=selectedMarker();if(m)mutate(()=>m.note=inpu
 function raumVorschlaege(){if(!project)return;const seen=new Set<string>(),out:string[]=[];for(const r of [...allMarkers(project),...(project.pending||[])]){const v=(r.raum||'').trim();if(v&&!seen.has(v)){seen.add(v);out.push(v);}}
   $('raum-list').replaceChildren(...out.sort((a,b)=>a.localeCompare(b,'de',{numeric:true})).map(v=>{const o=document.createElement('option');o.value=v;return o;}));}
 input('raum').addEventListener('focus',raumVorschlaege);
-input('raum').onchange=()=>{const m=selectedMarker(),v=input('raum').value.trim().slice(0,MAX_RAUM);if(m&&(m.raum||'')!==v)mutate(()=>{if(v)m.raum=v;else delete m.raum;});};
+input('raum').onchange=()=>{const m=selectedMarker(),v=input('raum').value.trim().slice(0,MAX_RAUM);if(m&&(m.raum||'')!==v)mutate(()=>{if(v)m.raum=v;else delete m.raum;delete m.raumSkizze;});};   // von Hand: gilt, Skizze ändert ihn nicht mehr
 $<HTMLSelectElement>('surface').onchange=()=>{const m=selectedMarker(),v=$<HTMLSelectElement>('surface').value as Surface|'';if(m&&m.kind==='sample')mutate(()=>{if(v&&SURFACES.includes(v))m.surface=v;else delete m.surface;});};
 $<HTMLSelectElement>('shape').onchange=()=>{const m=selectedMarker(),v=$<HTMLSelectElement>('shape').value as Shape;if(m&&m.kind==='sample'&&SHAPES.includes(v))mutate(()=>{if(v==='circle'&&!typeFromArt(m.lab?.art))delete m.shape;else m.shape=v;});};
 for(const id of ['report','date'] as const)input(id).onchange=()=>mutate(p=>p[id]=input(id).value);
@@ -630,7 +630,7 @@ function endPointer(e:PointerEvent,cancel=false){if(cropping)return;pointers.del
   else if(!d.moved&&mode==='lab-place'){labUI?.placeAt(point(e));}
   else if(!d.moved&&mode==='area-draw'){const pt=point(e);if(pt.x<0||pt.y<0||pt.x>project.plan.width||pt.y>project.plan.height){toast('Bitte innerhalb des Grundrisses zeichnen.');return;}if(draftPoints.length>=MAX_POINTS){toast(`Höchstens ${MAX_POINTS} Eckpunkte pro Fläche.`,true);return;}draftPoints.push(pt);render();}
   else if(d.marker&&d.moved&&d.before){history.push(d.before);changed();}
-  else if(!d.moved&&(mode==='sample'||mode==='fire')){const hit=document.elementFromPoint(e.clientX,e.clientY)?.closest('[data-id]');if(hit)return;const pt=point(e);if(pt.x<0||pt.y<0||pt.x>project.plan.width||pt.y>project.plan.height){toast('Bitte innerhalb des Grundrisses markieren.');return;}mutate(p=>{const m=addMarker(p,mode==='sample'?'sample':'fire',pt.x,pt.y),f=$<HTMLSelectElement>('next-shape').value as Shape;if(m.kind==='sample'&&f!=='circle'&&SHAPES.includes(f))m.shape=f;if(p.plan.sketch&&quickSketchOn()){const r=roomAt(p.plan.sketch,pt);if(r)m.raum=r.name;}selected=m.id;});}
+  else if(!d.moved&&(mode==='sample'||mode==='fire')){const hit=document.elementFromPoint(e.clientX,e.clientY)?.closest('[data-id]');if(hit)return;const pt=point(e);if(pt.x<0||pt.y<0||pt.x>project.plan.width||pt.y>project.plan.height){toast('Bitte innerhalb des Grundrisses markieren.');return;}mutate(p=>{const m=addMarker(p,mode==='sample'?'sample':'fire',pt.x,pt.y),f=$<HTMLSelectElement>('next-shape').value as Shape;if(m.kind==='sample'&&f!=='circle'&&SHAPES.includes(f))m.shape=f;if(p.plan.sketch&&quickSketchOn()){const r=roomAt(p.plan.sketch,pt);if(r){m.raum=r.name;m.raumSkizze=r.id;}}selected=m.id;});}
 }
 svg.addEventListener('pointerup',e=>endPointer(e));svg.addEventListener('pointercancel',e=>endPointer(e,true));
 new ResizeObserver(()=>{if(project){const rect=svg.getBoundingClientRect(),h=camera.width*rect.height/rect.width;if(Number.isFinite(h)){camera.y+=(camera.height-h)/2;camera.height=h;updateCamera();}}}).observe($('stage'));
@@ -1014,7 +1014,7 @@ $('measure-dialog').addEventListener('close',()=>{
   else{measurePoints=[];renderMeasure();if(mode==='measure')$('mode-hint').textContent='Strecke messen: ersten Punkt anklicken · Esc bricht ab';}
   dialog.returnValue='';
 });
-$('measure-start').onclick=()=>{if(!project||busy||cropping)return;setMode('measure');measurePoints=[];renderMeasure();toast('Zwei Punkte einer bekannten Strecke anklicken.');};
+$('measure-start').onclick=()=>{if(!project||busy||cropping)return;if(project.plan.sketch?.schematic){toast('Die Skizze ist „nicht maßstäblich“. Zum Messen in der Skizze den Haken „Skizze – nicht maßstäblich“ entfernen – dann gilt der Maßstab der Skizze.',true);return;}setMode('measure');measurePoints=[];renderMeasure();toast('Zwei Punkte einer bekannten Strecke anklicken.');};
 $('scale-clear').onclick=()=>{if(project?.plan.calibration)mutate(p=>{delete p.plan.calibration;});};
 function setNorth(value:number|null){if(!project)return;const v=value===null?null:((Math.round(value)%360)+360)%360;if(v===northAngle(project.plan))return;mutate(p=>{if(v===null)delete p.plan.north;else p.plan.north=v;});}
 input('north-on').addEventListener('change',()=>setNorth(input('north-on').checked?0:null));
@@ -1024,7 +1024,8 @@ function updateScaleUI(){
   const sec=$('scale-section');sec.hidden=!project;if(!project)return;const plan=project.plan,mpu=metersPerUnit(plan),north=northAngle(plan);
   $('scale-value').textContent=mpu?'kalibriert':'–';$('scale-clear').hidden=!mpu;
   if(mpu){const b=bounds(project);$('scale-status').textContent=`Gemessen: ${deNum(plan.calibration!.meters)} m. Plan ca. ${deNum(b.width*mpu,1)} × ${deNum(b.height*mpu,1)} m. Prüfen: erneut messen, der bisherige Wert wird angezeigt.`;}
-  else $('scale-status').textContent='Nicht kalibriert. Für maßstäbliche PDFs eine bekannte Strecke messen, z. B. eine Wandlänge.';
+  else $('scale-status').textContent=plan.sketch?.schematic?'Skizze – nicht maßstäblich: kein Maßstab. Für einen Maßstab in der Skizze den Haken „nicht maßstäblich“ entfernen.':'Nicht kalibriert. Für maßstäbliche PDFs eine bekannte Strecke messen, z. B. eine Wandlänge.';
+  $<HTMLButtonElement>('measure-start').disabled=!!plan.sketch?.schematic;
   input('north-on').checked=north!==null;$('north-controls').hidden=north===null;if(north!==null&&document.activeElement!==$('north-angle'))input('north-angle').value=String(Math.round(north));
   $('north-needle').setAttribute('transform',`rotate(${north??0})`);
 }

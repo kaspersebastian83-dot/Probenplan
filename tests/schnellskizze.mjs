@@ -43,17 +43,22 @@ for(const engine of engines){
   });
   await check(`${engine}: Probe in der Küche bekommt den Raum; Umbenennen zieht mit`,async()=>{
    await blur(page);await page.keyboard.press('p');await tapPlan(page,800,275);await page.keyboard.press('v');
-   let s=await savedProject(page);assert.equal(s.markers.length,1);assert.equal(s.markers[0].raum,'Küche');
+   let s=await savedProject(page);assert.equal(s.markers.length,1);assert.equal(s.markers[0].raum,'Küche');assert.equal(s.markers[0].raumSkizze,s.plan.sketch.rooms[1].id);
    assert.equal(await page.locator('#raum').inputValue(),'Küche');
+   // Probe im Flur, Raum von Hand auf „Küche“ gesetzt: gilt als Handeingabe und zieht beim Umbenennen nicht mit
+   await page.keyboard.press('p');await tapPlan(page,300,275);await page.keyboard.press('v');
+   await page.locator('#raum').fill('Küche');await page.locator('#raum').press('Enter');
+   s=await savedProject(page);assert.equal(s.markers[1].raum,'Küche');assert.equal(s.markers[1].raumSkizze,undefined);
+   assert.equal(await page.locator('#measure-start').isDisabled(),true,'nicht maßstäblich: kein Messen');
    await page.locator('#sketch-edit').click();await page.locator('#sketch-actions').waitFor();
    assert.equal(await page.locator('#sketch-list-panel').isVisible(),false,'mit Räumen keine Liste aufklappen');
    await tapPlan(page,700,150);await page.locator('#sketch-name').fill('Kochen');await page.locator('#sketch-name').press('Enter');
-   s=await savedProject(page);assert.equal(s.markers[0].raum,'Kochen');
+   s=await savedProject(page);assert.equal(s.markers[0].raum,'Kochen');assert.equal(s.markers[1].raum,'Küche','Handeingabe bleibt');
   });
   await check(`${engine}: Haken „nicht maßstäblich“ aus – Maßstab und m² wieder da`,async()=>{
    await blur(page);await tapPlan(page,1700,1700);await page.locator('#sketch-schematic').uncheck();
    const s=await savedProject(page);assert.equal(s.plan.sketch.schematic,undefined);assert.deepEqual(s.plan.calibration,{units:100,meters:1});
-   assert.match(await planSVG(page,s.plan.data),/m²/);
+   assert.match(await planSVG(page,s.plan.data),/m²/);assert.equal(await page.locator('#measure-start').isDisabled(),false);
    await page.locator('#sketch-schematic').check();
   });
   await check(`${engine}: Schalter aus – Skizze wie bisher, kein Raum an der Probe`,async()=>{
@@ -61,7 +66,7 @@ for(const engine of engines){
    assert.equal(await page.locator('#sketch-list-open').isVisible(),false);assert.equal(await page.locator('#sketch-schematic').isVisible(),false);
    assert.equal(await page.evaluate(()=>localStorage.getItem('plankit-schnellskizze')),'0');
    await page.locator('#sketch-done').click();await blur(page);await page.keyboard.press('p');await tapPlan(page,300,725);await page.keyboard.press('v');
-   const s=await savedProject(page);assert.equal(s.markers.length,2);assert.equal(s.markers[1].raum,undefined);
+   const s=await savedProject(page);assert.equal(s.markers.length,3);assert.equal(s.markers[2].raum,undefined);
    assert.equal(s.plan.sketch.schematic,true,'gesetzte Kennzeichen bleiben in der Skizze');
    await page.evaluate(()=>localStorage.setItem('plankit-schnellskizze','1'));
   });
