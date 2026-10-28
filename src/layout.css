@@ -338,3 +338,11 @@ label.pflicht-offen>input,label.pflicht-offen>select{border-color:#d9a400!import
 #sketch-list-panel label{font-size:12px;font-weight:600}
 #sketch-list-panel textarea{width:100%;box-sizing:border-box;min-height:110px;font:inherit;font-size:14px;line-height:1.5;padding:6px 8px;resize:vertical}
 #sketch-list-panel .tiny{margin:0;color:var(--kit-muted)}
+/* Zuschneiden (ab 1.43): Angebot nach dem Laden, Größe/Hinweise, Anfasser */
+.crop-offer{position:absolute;top:56px;left:50%;transform:translateX(-50%);z-index:3;background:#fff;border:1px solid var(--kit-line2);border-radius:8px;box-shadow:0 2px 8px rgba(40,72,116,.15);padding:8px 12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;width:max-content;max-width:calc(100% - 24px)}
+.crop-offer[hidden]{display:none!important}
+.crop-offer span{font-size:13px;font-weight:600}
+.crop-offer button{width:auto;margin:0;min-height:36px}
+#crop-info{width:100%;margin:0 0 4px;color:var(--kit-muted)}
+#crop-info.warn{color:#9a4b00;font-weight:600}
+#stage[data-mode=crop] #drawing{touch-action:none}
