@@ -47,7 +47,7 @@ for(const engine of engines){
    assert.equal(await page.locator('#raum').inputValue(),'Küche');
    // Probe im Flur, Raum von Hand auf „Küche“ gesetzt: gilt als Handeingabe und zieht beim Umbenennen nicht mit
    await page.keyboard.press('p');await tapPlan(page,300,275);await page.keyboard.press('v');
-   await page.locator('#raum').fill('Küche');await page.locator('#raum').press('Enter');
+   await page.locator('#raum').fill('Küche');await page.locator('#raum').press('Tab');   // Tab: change-Ereignis in allen Browsern (WebKit: Enter im Feld mit Vorschlagsliste nicht)
    s=await savedProject(page);assert.equal(s.markers[1].raum,'Küche');assert.equal(s.markers[1].raumSkizze,undefined);
    assert.equal(await page.locator('#measure-start').isDisabled(),true,'nicht maßstäblich: kein Messen');
    await page.locator('#sketch-edit').click();await page.locator('#sketch-actions').waitFor();
