@@ -36,4 +36,25 @@ ok('Eurofins liefert Chlorid je Probe und je Fläche (Reihenfolge wechselt): bew
  assert.equal(valueOf(project.markers[0],P).r,'199');assert.deepEqual(units(project,P),['mg/m²'],'keine leere Skala für µg/Probe');
  assert.equal(rate(scaleFor({scales:{}},P,'mg/m²').scale,199),2,'199 mg/m² = 19,9 µg/cm² → oberhalb');
 });
+// Automatisch – je Probenart: PAK, Chlorid und Asbest auf einer Karte.
+{const {rateMarkers,prepare,AUTO_PARAM,hauptwert,paramUnits}=await import('../src/results.ts');
+ const SUM='Summe 16 EPA-PAK exkl. BG',mk=(label,werte,typ)=>({id:label,kind:'sample',label,note:'',x:1,y:1,lx:1,ly:1,...(typ?{typ}:{}),lab:{ref:label,desc:'',werte}});
+ const plan=()=>({format:'probenplan',version:4,plan:{name:'x',width:100,height:100,data:''},nextSample:9,nextFire:1,report:'',date:'',markers:[
+  mk('P1',[{p:SUM,r:'45',u:'µg/m²'},{p:'Benzo[a]pyren',r:'3',u:'µg/m²'}],'PAK'),mk('P2',[{p:SUM,r:'4',u:'µg/m²'}]),
+  mk('P3',[{p:'Chlorid (Cl)',r:'120',u:'µg/Probe'},{p:'Chlorid (Cl)',r:'7,5',u:'µg/cm²'}],'Chlorid'),mk('P4',[{p:'Chlorid (Cl)',r:'2',u:'µg/cm²'}]),
+  mk('P5',[{p:'Asbestart',r:'Chrysotil',u:''},{p:'Asbestgehalt',r:'5 - 20',u:'%'}],'Asbest'),mk('P6',[{p:'Asbest',r:'Kein Asbest nachgewiesen',u:''}],'Asbest'),
+  mk('P7',[{p:'MKW C10-C40',r:'80',u:'mg/kg'}])]});
+ ok('Automatisch: neue Ergebniskarte bewertet jede Probe nach ihrer Art (PAK nach Nutzung, Chlorid 5–10, Asbest nachgewiesen hellrot)',()=>{
+  const p=plan();prepare(p);assert.equal(p.results.parameter,AUTO_PARAM);p.results.usage='residential';
+  const r=rateMarkers(p),f=Object.fromEntries(r.fill);
+  assert.deepEqual(f,{P1:'#e0453a',P2:'#4caf50',P3:'#f0a030',P4:'#4caf50',P5:'#ef9a9a',P6:'#4caf50',P7:'#c3ccd5'});
+  assert.deepEqual(r.groups.map(g=>g.parameter),[SUM,'Chlorid (Cl)','Asbest']);assert.deepEqual(r.unrated,['P7']);
+  assert.deepEqual(paramUnits(p,AUTO_PARAM).map(x=>x.key),[`${SUM}|µg/m²`,'Chlorid (Cl)|µg/cm²','Asbest|']);
+  assert.equal(hauptwert(p.markers[4].lab.werte).r,'Chrysotil · 5 - 20 %');
+ });
+ ok('Einzelparameter bleibt wählbar: nur PAK bewertet, Chlorid grau',()=>{
+  const p=plan();prepare(p);p.results.parameter=SUM;p.results.usage='residential';const f=Object.fromEntries(rateMarkers(p).fill);
+  assert.equal(f.P1,'#e0453a');assert.equal(f.P3,'#c3ccd5');prepare(p);assert.equal(p.results.parameter,SUM,'gewählter Parameter bleibt');
+ });
+}
 console.log(`${n} Prüfungen Chlorid bestanden`);

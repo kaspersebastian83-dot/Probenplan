@@ -74,7 +74,7 @@ try{
   assert.match(t,/^Anlage 3: Probenahme und Laborergebnisse\nProjekt 26\.0142 · Teststadt/m);
   assert.match(t,/Objekt\nEFH, Musterweg 7/);assert.match(t,/Schadendatum\n02\.10\.2026/);
   assert.match(t,/1\. Lageplan der Probenahmestellen/);assert.match(t,/Ohne Maßstab \(Plan nicht kalibriert\)/);
-  assert.match(t,/Parameter: Summe 16 EPA-PAK exkl\. BG/);
+  assert.match(t,/Parameter: je Probenart – Σ16 EPA-PAK, Chlorid, Asbest/,"Standard: Automatisch");
   assert.match(t,/P1\nTestbereich 1, fiktive Oberfläche/);
   assert.doesNotMatch(t,/Probe\nGeschoss\nProbenahmestelle/,"nur ein Plan: keine Geschoss-Spalte");
   assert.match(t,/38,5 µg\/100 cm²\nmittel/,'Rohwert und Einordnung');assert.match(t,/< 0,50 µg\/100 cm²\nunter BG/);assert.match(t,/120 µg\/100 cm²\nhoch/);

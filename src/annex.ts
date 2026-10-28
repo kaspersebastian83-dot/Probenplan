@@ -4,7 +4,7 @@
 // Einordnung nur in die Skala des Sachverständigen (mit Angabe der Skala) – jede Abweichung steht im Prüfprotokoll.
 // Dieser Teil ist rein: er rechnet nur mit den übergebenen Daten (Bilder, Prüfsummen und Dateien liefert annex-run.ts).
 import {allMarkers,floorName,sheetCount,sheetProject,type Project,type Wert} from './model';
-import {rangeText,rateMarkers,scaleFor,shortParameter,valueOf,wertFuer,type Rated} from './results';
+import {ASBEST_PARAM,AUTO_PARAM,rangeText,rateMarkers,scaleFor,shortParameter,valueOf,wertFuer,type Rated} from './results';
 import {STIL,type Block,type Cell,type Row} from './docx';
 
 export interface AnnexImage {data:Uint8Array;ext:'png'|'jpeg';widthPx:number;heightPx:number}
@@ -77,10 +77,11 @@ export function collectSamples(p:Project):AnnexSample[]{
 /** Beschreibung der verwendeten Skalen (je Einheit), damit die Einordnung nachvollziehbar ist. */
 export function scaleNotes(p:Project):string[]{
   const s=p.results;if(!s?.parameter)return [];const seen=new Set<string>(),notes:string[]=[];
-  for(const m of allMarkers(p)){const w=valueOf(m,s.parameter);if(!w||seen.has(w.u))continue;seen.add(w.u);
-    const eff=scaleFor(s,s.parameter,w.u),scale=eff.scale;
-    if(!scale?.cats.length){notes.push(`${shortParameter(s.parameter)} in ${w.u}: keine Skala hinterlegt – Werte ohne Einordnung.`);continue;}
-    notes.push(`${shortParameter(s.parameter)} in ${w.u}: ${scale.name?`Skala „${scale.name}“`:'Skala'}${eff.vds?(eff.angepasst?' (VdS-Referenz, im Projekt angepasst)':''):' (Vorgabe des Sachverständigen)'} – ${scale.cats.map((c,i)=>`${c.name} ${rangeText(scale,i,w.u)}`).join(' · ')}.`);}
+  for(const m of allMarkers(p)){const w=valueOf(m,s.parameter);if(!w||seen.has(`${w.p}|${w.u}`))continue;seen.add(`${w.p}|${w.u}`);
+    const eff=scaleFor(s,w.p,w.u),scale=eff.scale,was=`${shortParameter(w.p)}${w.u?` in ${w.u}`:''}`;
+    if(!scale?.cats.length){notes.push(`${was}: keine Skala hinterlegt – Werte ohne Einordnung.`);continue;}
+    if(w.p===ASBEST_PARAM&&!w.u){notes.push(`${was}: Befund wie im Prüfbericht – „Asbest nachgewiesen“ hellrot, sonst grün.`);continue;}
+    notes.push(`${was}: ${scale.name?`Skala „${scale.name}“`:'Skala'}${eff.vds?(eff.angepasst?' (VdS-Referenz, im Projekt angepasst)':''):' (Vorgabe des Sachverständigen)'} – ${scale.cats.map((c,i)=>`${c.name} ${rangeText(scale,i,w.u)}`).join(' · ')}.`);}
   return notes;
 }
 
@@ -141,7 +142,7 @@ export function annexBlocks(a:AnnexInput):Block[]{
 
   // 3 · Probenverzeichnis
   b.push(head('2. Probenverzeichnis'));
-  if(param)b.push(P(`Parameter: ${a.parameter}`,{size:10,after:80}));
+  if(param)b.push(P(`Parameter: ${a.parameter===AUTO_PARAM?'je Probenart – Σ16 EPA-PAK, Chlorid, Asbest':a.parameter}`,{size:10,after:80}));
   // Spalte „Geschoss“ nur bei mehreren Plänen; nicht platzierte Proben stehen dann in „Probenahmestelle“
   // Breiten so, dass Datum, „Probe“ und „Referenzwert“ nicht mitten im Wort umbrechen
   const floors=a.plans.length>1,w=floors?[650,900,1550,1200,1050,1150,1170,1400]:[650,2050,1200,1050,1250,1270,1600];
@@ -162,7 +163,7 @@ export function annexBlocks(a:AnnexInput):Block[]{
     b.push(STIL.unterzeile([s.art,s.placed?s.floor:'nicht im Plan platziert'].filter(Boolean).join(' · '),{before:0,after:140,keepNext:true}));
     const d:[string,string][]=([['Probenahmestelle',s.desc],['Notiz im Plan',s.note],['Geschoss',s.placed?s.floor:'nicht im Plan'],['Art / Matrix',s.art],['Probenahmedatum',deDate(s.datum)],
       ['Laborreferenz',s.ref],['Labor-Nr.',s.labNr],['Prüfbericht',[s.bericht,s.labor].filter(Boolean).join(' · ')],
-      ...(param?[[`${param} (Einordnung)`,s.value?`${s.value.r} ${s.value.u}`.trim()+(s.rating?` · ${s.rating}`:''):'kein Messwert']]:[])] as [string,string][]).filter(([,v])=>v);
+      ...(param?[[`${a.parameter===AUTO_PARAM&&s.value?shortParameter(s.value.p):param} (Einordnung)`,s.value?`${s.value.r} ${s.value.u}`.trim()+(s.rating?` · ${s.rating}`:''):'kein Messwert']]:[])] as [string,string][]).filter(([,v])=>v);
     b.push({t:'table',widths:[2800,W-2800],size:9.5,rows:d.map(([k,v])=>({cells:[STIL.label(k),{text:v}]}))});
     if(s.excerpt){const sz=imageSize(s.excerpt,95,55);b.push({t:'image',data:s.excerpt.data,ext:s.excerpt.ext,...sz,alt:`Lage von ${s.label}`,after:20,keepNext:true});b.push(small(`Lage im Plan${s.floor?` (${s.floor})`:''} – Ausschnitt, ohne Maßstab`,{align:'center'}));}
     if(a.photosIncluded){
@@ -178,7 +179,7 @@ export function annexBlocks(a:AnnexInput):Block[]{
       }
     }
     b.push(STIL.zwischen('Laborwerte (Schreibweise des Prüfberichts)'));
-    if(s.werte.length)b.push({t:'table',widths:[5070,2200,1800],size:9,rows:[{header:true,cells:[th('Parameter'),th('Ergebnis'),th('Einheit')]},...s.werte.map(x=>({cells:[{text:x.p,b:x.p===a.parameter},{text:x.r,b:x.p===a.parameter},{text:x.u}]}))]});
+    if(s.werte.length)b.push({t:'table',widths:[5070,2200,1800],size:9,rows:[{header:true,cells:[th('Parameter'),th('Ergebnis'),th('Einheit')]},...s.werte.map(x=>{const fett=x.p===(s.value?.p??a.parameter)&&(!s.value||x.u===s.value.u);return {cells:[{text:x.p,b:fett},{text:x.r,b:fett},{text:x.u}]};})]});
     else b.push(small('Keine Laborwerte zugeordnet.'));
   }
 

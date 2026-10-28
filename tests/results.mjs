@@ -23,14 +23,15 @@ for(const engine of ['chromium','webkit']){
    await page.locator('#lab-files').setInputFiles([{name:'bericht.xml',mimeType:'application/xml',buffer:Buffer.from(labXML(rows))}]);await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});
    for(const [i,[fx,fy]] of [[.2,.3],[.4,.3],[.6,.3],[.8,.3],[.5,.7]].entries()){await page.locator('[data-pending]').first().click();await tap(page,fx,fy);void i;}
    const saved=await savedProject(page);assert.deepEqual(saved.markers.map(m=>m.label),['P1','P2','P3','P4','P5']);
-   assert.deepEqual(saved.markers[3].lab.werte[0],{p:SUM,r:'1.300,0',u:UNIT});assert.equal(saved.results,undefined);
+   assert.deepEqual(saved.markers[3].lab.werte[0],{p:SUM,r:'1.300,0',u:UNIT});
+   assert.equal(await page.locator('#results-toggle').getAttribute('aria-pressed'),'true','Ergebniskarte schaltet sich mit Messwerten selbst ein');
    assert.equal(await page.locator('#results-toggle').isDisabled(),false);
   });
-  await check(`${engine}: K färbt nach FotoKit-Skala (grün → rot), ohne Wert grau`,async()=>{
-   await page.keyboard.press('Escape');await page.keyboard.press('k');assert.equal(await page.locator('#results-toggle').getAttribute('aria-pressed'),'true');
-   await page.locator('#results-section').waitFor();assert.equal(await page.locator('#result-param').inputValue(),SUM);
+  await check(`${engine}: Automatisch färbt nach FotoKit-Skala (grün → rot), ohne Wert grau; K schaltet aus und an`,async()=>{
+   await page.keyboard.press('Escape');await page.keyboard.press('k');assert.equal(await page.locator('#results-toggle').getAttribute('aria-pressed'),'false');await page.keyboard.press('k');assert.equal(await page.locator('#results-toggle').getAttribute('aria-pressed'),'true');
+   await page.locator('#results-section').waitFor();assert.equal(await page.locator('#result-param').inputValue(),'*');
    assert.deepEqual(await fills(page),{P1:'#749bb5',P2:'#4caf50',P3:'#f2c94c',P4:'#e0453a',P5:'#c3ccd5'});
-   const saved=await savedProject(page);assert.equal(saved.results.parameter,SUM);assert.deepEqual(saved.results.scales[KEY].cats.map(c=>[c.name,c.from,c.color]),[['gering',0,'#4caf50'],['mittel',5,'#f2c94c'],['hoch',50,'#e0453a']]);
+   const saved=await savedProject(page);assert.equal(saved.results.parameter,'*');assert.deepEqual(saved.results.scales[KEY].cats.map(c=>[c.name,c.from,c.color]),[['gering',0,'#4caf50'],['mittel',5,'#f2c94c'],['hoch',50,'#e0453a']]);
    assert.match(await page.locator('#result-legend').textContent(),/gering.*mittel.*hoch.*ohne Bewertung/);
    assert.match(await page.locator('#result-scales').textContent(),/P2/);
   });
@@ -105,7 +106,7 @@ for(const engine of ['chromium','webkit']){
    await page.locator('#project-file').setInputFiles({name:'x.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(bad))});await page.locator('#toast.error').waitFor();assert.match(await page.locator('#toast').textContent(),/Bewertungsskala/);
    await page.evaluate(()=>localStorage.removeItem('bu-scales'));
    await page.locator('#project-file').setInputFiles({name:'ok.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(file))});await page.locator('#replace-yes').click();await page.locator('#toast:not(.error)').waitFor();
-   await page.keyboard.press('k');assert.equal((await fills(page)).P4,'#e0453a');
+   assert.equal(await page.locator('#results-toggle').getAttribute('aria-pressed'),'true','geöffnetes Projekt mit Werten: Ergebniskarte an');assert.equal((await fills(page)).P4,'#e0453a');
   });
   await check(`${engine}: qualifier legends, malformed limits, original strings and measured zero`,async()=>{
    const file=await downloadedProject(page),values=['< 0,50','unter BG','n.n.','n.b.','< kaputt'];

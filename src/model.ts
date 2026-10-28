@@ -10,6 +10,8 @@ export interface LabData {ref:string;desc:string;art?:string;labNr?:string;datum
 export interface Category {name:string;from:number;color:string}
 export interface Scale {name:string;cats:Category[]}
 /** scales: eigene Skalen je Parameter|Einheit. vds: im Projekt angepasste VdS-Referenzen (ab 1.27) – getrennt, damit die eigene Skala erhalten bleibt. */
+/** Bewerteter Parameter „Automatisch – je Probenart“: jede Probe nach ihrem Hauptwert (Σ16 EPA-PAK, Chlorid, Asbest). */
+export const AUTO_PARAM='*';
 export interface ResultSettings {usage?:'residential'|'industrial';parameter:string;scales:Record<string,Scale>;vds?:Record<string,Scale>}
 /** typ: Probenart aus LabelKit (PAK, Chlorid, Asbest, Sonstige) – bleibt erhalten, wenn der Laborbericht die Probe ergänzt. */
 export interface LabSample extends LabData {label:string;typ?:string;shape?:Shape;surface?:Surface;raum?:string}

@@ -115,6 +115,9 @@ body{height:100dvh;overflow:hidden;display:flex;flex-direction:column}
 #result-legend[hidden]{display:none}
 #result-legend span{display:flex;align-items:center;gap:4px}
 #result-legend i{width:10px;height:10px;border-radius:50%;border:1px solid #1d2a33;display:inline-block}
+.scale-dot{width:10px;height:10px;border-radius:50%;border:1px solid #1d2a33;display:inline-block;vertical-align:-1px}
+#result-legend b{font-weight:600}
+#result-legend .legend-art{gap:8px;white-space:nowrap}
 
 /* Projektordner */
 @media(max-width:1600px){body.in-project #canvas-name{display:none}#offline{max-width:30px;overflow:hidden;white-space:nowrap;padding-left:9px;padding-right:0}body.in-project .tb-doc{margin-left:0;padding-left:6px}}

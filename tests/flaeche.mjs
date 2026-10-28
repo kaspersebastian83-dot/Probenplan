@@ -47,7 +47,7 @@ for(const engine of engines){
    s=await savedProject(page);assert.equal(s.plan.surfaceBars,undefined,'an = Standard, nichts gespeichert');
   });
   await check(`${engine}: Wertkästchen nennt die Oberflächenart`,async()=>{
-   await blur(page);await page.keyboard.press('v');await page.locator('#value-labels').check();await page.locator('#results-toggle').click();
+   await blur(page);await page.keyboard.press('v');await page.locator('#value-labels').check();(await page.locator('#results-toggle').getAttribute('aria-pressed')==='true'||await page.locator('#results-toggle').click());
    await page.locator('#marks text',{hasText:'Untersicht · hoch'}).waitFor();assert.ok((await page.locator('#marks').textContent()).includes('Ansicht · gering'));
    if(process.env.SHOT){await page.waitForTimeout(400);await page.screenshot({path:process.env.SHOT+'-1.png'});
     await page.locator('#export-open').click();await page.locator('#export').waitFor();await page.locator('#view').selectOption('results');

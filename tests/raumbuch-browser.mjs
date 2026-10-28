@@ -27,7 +27,7 @@ for(const engine of engines){
   await page.locator('#lab-files').setInputFiles([{name:'bericht.xml',mimeType:'application/xml',buffer:Buffer.from(labXML(rows))}]);
   await page.locator('#lab-review').waitFor();const conflicts=page.locator('[data-lab-row] .lab-conflict select');for(let i=0;i<await conflicts.count();i++)await conflicts.nth(i).selectOption('update');
   await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});
-  await page.locator('#results-toggle').click();await page.locator('#result-usage').selectOption('residential');await page.locator('#results-toggle').click();
+  (await page.locator('#results-toggle').getAttribute('aria-pressed')==='true'||await page.locator('#results-toggle').click());await page.locator('#result-usage').selectOption('residential');await page.locator('#results-toggle').click();
 
   await check(`${engine}: Raum kommt aus LabelKit und bleibt mit Laborwerten am Marker`,async()=>{
    const s=await savedProject(page);assert.deepEqual(s.markers.map(m=>m.raum),['EG Küche','EG Kueche','EG Flur','EG Bad']);assert.ok(s.markers.every(m=>m.lab?.werte?.length));

@@ -31,6 +31,16 @@ ok('fehlende P-Nummer wird aus der Probenreferenz gebildet; Übernahme legt eige
  const p=applyLabImport(createProject({kind:'image',name:'Plan',width:100,height:100,src:'data:,'}),r,new Map());
  assert.equal(p.labReports.length,1);assert.equal(p.pending.length,2);assert.equal(p.pending[0].reportId,p.labReports[0].id);assert.equal(p.labReports[0].bericht,'AR-999-2099-000001-01');
 });
+ok('Oberflächenart und Raum aus ResultKit (an der Probe oder aus dem Laborauftrag) – Aktualisieren füllt leere Marker',()=>{
+ const roh=JSON.parse(labErgebnisse(labRows.slice(0,3)));const pr=roh.berichte[0].proben;
+ pr[0].surface='ceiling';pr[0].raum='EG Küche';pr[1].surface='quatsch';
+ roh.auftrag={quelle:'x_Daten.json',proben:[{label:'P2',ref:'Probe 2',desc:'',surface:'wall',raum:'OG Bad'},{label:'P3',ref:'Probe 3',desc:'',surface:'floor'}]};
+ const b=liesErgebnisse(JSON.stringify(roh)).berichte[0];
+ assert.deepEqual(b.proben.map(p=>[p.label,p.surface,p.raum]),[['P1','ceiling','EG Küche'],['P2','wall','OG Bad'],['P3','floor',undefined]]);
+ const plan={format:'probenplan',version:4,plan:{name:'x',width:100,height:100,data:''},markers:[{id:'m1',kind:'sample',label:'P1',note:'',x:1,y:1,lx:1,ly:1}],nextSample:4,nextFire:1,report:'',date:''};
+ const r=berichtAlsReport(b),p=applyLabImport(plan,r,new Map([[r.rows[0],'update']]));
+ assert.equal(p.markers[0].surface,'ceiling');assert.equal(p.markers[0].raum,'EG Küche');assert.equal(p.pending.find(x=>x.label==='P2').surface,'wall');
+});
 // Review 1.38.0: „Aktualisieren“ ergänzt Labordaten und Messwerte, statt sie zu ersetzen.
 {const {labelkitReport}=await import('../src/labelkit.ts');const {valueOf}=await import('../src/results.ts');
  const SUM='Summe 16 EPA-PAK exkl. BG',CL='Chlorid',bericht=(id,nr,werte,o={})=>({id,bericht:nr,labor:'Testlabor',auftragsreferenz:'99.9001',sources:{xml:`${nr}.xml`},...o,proben:[{label:'P1',ref:'Probe 1',desc:'EG Küche Decke',labNr:`${nr}-1`,werte}]});

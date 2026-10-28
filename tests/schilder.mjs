@@ -72,6 +72,7 @@ for(const engine of engines){
    for(const [fx,fy] of [[.7,.3],[.75,.3],[.3,.7],[.85,.75]]){await page.locator('[data-pending]').first().click();await tap(page,fx,fy);}
    await page.keyboard.press('Escape');await page.keyboard.press('v');
    await page.locator('#value-labels').check();assert.equal((await savedProject(page)).plan.valueLabels,true);
+   assert.equal(await page.locator('#results-toggle').getAttribute('aria-pressed'),'true','Ergebniskarte schaltet sich mit Messwerten selbst ein');await page.locator('#results-toggle').click();
    assert.equal(await page.locator('#marks text',{hasText:'1.300,0'}).count(),0,'ohne Ergebniskarte keine Wertkästchen');
    await page.locator('#results-toggle').click();
    await page.locator('#marks text',{hasText:'1.300,0'}).first().waitFor();

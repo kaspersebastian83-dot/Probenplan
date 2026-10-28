@@ -3,7 +3,7 @@
 // über die gewohnte Prüftabelle (applyLabImport). Die Datei schreibt nur ResultKit – PlanKit liest sie nur.
 // Feldnamen der Berichte wie PlanKits LabOrigin/LabSample (ResultKit src/ergebnisse.ts, dort identisch halten).
 import {blankReport,referenceLabel,type LabReport} from './labreport';
-import type {LabOrigin,LabSample} from './model';
+import {MAX_RAUM,type LabOrigin,type LabSample,type Surface} from './model';
 
 export const ERGEBNIS_DATEI='_Ergebnisse.json';
 export interface ErgebnisBericht extends LabOrigin {proben:LabSample[]}
@@ -19,10 +19,13 @@ export function liesErgebnisse(inhalt:string):Ergebnisse{
  if(!obj(v)||v.format!=='spektron-ergebnisse')throw Error(`„${ERGEBNIS_DATEI}“ stammt nicht aus ResultKit.`);
  if(v.version!==1)throw Error(`„${ERGEBNIS_DATEI}“ hat ein neueres Format (Version ${String(v.version)}) – bitte PlanKit aktualisieren.`);
  if(!Array.isArray(v.berichte))throw Error(`„${ERGEBNIS_DATEI}“ ist unvollständig.`);
+ // Oberflächenart und Raum (aus LabelKit): ab ResultKit 1.5 an jeder Berichtsprobe; ältere Dateien nur im Laborauftrag.
+ const auftrag=new Map((obj(v.auftrag)&&Array.isArray(v.auftrag.proben)?v.auftrag.proben:[]).filter(obj).slice(0,1000).map(p=>[text(p.label,12).toUpperCase(),p] as const).filter(([l])=>l));
  const berichte=v.berichte.filter(obj).slice(0,200).map((b,i):ErgebnisBericht=>{
   const sources=obj(b.sources)?b.sources:{};
   const proben=(Array.isArray(b.proben)?b.proben:[]).filter(obj).slice(0,1000).map((p):LabSample=>({label:text(p.label,12),ref:text(p.ref,160),desc:text(p.desc),
    ...(p.art?{art:text(p.art,160)}:{}),...(p.labNr?{labNr:text(p.labNr,160)}:{}),...(p.datum?{datum:text(p.datum,10)}:{}),...(p.typ?{typ:text(p.typ,40)}:{}),
+   ...lage(p,auftrag.get(text(p.label,12).toUpperCase())),
    ...(Array.isArray(p.werte)?{werte:p.werte.filter(obj).slice(0,300).map(w=>({p:text(w.p,200),r:text(w.r,40),u:text(w.u,40)}))}:{})}));
   return {id:text(b.id,80)||`b${i+1}`,bericht:text(b.bericht,160),labor:text(b.labor,500),auftragsreferenz:text(b.auftragsreferenz,2000),...(b.batch?{batch:text(b.batch,160)}:{}),
    sources:{...(sources.xml?{xml:text(sources.xml,255)}:{}),...(sources.pdf?{pdf:text(sources.pdf,255)}:{})},...(b.vorlaeufig===true?{vorlaeufig:true as const}:{}),proben};});
@@ -30,6 +33,13 @@ export function liesErgebnisse(inhalt:string):Ergebnisse{
  return {projekt:text(v.projekt,20),uebernommen:text(v.uebernommen,40),vollstaendig:v.vollstaendig===true,stand:text(v.stand,1e6),berichte,offen:Array.isArray(v.offen)?v.offen.map(x=>text(x,160)):[],ersetzt};
 }
 
+const SURFACES:readonly Surface[]=['floor','wall','ceiling'];
+/** Oberflächenart und Raum einer Probe: aus der Berichtsprobe, sonst aus dem Laborauftrag (gleiche Probennummer). */
+function lage(p:Record<string,unknown>,a:Record<string,unknown>|undefined):{surface?:Surface;raum?:string}{
+ const surface=[p.surface,a?.surface].find((x):x is Surface=>SURFACES.includes(x as Surface));
+ const raum=[p.raum,a?.raum].map(x=>text(x,MAX_RAUM).trim()).find(Boolean);
+ return {...(surface?{surface}:{}),...(raum?{raum}:{})};
+}
 /** Ein Bericht aus ResultKit als Laborbericht für die Prüftabelle (wie nach dem Lesen einer XML). */
 export function berichtAlsReport(b:ErgebnisBericht):LabReport{
  const r=blankReport();
