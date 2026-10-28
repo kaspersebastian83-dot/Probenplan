@@ -12,7 +12,8 @@ const engines=(process.env.ENGINES||'chromium,webkit').split(',');
 for(const engine of engines){
  const browser=await ({chromium,webkit}[engine]).launch();
  try{
-  const context=await browser.newContext({viewport:{width:1440,height:900},acceptDownloads:true}),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const context=await browser.newContext({viewport:{width:1440,height:900},acceptDownloads:true}),page=await context.newPage();await context.addInitScript(()=>{try{localStorage.setItem('plankit-schnellskizze','0');}catch{}});   // klassische Skizze; Schnellskizze: tests/schnellskizze.mjs
+  const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(base);
 
   await check(`${engine}: ohne Plan ist „✎ Skizze“ oben und auf der Startseite sichtbar`,async()=>{

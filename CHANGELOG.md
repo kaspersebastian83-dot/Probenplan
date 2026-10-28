@@ -1,5 +1,15 @@
 # Änderungen
 
+## 1.41.0 – 28. Oktober 2026
+
+- **Schnellskizze (Test, abschaltbar)** – schneller zum Probenplan, wenn kein Grundriss da ist:
+  - **„☰ Räume aus Liste“**: Räume eintippen (einer pro Zeile, Komma geht auch), „Raster erzeugen“ – PlanKit legt sie als beschriftete Rechtecke im Raster an. Danach nur noch ziehen und anordnen; Räume rasten dabei vorrangig an der Nachbarwand ein. Neue leere Skizzen öffnen die Liste gleich.
+  - **„Skizze – nicht maßstäblich“** (Standard bei neuen Skizzen): kein Maßstab, keine m² unter den Raumnamen, Stempel „SKIZZE – NICHT MASSSTÄBLICH“ unten rechts auf dem Plan. Haken raus = wie bisher mit Maßstab und m².
+  - **Brandraum** je Raum: Haken beim Raum oder „Küche Brandraum“ in der Liste – Raum hell orange, „BRANDRAUM“ unter dem Namen.
+  - **Raum an der Probe**: Wird eine Probe (oder ein Brandherd) in einen Skizzenraum gesetzt, steht der Raumname gleich unter „Raum“ – fürs Raumbuch. Raum aus LabelKit hat Vorrang. Raum umbenennen zieht die Proben mit.
+  - Ausschalten: Haken „Schnellskizze (Test)“ in der Skizzenleiste (gilt je Browser). Aus = Skizze genau wie bisher; gesetzte Kennzeichen bleiben in der Skizze erhalten.
+- Projektdatei: `plan.sketch.schematic:true` und `rooms[].fire:true` nur wenn gesetzt; ältere PlanKit-Versionen lesen die Skizze weiter, übergehen aber diese beiden Kennzeichen.
+
 ## 1.40.1 – 27. Oktober 2026
 
 - Warnleiste „Neuerer Laborstand in ResultKit“ erschien schon, wenn der Plan nur die Probenerfassung aus LabelKit enthielt (noch keine Messwerte). Die LabelKit-Herkunft hat keine Prüfberichtsnummer und zählt jetzt nicht mehr als Laborwert – die Leiste kommt erst, wenn Werte aus einem Prüfbericht im Plan stehen. Gefunden vom neuen Integrationstest „Spektron-Kette“ (ResultKit).

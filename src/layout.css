@@ -328,3 +328,10 @@ dialog.export-card label.export-check input{width:auto;margin:0}
 label.pflicht-offen .pflicht-tag{display:inline-block}
 label.pflicht-offen>input,label.pflicht-offen>select{border-color:#d9a400!important;background:#fff8e1;box-shadow:inset 3px 0 0 #d9a400}
 @media (prefers-color-scheme:dark){.pflicht-tag{color:#f0c850}label.pflicht-offen>input,label.pflicht-offen>select{background:rgba(217,164,0,.12)}}
+/* Schnellskizze (ab 1.41) */
+#sketch-actions #sketch-quick-row label input[type=checkbox],#sketch-actions #sketch-fire-row input{width:18px;height:18px;min-height:0;margin:0}
+#sketch-actions .sketch-switch{margin-left:auto;color:var(--kit-muted);font-weight:500}
+#sketch-list-panel{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--kit-line2);padding-top:6px}
+#sketch-list-panel label{font-size:12px;font-weight:600}
+#sketch-list-panel textarea{width:100%;box-sizing:border-box;min-height:110px;font:inherit;font-size:14px;line-height:1.5;padding:6px 8px;resize:vertical}
+#sketch-list-panel .tiny{margin:0;color:var(--kit-muted)}
