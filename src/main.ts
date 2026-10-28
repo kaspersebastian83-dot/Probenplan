@@ -94,7 +94,7 @@ document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Wa
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Raumbuch</h3><p>Liste → „Raumbuch bearbeiten …“: je Raum Befund (Proben mit Messwert und Oberflächenart, Brandherd) und Bewertung nach der Skala der Ergebniskarte – beides berechnet. Sie tragen je Raum Maßnahme und Bemerkung ein; Räume ohne Probe kommen mit Status dazu (Sichtprüfung unauffällig / auffällig, nicht begangen). Der Raum kommt aus LabelKit („Raum / Ort“) oder steht unter „Markierungen“ im Feld „Raum“. Ähnliche Schreibweisen (z. B. „Kü.“ und „Küche“) lassen sich zusammenführen. Ausgabe als Word-Anlage und als Tabelle für Excel (CSV) in „Mitteilungen“. Keine Flächen und Mengen – die Mengenermittlung bleibt beim ausführenden Unternehmen. Der Raum kommt aus „Raum / Ort“ in LabelKit; bei der Bezeichnung nach Handbuch („EG Küche Brandraum Decke“) zählen Geschoss und Raum, Zusatz und Bauteil bleiben bei der Probe. Steht ein eigenes Bauteil dahinter („EG Wohnzimmer Schrank oben“), die Zeilen im Raumbuch zusammenführen.</p><h3>Oberflächenart</h3><p>Aufsicht, Ansicht oder Untersicht je Probe kommt beim „Proben übernehmen“ aus LabelKit (Spalte „Oberflächenart“). Fehlt sie dort, lässt sie sich unter „Markierungen“ wählen; eine Eingabe in PlanKit bleibt auch bei erneutem Import. Am Schild ein Balken unten (Aufsicht), links (Ansicht) oder oben (Untersicht), dazu im Wertkästchen der Ergebniskarte und in der Legende.</p>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Skizze (kein Plan vorhanden)</h3><p>Links in der Werkzeugleiste „✎ Skizze“ (ohne Plan: neue Skizze, sonst als weiterer Plan; auf einer Skizze: bearbeiten), Startseite „Kein Plan? Skizze zeichnen“ oder unten „＋ Skizze“ für ein weiteres Geschoss. <b>Raum</b>: von Ecke zu Ecke aufziehen (Raster 10 cm, Räume rasten an Wänden ein), danach Name, Breite und Tiefe in Metern eintippen. <b>Wand</b>: frei ziehen, auch schräg (15°-Schritte rasten ein, Länge eintippbar). <b>Tür</b>/<b>Fenster</b>: auf eine Wand tippen (Tür 0,90 m mit Aufschlag, Fenster 1,20 m). <b>Text</b>: antippen und eintippen, z. B. „Treppe“. <b>Auswählen</b>: Räume, Wände, Texte ziehen, Ecke unten rechts ändert die Raumgröße, Entf löscht. „Skizze fertig“ schneidet die Zeichenfläche auf die Räume zu; der Maßstab ist automatisch gesetzt. „Skizze“ links bearbeitet sie weiter; Proben bleiben an ihrer Stelle.</p><h3>Schnellskizze (Test)</h3><p>Schneller ohne Maße: „☰ Räume aus Liste“ – Räume eintippen (einer pro Zeile, „Küche Brandraum“ markiert den Brandraum), „Raster erzeugen“, dann die Räume ziehen und anordnen. „Skizze – nicht maßstäblich“ (Standard bei neuen Skizzen): kein Maßstab, keine m², Stempel auf dem Plan. Wird eine Probe in einen Raum gesetzt, steht der Raumname gleich unter „Raum“ (fürs Raumbuch). Abschalten: Haken „Schnellskizze (Test)“ in der Skizzenleiste – die Skizze verhält sich dann wie bisher.</p>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Entzerren (Fluchtplan fotografiert)</h3><p>„Entzerren“ (W) links in der Leiste: die vier Ecken des Plans im Foto antippen oder ziehen – 1 oben links, 2 oben rechts, 3 unten rechts, 4 unten links. Die Lupe zeigt die Ecke vergrößert. Seitenverhältnis „wie im Foto“ oder DIN quer/hoch (Fluchtpläne sind meist A3/A4). „Entzerren“ rechnet ein gerades Bild; Proben und Flächen werden mitgerechnet. Ein vorhandener Maßstab und die Nordrichtung werden dabei entfernt und sind neu zu setzen. Rückgängig stellt das Foto wieder her; die Fotodatei selbst bleibt unverändert.</p>');
-document.getElementById('app-version')!.textContent='v1.44.1';
+document.getElementById('app-version')!.textContent='v1.45.0';
 document.querySelector('#help-dialog h2')!.insertAdjacentHTML('afterend','<h3>Neu in PlanKit 1.16.1 · 20.10.2026</h3><p>Projektzentrale und Spektron-Leiste übergeben Projekte jetzt über #projekt im Fragment. Sonderzeichen bleiben erhalten; alte ?projekt-Links funktionieren weiterhin und werden nach dem Laden bereinigt. Projektwechsel laden auch bereits geöffnete App-Fenster neu; eine Warnung vor ungesicherten Eingaben kann den Wechsel abbrechen. Die Anlagenaktion aktion=anlage wird ebenfalls im Fragment übergeben. Installiertes PlanKit nach einer Online-Aktualisierung vollständig schließen und erneut öffnen.</p>');
 const colorOptions=PALETTE.map(c=>`<option value="${c.color}">${c.title} · ${c.suggestion}</option>`).join('');
 document.querySelector('.modes')!.insertAdjacentHTML('beforeend','<button data-mode="area-draw" class="mode" disabled><span class="tool-icon">⬡</span><span>Fläche zeichnen<small>Eckpunkte setzen & abschließen</small></span></button><button data-mode="area-edit" class="mode" disabled><span class="tool-icon">◇</span><span>Fläche bearbeiten<small>Ecken oder ganze Fläche ziehen</small></span></button>');
@@ -727,7 +727,7 @@ function annexTitle(){try{return localStorage.getItem(annexKey())||'Anlage';}cat
 function collectCount(p:Project){return [...p.markers,...(p.sheets||[]).filter((_,i)=>i!==(p.active??0)).flatMap(s=>s.markers||[])].filter(m=>m.kind==='sample').length+(p.pending?.length||0);}
 async function runAnnex(){
   if(!project)return;const title=input('annex-title').value.trim()||'Anlage';try{localStorage.setItem(annexKey(),title);}catch{/* ohne Speicher */}
-  if(folder&&!await flushFolder())throw Error(`Der Plan ist noch nicht in „${PLAENE}“ gespeichert. Bitte „Speichern“ und erneut versuchen – die Anlage soll den gespeicherten Stand belegen.`);
+  if(folder&&!await flushFolder())throw Error(`Der Plan ist noch nicht in „${planPfad(folder)}“ gespeichert. Bitte „Speichern“ und erneut versuchen – die Anlage soll den gespeicherten Stand belegen.`);
   const app=`PlanKit ${$('app-version').textContent?.replace(/^v/,'')}`,resultsView=hasValues(project);   // Lageplan als Ergebniskarte, sobald Messwerte da sind
   for(let i=0;i<sheetCount(project);i++)await ensureInk(sheetProject(project,i).plan);
   const r=await createAnnex(project,folder,{title,maxPhotos:Number(input('annex-photos').value),results:resultsView,objekt:String(projectData.objekt||'').trim(),projectData,projectDataSource:projectReader.state.file,projectDataStale:projectReader.state.stale,app,progress:t=>{$('export').textContent=t;}});
@@ -930,7 +930,7 @@ async function raumbuchExport(kind:'docx'|'csv'){
   if(!project||busy)return;const title=input('raumbuch-anlage').value.trim()||'Anlage';try{localStorage.setItem(raumbuchKey(),title);}catch{/* ohne Speicher */}
   busy=true;const buttons=[$<HTMLButtonElement>('raumbuch-word'),$<HTMLButtonElement>('raumbuch-csv')];buttons.forEach(b=>b.disabled=true);
   try{
-    if(folder&&!await flushFolder())throw Error(`Der Plan ist noch nicht in „${PLAENE}“ gespeichert. Bitte „Speichern“ und erneut versuchen.`);
+    if(folder&&!await flushFolder())throw Error(`Der Plan ist noch nicht in „${planPfad(folder)}“ gespeichert. Bitte „Speichern“ und erneut versuchen.`);
     const st=raumbuchStand(project);if(!st.rows.length)throw Error('Das Raumbuch ist noch leer.');
     const hints=pruefhinweise(st),created=new Date().toISOString(),app=`PlanKit ${$('app-version').textContent?.replace(/^v/,'')}`;
     const source=folder?`${planPfad(folder)}/${projectFileName(folder)}`:'PlanKit-Projekt (nicht im Projektordner)';
@@ -994,7 +994,7 @@ async function wandExport(kind:'docx'|'csv'){
   if(!project||busy)return;const title=input('wand-anlage').value.trim()||'Anlage';try{localStorage.setItem(wandKey(),title);}catch{/* ohne Speicher */}
   busy=true;const buttons=[$<HTMLButtonElement>('wand-word'),$<HTMLButtonElement>('wand-csv')];buttons.forEach(b=>b.disabled=true);
   try{
-    if(folder&&!await flushFolder())throw Error(`Der Plan ist noch nicht in „${PLAENE}“ gespeichert. Bitte „Speichern“ und erneut versuchen.`);
+    if(folder&&!await flushFolder())throw Error(`Der Plan ist noch nicht in „${planPfad(folder)}“ gespeichert. Bitte „Speichern“ und erneut versuchen.`);
     wandDaten=await wandLaden();const {st,datei}=wandDaten,p1=$<HTMLSelectElement>('wand-p1').value,p2=$<HTMLSelectElement>('wand-p2').value;
     if(!st.waende.length&&!st.referenz.length)throw Error('Keine Bohrkerne zum Darstellen.');
     const created=new Date().toISOString(),app=`PlanKit ${$('app-version').textContent?.replace(/^v/,'')}`,source=folder?`${planPfad(folder)}/${projectFileName(folder)}`:'PlanKit-Projekt';
@@ -1219,7 +1219,7 @@ async function chooseStoredVersion(target:ProjectFolder,revision:string|null,has
 }
 function footerExtra(){const o=String(projectData.objekt||'').trim();return o?`Objekt ${o}`:'';}
 function showFolder(){$('emergency-copy').hidden=!folder;const b=$('project-badge');b.hidden=!folder;document.body.classList.toggle('in-project',!!folder);if(folder){b.innerHTML=`<b>${escape(folder.nr)}</b> ${escape(folder.ort)}`;b.title=`Projektordner „${folder.name}“ – PlanKit speichert in „${PLAENE}“`;document.title=`${folder.name} · PlanKit`;}}
-function scheduleFolderSave(){clearTimeout(folderTimer);$('saved').textContent=`Wird in „${PLAENE}“ gespeichert …`;folderTimer=window.setTimeout(()=>void saveToFolder(false),700);}
+function scheduleFolderSave(){clearTimeout(folderTimer);$('saved').textContent=`Wird in „${folder?planPfad(folder):PLAENE}“ gespeichert …`;folderTimer=window.setTimeout(()=>void saveToFolder(false),700);}
 async function flushFolder(){if(folderTimer){clearTimeout(folderTimer);folderTimer=0;await saveToFolder(false);}await folderWriting.catch(()=>{});await saveQueue.catch(()=>{});return !folderDirty;}
 function saveToFolder(explicit:boolean){
  clearTimeout(folderTimer);folderTimer=0;const f=folder;if(!f||!project||(folderBlocked&&!explicit))return folderWriting;
@@ -1233,10 +1233,10 @@ function saveToFolder(explicit:boolean){
    for(;;){
     try{
      const result=await saveFolderProject(f,JSON.stringify(snapshot),expected);folderRevision=result.revision;folderBlocked=false;
-     if(folder===f&&generation===saveRevision){folderDirty=false;$('saved').textContent=`✓ In „${PLAENE}“ gespeichert`;
+     if(folder===f&&generation===saveRevision){folderDirty=false;$('saved').textContent=`✓ In „${planPfad(f)}“ gespeichert`;
       saveQueue=saveQueue.catch(()=>{}).then(async()=>{if(folder===f&&generation===saveRevision)await saveLocal({savedAt:Date.now(),project:snapshot,dirty:false,baseRevision:result.revision},folderKey(f));}).catch(()=>{if(folder===f&&generation===saveRevision)toast('Projektdatei gespeichert; die zusätzliche Browsersicherung ist fehlgeschlagen.',true);});
      }
-     if(explicit&&folder===f&&generation===saveRevision){toast(`Gespeichert: ${PLAENE}/${projectFileName(f)}`);savedToastRevision=generation;}return;
+     if(explicit&&folder===f&&generation===saveRevision){toast(`Gespeichert: ${planPfad(f)}/${projectFileName(f)}`);savedToastRevision=generation;}return;
     }catch(e){
      if(!(e instanceof FolderConflict))throw e;
      folderBlocked=true;$('saved').textContent='⚠ Datei wurde andernorts geändert';
@@ -1252,7 +1252,7 @@ function saveToFolder(explicit:boolean){
      expected=e.revision; // If changed again while deciding, ask again; never silently overwrite it.
     }
    }
-  }catch(e){if(folder===f){folderBlocked=true;$('saved').textContent=`⚠ Nicht im Projektordner gespeichert`;toast(`Speichern in „${PLAENE}“ fehlgeschlagen: ${e instanceof Error?e.message:'unbekannter Fehler'}. Änderungen bleiben geöffnet. Bitte „Speichern“ erneut versuchen oder eine Notfallkopie herunterladen.`,true);}}
+  }catch(e){if(folder===f){folderBlocked=true;$('saved').textContent=`⚠ Nicht im Projektordner gespeichert`;toast(`Speichern in „${planPfad(f)}“ fehlgeschlagen: ${e instanceof Error?e.message:'unbekannter Fehler'}. Änderungen bleiben geöffnet. Bitte „Speichern“ erneut versuchen oder eine Notfallkopie herunterladen.`,true);}}
  });return folderWriting;
 }
 async function reloadFromFolder(){
@@ -1327,7 +1327,7 @@ async function enterFolder(dir:Parameters<typeof openFolder>[0]){
   showFolder();void refreshProjectData();resultkitStand=null;void resultkitLesen();$('folder-prompt').hidden=true;await renderFolderPlans();
   PROJEKT_URL.setzen(target.name);
   (window as any).MosaikLeiste?.aktualisieren();
-  toast(next?`Projekt ${target.name}: Probenplan aus „${PLAENE}“ geöffnet.`:`Projekt ${target.name}: noch kein Probenplan – Grundriss wählen.`);
+  toast(next?`Projekt ${target.name}: Probenplan aus „${planPfad(target)}“ geöffnet.`:`Projekt ${target.name}: noch kein Probenplan – Grundriss wählen.`);
 }
 async function openFromZentrale(name:string){
   const root=await archiv();
