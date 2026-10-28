@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.44.1 – 28. Oktober 2026
+
+- Leiste oben: die Haken für Proben, Fotos, Ergebnisse, Plan und Abrechnung finden die App-Daten auch im künftigen Ordner „_Spektron“ (spektron-ordner.js). Keine sichtbare Änderung.
+
 ## 1.44.0 – 28. Oktober 2026
 
 - **Vorbereitung „Spektron-Ordner“:** Die App-Daten eines Projekts ziehen später in den Unterordner `_Spektron` (Bilder und PDFs des Plans bleiben in „Pläne“). PlanKit liest und schreibt die PlanKit-Datei, die Projektdaten, die Daten von FotoKit, LabelKit und ResultKit sowie das Anlagen-Protokoll jetzt über `spektron-ordner.js` – bis zum Umzug am bisherigen Ort, es ändert sich nichts.
