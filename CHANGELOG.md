@@ -1,5 +1,17 @@
 # Änderungen
 
+## 1.48.0 – 29. Oktober 2026
+
+- **Seitenleiste mit Reitern und einer Probenliste (Test, abschaltbar):** Die lange Spalte ist in drei Reiter geteilt – **Proben** (Standard), **Plan & Ausgabe** (Punktgröße, Beschriftung, Maßstab & Norden, Ergebniskarte, Flächen) und **Raumbuch**. Am Reiter „Proben“ steht die Zahl der offenen Proben.
+  - **Eine Liste für offene und platzierte Laborproben:** Fortschrittsbalken („10 von 37 platziert“), Filter Offen · Platziert · Alle, Suche nach Raum oder Kennung. Gruppiert nach Geschoss, dann Raum; Gruppen lassen sich auf- und zuklappen und zeigen ihren Stand („2/3“). Fertig platzierte Räume stehen zugeklappt am Ende. Im Raum stehen offene Proben vor den platzierten.
+  - **Kompakte Zeilen (rund 32 px):** Kennung als Marke (durchgezogen = platziert, gestrichelt = offen), Bauteil · Oberfläche, Probenart. Mit der Maus über einer Zeile oder einem Punkt wird der Partner in Plan bzw. Liste hervorgehoben.
+  - **⋯ je Zeile statt ✕:** Im Plan zeigen · Neu platzieren · Zurück zu offen · Punkt löschen (bei offenen: Aus der Liste entfernen). „Liste leeren“ und „Prüftabelle speichern“ stehen im ⋯-Menü der Liste. Alles ist mit Rückgängig umkehrbar.
+  - Eine offene Zeile anwählen startet das Platzieren (mit Weiter-Platzieren); eine platzierte wählt den Punkt aus. Ziehen aus der Liste auf den Plan platziert genau diese Probe. Brandherde und Markierungen ohne Laborbezug stehen unter „Brandherde & weitere Markierungen“.
+  - Mehrere Pläne: Die Liste zeigt die Proben aller Pläne; ein Punkt auf einem anderen Plan wird beim Anwählen dorthin gewechselt. Neu platzieren, Zurück zu offen und Löschen gelten für den aktiven Plan.
+  - Ausschalten: Haken „Neue Liste (Test)“ oben in der Seitenleiste (gilt je Browser). Aus = Seitenleiste wie bisher mit der alten Probenliste.
+  - Projektdatei unverändert (Schalter und Auf-/Zuklappen stehen nur im Browser).
+- Formen: Ein gewählter Kreis bleibt am Punkt gespeichert – beim Platzieren, bei „Zurück zu offen“ und „Neu platzieren“. Bisher bekam eine Chlorid- oder Asbestprobe, die im Prüfdialog oder von Hand auf Kreis gestellt war, wieder die Form aus dem Probentyp (Quadrat/Raute).
+
 ## 1.47.0 – 29. Oktober 2026
 
 - **Weiter-Platzieren (Test, abschaltbar):** Nach dem Platzieren einer Laborprobe wählt PlanKit gleich die nächste offene – zuerst im selben Raum, danach im nächsten Raum (Geschoss, dann Raum; Proben ohne Raum zuletzt). Der Platziermodus bleibt, der Punkt wird nicht mehr ausgewählt, die Fläche bleibt frei. Oben auf der Fläche steht „JETZT P11 · EG Flur · Decke · Untersicht – In den Plan tippen“ mit **Überspringen** (nächste Probe, im Raum reihum) und **Fertig (Esc)**; ist ein Raum durch, nennt der Hinweis ihn. Nach der letzten offenen Probe geht es wie bisher zurück zur Ansicht. Das Feld „Nächste Probe“ ist im Platziermodus ausgeblendet.
