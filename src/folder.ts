@@ -69,6 +69,33 @@ export async function findSubdir(dir:Dir,name:string):Promise<Dir|null>{try{retu
 export async function listFiles(dir:Dir,pattern:RegExp):Promise<FolderFile[]>{const out:FolderFile[]=[];for await(const h of dir.values())if(h.kind==='file'&&pattern.test(h.name)){const f=await (h as FileSystemFileHandle).getFile();out.push({name:h.name,handle:h as FileSystemFileHandle,lastModified:f.lastModified});}return out.sort((a,b)=>b.lastModified-a.lastModified);}
 export async function fileInfo(dir:Dir,name:string){try{const h=await dir.getFileHandle(name);return await h.getFile();}catch(e){if((e as DOMException).name==='NotFoundError')return null;throw e;}}
 export async function writeFile(dir:Dir,name:string,data:Blob|string){const h=await dir.getFileHandle(name,{create:true}),w=await h.createWritable();try{await w.write(data);await w.close();}catch(e){await w.abort().catch(()=>{});throw e;}return (await h.getFile()).lastModified;}
+
+const exportKey=(n:string)=>n.normalize('NFC').toLowerCase();
+/** Welche dieser Exportnamen gibt es im Ordner schon (auch in anderer Groß-/Kleinschreibung oder Unicode-Schreibweise)? */
+export async function existingExports(dir:Dir,names:string[]):Promise<string[]>{
+ const want=new Set(names.map(exportKey)),found:string[]=[];
+ for await(const h of dir.values())if(h.kind==='file'&&want.has(exportKey(h.name)))found.push(h.name);
+ return found;
+}
+/** Exporte (PDF, Bilder) nie still über eine vorhandene Datei schreiben – sie kann außerhalb von PlanKit nachbearbeitet sein
+ *  (Prüfbericht 29.10., F09). Mit replace (nach Rückfrage) wird die vorhandene Datei ersetzt, sonst kommt die neue Fassung
+ *  daneben als „… (2).pdf“. Rückgabe: der tatsächlich verwendete Name. */
+export async function writeExportFile(dir:Dir,name:string,data:Blob|string,replace=false):Promise<string>{
+ const run=async()=>{
+  let existing:string|null=null;const names=new Set<string>();
+  for await(const h of dir.values()){names.add(exportKey(h.name));if(exportKey(h.name)===exportKey(name))existing=h.name;}
+  let target=name;
+  if(existing&&replace)target=existing;
+  else{const dot=name.lastIndexOf('.'),stem=dot<0?name:name.slice(0,dot),ext=dot<0?'':name.slice(dot);for(let n=2;names.has(exportKey(target));n++)target=`${stem} (${n})${ext}`;}
+  const h=await dir.getFileHandle(target,{create:true});
+  if(target!==existing&&(await h.getFile()).size)throw Error(`„${target}“ wurde gerade von jemand anderem angelegt – bitte erneut exportieren.`);
+  const w=await h.createWritable();try{await w.write(data);await w.close();}catch(e){await w.abort().catch(()=>{});throw e;}
+  return target;
+ };
+ const locks=typeof navigator!=='undefined'?navigator.locks:undefined;
+ return locks?locks.request('plankit:export:'+exportKey(name),run):run();
+}
+
 /** Read errors must propagate; an empty object is only valid JSON or a verified missing file. */
 export async function readProjectData(f:ProjectFolder):Promise<Record<string,unknown>>{
  const so=spektron(),d=so?(await so.ort(f.dir,'projekt')).dir:f.dir;if(!d)return {};   // _Projekt.json im Projektordner oder künftig in „_Spektron“
