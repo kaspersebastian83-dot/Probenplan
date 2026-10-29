@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.45.1 – 29. Oktober 2026
+
+- Gemeinsames Modul spektron-ordner.js: Beim Umzug und bei der Ortswahl zählen in „Abrechnung“ nur noch die Dateien, die BelegKit selbst schreibt (Aufwand_<Kürzel>.json, _Abrechnung.json, <Nr>_Aufwand_<Datum>.json, _BelegKit_Sicherungen) – andere JSON dort bleiben liegen. Für PlanKit ändert sich nichts.
+
 ## 1.45.0 – 28. Oktober 2026
 
 - **Spektron-Ordner:** Seit dem Umzug liegt die PlanKit-Datei in `_Spektron/PlanKit` (neue Projekte direkt dort); Bilder und PDFs weiter in „Pläne“. Meldungen nennen den tatsächlichen Ort. Gemeinsames Modul mit Umstellung an.
