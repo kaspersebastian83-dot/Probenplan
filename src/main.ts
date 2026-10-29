@@ -16,7 +16,7 @@ import {candidates,loadImage,readPlan,validateProject,type Candidate} from './im
 import {download,restoreLocal,saveLocal} from './storage';
 import {labelkitReport} from './labelkit';
 import {berichtAlsReport,liesErgebnisse,standKennung,planHinterResultKit,hinterText,ERGEBNIS_DATEI,type Ergebnisse} from './ergebnisse';
-import {fileInfo,fileRevision,FolderConflict,saveFolderProject,writeProjectCopy,KEEP_RECENT,findSubdir,listFiles,openFolder,parseProjName,permission,pickFolder,projectDirOf,projectFileName,supported as folderSupported,writeFile,writeExportFile,archiv,AUFTRAEGE,LABOR,PLAENE,type ProjectFolder,planOrdner,planPfad} from './folder';
+import {fileInfo,fileRevision,FolderConflict,saveFolderProject,writeProjectCopy,KEEP_RECENT,findSubdir,listFiles,openFolder,parseProjName,permission,pickFolder,projectDirOf,projectFileName,supported as folderSupported,writeFile,writeExportFile,existingExports,archiv,AUFTRAEGE,LABOR,PLAENE,type ProjectFolder,planOrdner,planPfad} from './folder';
 import {ort} from './so';
 import {exportImage,exportLayout} from './export';
 import {annexFileName,createAnnex,saveAnnex,saveDocument,ANNEX_DIR} from './annex-run';
@@ -714,13 +714,18 @@ async function framedImage(view:Project,longSide:number,format:'png'|'jpeg',rate
   catch(e){throw Error(`${e instanceof Error?e.message:'Bildexport fehlgeschlagen.'} Bitte die kleinere Exportstufe (3.500 px) wählen oder andere Apps schließen.`);}
   finally{if(canvas){canvas.width=1;canvas.height=1;}}
 }
+/** Gibt es Exporte gleichen Namens schon in „Pläne“? Einmal fragen: true = ersetzen, false = neue Fassung daneben („… (2)“). */
+async function replaceExports(names:string[]):Promise<boolean>{
+  if(!folder)return false;const found=await existingExports(folder.plaene,names);if(!found.length)return false;
+  return window.confirm(`${found.length===1?'Diese Datei gibt es':'Diese Dateien gibt es'} in „${PLAENE}“ schon:\n• ${found.join('\n• ')}\n\nOK = ersetzen (auch was dort von Hand ergänzt wurde, geht verloren)\nAbbrechen = behalten und die neue Fassung daneben speichern, z. B. „… (2).pdf“`);
+}
 async function runPdf(paper:Paper,resultsView:boolean,all:boolean){
   if(!project)return;const views=all?Array.from({length:sheetCount(project)},(_,i)=>clone(sheetProject(project!,i))):[clone(project)],pages:PdfPage[]=[];
   for(const [i,view] of views.entries()){$('export').textContent=views.length>1?`Blatt ${i+1} von ${views.length} wird erstellt …`:'PDF wird erstellt …';pages.push(await sheetPage(view,paper,resultsView?rateMarkers(view):null,i+1,views.length));}
   let name=exportName(project,'pdf',resultsView,all);const blob=buildPdf(pages,{title:name.replace(/\.pdf$/,''),subject:[project.report&&`Gutachten ${project.report}`,String(projectData.objekt||'').trim()].filter(Boolean).join(' · '),author:COMPANY.name});
   if(exportURL)URL.revokeObjectURL(exportURL);exportURL=URL.createObjectURL(blob);const a=$<HTMLAnchorElement>('export-link');a.hidden=false;a.href=exportURL;a.download=name;a.textContent='PDF erneut herunterladen';$('export-result').hidden=false;
   const uncalibrated=views.filter(v=>!metersPerUnit(v.plan)).length,hint=uncalibrated?` ${uncalibrated===views.length?'Ohne':'Teilweise ohne'} Maßstab – Plan in der Liste kalibrieren („Strecke messen“).`:'';
-  if(folder){name=await writeExportFile(folder.plaene,name,blob);a.download=name;toast(`PDF gespeichert: ${PLAENE}/${name}.${hint}`,!!uncalibrated);}else{a.click();toast(`PDF erstellt (${pages.length} ${pages.length===1?'Blatt':'Blätter'}). Der Download ist bereit.${hint}`,!!uncalibrated);}
+  if(folder){name=await writeExportFile(folder.plaene,name,blob,await replaceExports([name]));a.download=name;toast(`PDF gespeichert: ${PLAENE}/${name}.${hint}`,!!uncalibrated);}else{a.click();toast(`PDF erstellt (${pages.length} ${pages.length===1?'Blatt':'Blätter'}). Der Download ist bereit.${hint}`,!!uncalibrated);}
 }
 function annexKey(){return `plankit-anlage-titel:${folder?.name||''}`;}
 function annexTitle(){try{return localStorage.getItem(annexKey())||'Anlage';}catch{return 'Anlage';}}
@@ -749,9 +754,9 @@ async function runExport(){if(!project||busy||!requireFinished())return;
   $('export').textContent=pdf?'PDF wird erstellt …':'Bild wird erstellt …';$('export-link').textContent='Bild erneut herunterladen';
   try{
     if(pdf)await runPdf(chosen.slice(4) as Paper,resultsView,all);else
-    if(all){const count=sheetCount(project);for(let i=0;i<count;i++){$('export').textContent=`Bild ${i+1} von ${count} wird erstellt …`;const view=clone(sheetProject(project,i));const image=framed()?await framedImage(view,quality,format,resultsView?rateMarkers(view):null,i+1,count):await exportImage(view,quality,format,resultsView?rateMarkers(view):null,footerExtra()),name=exportName(view,format,resultsView);if(folder)await writeExportFile(folder.plaene,name,image);else await download(image,name);}
+    if(all){const count=sheetCount(project),replace=await replaceExports(Array.from({length:count},(_,i)=>exportName(sheetProject(project!,i),format,resultsView)));for(let i=0;i<count;i++){$('export').textContent=`Bild ${i+1} von ${count} wird erstellt …`;const view=clone(sheetProject(project,i));const image=framed()?await framedImage(view,quality,format,resultsView?rateMarkers(view):null,i+1,count):await exportImage(view,quality,format,resultsView?rateMarkers(view):null,footerExtra()),name=exportName(view,format,resultsView);if(folder)await writeExportFile(folder.plaene,name,image,replace);else await download(image,name);}
       $('export-result').hidden=true;toast(folder?`${count} Bilder in „${PLAENE}“ gespeichert – je Plan ein Bild.`:`${count} Bilder erstellt – je Plan ein Bild. Der Browser fragt eventuell einmal, ob mehrere Downloads erlaubt sind.`);}
-    else{const blob=framed()?await framedImage(clone(project),quality,format,resultsView?rateMarkers(project):null):await exportImage(clone(project),quality,format,resultsView?rateMarkers(project):null,footerExtra());if(exportURL)URL.revokeObjectURL(exportURL);exportURL=URL.createObjectURL(blob);const a=$<HTMLAnchorElement>('export-link');a.hidden=false;a.href=exportURL;a.download=exportName(project,format,resultsView);$('export-result').hidden=false;if(folder){a.download=await writeExportFile(folder.plaene,a.download,blob);toast(`Bild gespeichert: ${PLAENE}/${a.download}`);}else{a.click();toast('Bild erstellt. Der Download ist bereit.');}}
+    else{const blob=framed()?await framedImage(clone(project),quality,format,resultsView?rateMarkers(project):null):await exportImage(clone(project),quality,format,resultsView?rateMarkers(project):null,footerExtra());if(exportURL)URL.revokeObjectURL(exportURL);exportURL=URL.createObjectURL(blob);const a=$<HTMLAnchorElement>('export-link');a.hidden=false;a.href=exportURL;a.download=exportName(project,format,resultsView);$('export-result').hidden=false;if(folder){a.download=await writeExportFile(folder.plaene,a.download,blob,await replaceExports([a.download]));toast(`Bild gespeichert: ${PLAENE}/${a.download}`);}else{a.click();toast('Bild erstellt. Der Download ist bereit.');}}
   }catch(e){fail(e);$('export-result').hidden=false;$('export-link').hidden=!exportURL||all||pdf;$('smaller').hidden=pdf||quality<=3500;}finally{busy=false;$<HTMLButtonElement>('export').disabled=false;dimensions();render();}}
 $('export').onclick=runExport;$('smaller').onclick=()=>{input('quality').value='3500';dimensions();void runExport();};$('help').onclick=()=>$<HTMLDialogElement>('help-dialog').showModal();
 async function offline(){if(!('serviceWorker' in navigator)){ $('offline').textContent='○ Offline nicht verfügbar';return;}const update=()=>{$('offline').textContent=navigator.serviceWorker.controller?'● Offline bereit':'● Offline nach erneutem Öffnen bereit';$('offline').classList.add('ready');};navigator.serviceWorker.addEventListener('controllerchange',update);try{await navigator.serviceWorker.register('./sw.js');await navigator.serviceWorker.ready;update();}catch{if(navigator.serviceWorker.controller)update();else $('offline').textContent='○ Offline nicht eingerichtet';}}
