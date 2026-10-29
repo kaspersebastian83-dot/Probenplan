@@ -10,6 +10,7 @@
   - Mehrere Pläne: Die Liste zeigt die Proben aller Pläne; ein Punkt auf einem anderen Plan wird beim Anwählen dorthin gewechselt. Neu platzieren, Zurück zu offen und Löschen gelten für den aktiven Plan.
   - Ausschalten: Haken „Neue Liste (Test)“ oben in der Seitenleiste (gilt je Browser). Aus = Seitenleiste wie bisher mit der alten Probenliste.
   - Projektdatei unverändert (Schalter und Auf-/Zuklappen stehen nur im Browser).
+- Formen: Ein gewählter Kreis bleibt am Punkt gespeichert – beim Platzieren, bei „Zurück zu offen“ und „Neu platzieren“. Bisher bekam eine Chlorid- oder Asbestprobe, die im Prüfdialog oder von Hand auf Kreis gestellt war, wieder die Form aus dem Probentyp (Quadrat/Raute).
 
 ## 1.47.0 – 29. Oktober 2026
 

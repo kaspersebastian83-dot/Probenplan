@@ -97,7 +97,7 @@ for(const engine of ['chromium','webkit']){
   });
   await check(`${engine}: platzierte Laborproben bekommen die gewählte Form`,async()=>{
    for(const [fx,fy] of [[.2,.3],[.4,.3],[.6,.3]])await placeFirstPending(page2,fx,fy);
-   const p=await savedProject(page2),ms=p.markers.filter(m=>m.kind==='sample');assert.deepEqual(ms.map(m=>m.shape),[undefined,'square','diamond']);
+   const p=await savedProject(page2),ms=p.markers.filter(m=>m.kind==='sample');assert.deepEqual(ms.map(m=>m.shape),['circle','square','diamond'],'ab 1.48 bleibt auch ein gewählter Kreis am Punkt gespeichert (sonst käme bei Chlorid/Asbest wieder die Typform)');
   });
   await check(`${engine}: offene Probe mit ✕ entfernen (rückgängig) und „Liste leeren“`,async()=>{
    let p=await savedProject(page2);const n=p.pending.length,first=p.pending[0].label;assert.ok(n>=2);
