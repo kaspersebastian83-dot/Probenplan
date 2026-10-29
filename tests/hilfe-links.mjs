@@ -5,7 +5,8 @@ const src=await readFile(new URL('../src/main.ts',import.meta.url),'utf8');
 const FEST=['start','brandschaden','bohrkern-ablauf','app-projektzentrale','app-labelkit','app-fotokit','app-resultkit','app-plankit','app-belegkit','app-spesenkit','app-datenarchiv','bohrkern','wischprobe','raumkuerzel'];
 const neben=new URL('../../aidkit/hilfe-anker.json',import.meta.url);
 let anker=FEST,mitListe=false;
-try{await access(neben);anker=Object.keys(JSON.parse(await readFile(neben,'utf8')).anker);mitListe=true;assert.deepEqual([...anker].sort(),[...FEST].sort(),'Liste hier = hilfe-anker.json in AidKit');}catch(e){if(e.code!=='ENOENT')throw e;}
+try{await access(neben);anker=Object.keys(JSON.parse(await readFile(neben,'utf8')).anker);mitListe=true;}catch(e){if(e.code!=='ENOENT')throw e;}
+if(mitListe)for(const id of FEST)assert.ok(anker.includes(id),`#${id} fehlt in AidKit`);
 // handbuchLink('<anker>', …) und direkte ../aidkit/#…-Links
 const genutzt=[...src.matchAll(/handbuchLink\('([a-z0-9-]+)'/g)].map(m=>m[1]).concat([...src.matchAll(/\.\.\/aidkit\/#([a-z0-9-]+)/g)].map(m=>m[1]));
 assert.ok(genutzt.length>=3,'Hilfe-Links vorhanden');

@@ -8,7 +8,7 @@ import {drawPlanContent} from './export';
 import {clone,floorName,markerSize,sheetCount,sheetProject,type Project} from './model';
 import {hasValues,prepare,rateMarkers} from './results';
 import {berichtQuellen,vorlaeufigeBerichte,vorlaeufigText} from './lab-provenance';
-import {fileInfo,fileRevision,findSubdir,listFiles,projectFileName,planOrdner,planPfad,AUFTRAEGE,LABOR,type ProjectFolder} from './folder';
+import {dateiLesen,fileInfo,fileRevision,findSubdir,listFiles,projectFileName,planOrdner,planPfad,AUFTRAEGE,LABOR,type ProjectFolder} from './folder';
 import {ort,ortZumSchreiben} from './so';
 
 export const ANNEX_DIR='Mitteilungen',ANNEX_LOG='_Anlagen-Protokoll.txt',FOTOS='Fotos',FOTOKIT_FILE='_Bildumbenenner.json';
@@ -113,7 +113,7 @@ export async function createAnnex(p:Project,folder:ProjectFolder|null,o:AnnexOpt
       await hashSource(lab,LABOR,name,`Laborbericht ${r.bericht||''} ${r.labor?`(${r.labor})`:''}`.replace(/\s+/g,' ').trim(),sources,missing);
     const lk=await ort(folder.dir,'labelkit'),auftraege=lk.dir,daten=auftraege?(await listFiles(auftraege,/_Daten\.json$/i))[0]:undefined;   // „Laboraufträge“ oder künftig „_Spektron/LabelKit“
     let bk:Map<string,string[]>|undefined;
-    if(daten){const file=await daten.handle.getFile(),bytes=await file.arrayBuffer();sources.push({role:'Probenerfassung LabelKit (neueste Datei)',name:`${lk.wo==='neu'?lk.pfad:AUFTRAEGE}/${daten.name}`,stand:stand(file.lastModified),sha:await sha(bytes)});
+    if(daten){const file=await dateiLesen(auftraege!,daten.handle),bytes=await file.arrayBuffer();sources.push({role:'Probenerfassung LabelKit (neueste Datei)',name:`${lk.wo==='neu'?lk.pfad:AUFTRAEGE}/${daten.name}`,stand:stand(file.lastModified),sha:await sha(bytes)});
       try{bk=bohrkernNummern(JSON.parse(new TextDecoder().decode(bytes)));}catch{/* unlesbar: Bohrkern-IDs auf Fotos bleiben unzugeordnet (Prüfprotokoll nennt sie) */}}
     const pjDir=o.projectDataSource===undefined?(await ort(folder.dir,'projekt')).dir:null;
     const pj=o.projectDataSource===undefined?(pjDir?await fileInfo(pjDir,'_Projekt.json'):null):o.projectDataSource;

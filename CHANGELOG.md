@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.46.0 – 29. Oktober 2026
+
+- Vorhandene PDF- und Bildexporte bleiben erhalten; weitere Exporte erhalten einen freien Namen. Umgezogene LabelKit-Dateien behalten ihren Zeitstand. Gemeinsame Skalen prüfen parallele Änderungen; Meldungen nennen den Datenordner.
+
 ## 1.45.0 – 28. Oktober 2026
 
 - **Spektron-Ordner:** Seit dem Umzug liegt die PlanKit-Datei in `_Spektron/PlanKit` (neue Projekte direkt dort); Bilder und PDFs weiter in „Pläne“. Meldungen nennen den tatsächlichen Ort. Gemeinsames Modul mit Umstellung an.

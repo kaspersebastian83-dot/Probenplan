@@ -12,7 +12,7 @@ export type Dir=FileSystemDirectoryHandle&{values():AsyncIterable<FileSystemHand
 /* Spektron-Ordner (spektron-ordner.js, über main.ts geladen): diese Datei bleibt ohne Importe, damit Tests sie einzeln laden.
    Fehlt das Modul (z. B. im Einzeltest), gilt wie bisher der Projektordner bzw. „Pläne“. */
 type SoOrt={dir:Dir|null;wo:'neu'|'alt';pfad:string};
-const spektron=()=>(globalThis as unknown as {SpektronOrdner?:{ort(d:Dir,b:string,o?:{anlegen?:boolean}):Promise<SoOrt>}}).SpektronOrdner;
+const spektron=()=>(globalThis as unknown as {SpektronOrdner?:{dateiLesen?(d:Dir,h:FileSystemFileHandle):Promise<File>;ort(d:Dir,b:string,o?:{anlegen?:boolean}):Promise<SoOrt>}}).SpektronOrdner;
 export interface ProjectFolder {dir:Dir;name:string;nr:string;ort:string;plaene:Dir;daten?:Dir;datenPfad?:string}
 /** Ordner der PlanKit-Datei und ihrer Sicherungen. */
 export const planOrdner=(f:ProjectFolder)=>f.daten||f.plaene;
@@ -66,9 +66,22 @@ export async function archiv():Promise<Dir|null>{try{const db=await suite();try{
 export async function permission(h:FileSystemHandle,request=false){const x=h as Handle,o:Mode={mode:'readwrite'};try{if(!x.queryPermission||await x.queryPermission(o)==='granted')return true;return request&&!!x.requestPermission&&await x.requestPermission(o)==='granted';}catch{return false;}}
 
 export async function findSubdir(dir:Dir,name:string):Promise<Dir|null>{try{return await dir.getDirectoryHandle(name) as Dir;}catch{/* Schreibweise abweichend? */}const want=name.normalize('NFC').toLowerCase();for await(const h of dir.values())if(h.kind==='directory'&&h.name.normalize('NFC').toLowerCase()===want)return h as Dir;return null;}
-export async function listFiles(dir:Dir,pattern:RegExp):Promise<FolderFile[]>{const out:FolderFile[]=[];for await(const h of dir.values())if(h.kind==='file'&&pattern.test(h.name)){const f=await (h as FileSystemFileHandle).getFile();out.push({name:h.name,handle:h as FileSystemFileHandle,lastModified:f.lastModified});}return out.sort((a,b)=>b.lastModified-a.lastModified);}
-export async function fileInfo(dir:Dir,name:string){try{const h=await dir.getFileHandle(name);return await h.getFile();}catch(e){if((e as DOMException).name==='NotFoundError')return null;throw e;}}
+export const dateiLesen=(dir:Dir,h:FileSystemFileHandle):Promise<File>=>spektron()?.dateiLesen?.(dir,h)??h.getFile();
+export async function listFiles(dir:Dir,pattern:RegExp):Promise<FolderFile[]>{const out:FolderFile[]=[];for await(const h of dir.values())if(h.kind==='file'&&pattern.test(h.name)){const f=await dateiLesen(dir,h as FileSystemFileHandle);out.push({name:h.name,handle:h as FileSystemFileHandle,lastModified:f.lastModified});}return out.sort((a,b)=>b.lastModified-a.lastModified);}
+export async function fileInfo(dir:Dir,name:string){try{const h=await dir.getFileHandle(name);return await dateiLesen(dir,h);}catch(e){if((e as DOMException).name==='NotFoundError')return null;throw e;}}
 export async function writeFile(dir:Dir,name:string,data:Blob|string){const h=await dir.getFileHandle(name,{create:true}),w=await h.createWritable();try{await w.write(data);await w.close();}catch(e){await w.abort().catch(()=>{});throw e;}return (await h.getFile()).lastModified;}
+
+export async function writeExportFile(dir:Dir,name:string,data:Blob|string):Promise<string>{
+ const run=async()=>{
+  const names=new Set<string>();for await(const h of dir.values())names.add(h.name.normalize('NFC').toLowerCase());
+  const dot=name.lastIndexOf('.'),stem=dot<0?name:name.slice(0,dot),ext=dot<0?'':name.slice(dot);
+  let target=name;while(names.has(target.normalize('NFC').toLowerCase()))target=stem+' ('+crypto.randomUUID()+')'+ext;
+  if(await fileInfo(dir,target))throw Error('Exportname inzwischen belegt. Bitte erneut exportieren.');
+  await writeFile(dir,target,data);return target;
+ };
+ return navigator.locks?navigator.locks.request('plankit:export:'+name.normalize('NFC').toLowerCase(),run):run();
+}
+
 /** Read errors must propagate; an empty object is only valid JSON or a verified missing file. */
 export async function readProjectData(f:ProjectFolder):Promise<Record<string,unknown>>{
  const so=spektron(),d=so?(await so.ort(f.dir,'projekt')).dir:f.dir;if(!d)return {};   // _Projekt.json im Projektordner oder künftig in „_Spektron“
