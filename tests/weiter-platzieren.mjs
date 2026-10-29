@@ -26,6 +26,11 @@ ok('Sortierung: Geschoss (KG, EG, OG, DG), dann Raum natürlich, „Ohne Raum“
   assert.deepEqual(labels(W.sortiere(list)),['P5','P4','P8','P6','P3','P1','P7','P9','P2']);
   assert.deepEqual(labels(list),['P1','P2','P3','P4','P5','P6','P7','P8','P9'],'Eingabe bleibt unverändert');
 });
+ok('Nummerierte Untergeschosse von unten nach oben: 2. UG, 1. UG, KG, EG',()=>{
+  const list=[p('P1','1. UG Technik'),p('P2','EG Flur'),p('P3','2. UG Tiefgarage'),p('P4','KG Keller')];
+  assert.deepEqual(labels(W.sortiere(list)),['P3','P1','P4','P2']);
+  assert.equal(W.naechste(list,'P3'),'P1','nach dem letzten Raum im 2. UG weiter im 1. UG, nicht im EG');
+});
 ok('Nächste Probe: erst im selben Raum, dann der nächste Raum, nach dem letzten Raum wieder von vorn',()=>{
   const list=[p('P1','EG Flur'),p('P2','EG Küche'),p('P3','EG Flur'),p('P4','1. OG Bad'),p('P5','EG Küche')];
   // Reihenfolge: Flur P1 P3 · Küche P2 P5 · 1. OG Bad P4
