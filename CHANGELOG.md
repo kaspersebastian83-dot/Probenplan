@@ -1,5 +1,13 @@
 # Änderungen
 
+## 1.47.0 – 29. Oktober 2026
+
+- **Weiter-Platzieren (Test, abschaltbar):** Nach dem Platzieren einer Laborprobe wählt PlanKit gleich die nächste offene – zuerst im selben Raum, danach im nächsten Raum (Geschoss, dann Raum; Proben ohne Raum zuletzt). Der Platziermodus bleibt, der Punkt wird nicht mehr ausgewählt, die Fläche bleibt frei. Oben auf der Fläche steht „JETZT P11 · EG Flur · Decke · Untersicht – In den Plan tippen“ mit **Überspringen** (nächste Probe, im Raum reihum) und **Fertig (Esc)**; ist ein Raum durch, nennt der Hinweis ihn. Nach der letzten offenen Probe geht es wie bisher zurück zur Ansicht. Das Feld „Nächste Probe“ ist im Platziermodus ausgeblendet.
+  - Ausschalten: Haken „Weiter-Platzieren (Test)“ im Bereich Laborproben (gilt je Browser). Aus = wie bisher: eine Probe platzieren, zurück zur Ansicht, Punkt ausgewählt.
+  - Aus der Liste auf den Plan ziehen platziert weiter nur die eine Probe.
+  - Projektdatei unverändert (der Schalter steht nur im Browser).
+  - Vorbereitung für die Probenliste mit Reitern (nächste Version): die Raumreihenfolge steckt im neuen Modul `weiter.ts`.
+
 ## 1.46.0 – 29. Oktober 2026
 
 - **Exporte überschreiben nichts mehr still** (Prüfbericht 29.10.): Gibt es das PDF oder Bild in „Pläne“ schon (z. B. von Hand ergänzt), fragt PlanKit einmal – ersetzen oder die neue Fassung daneben als „… (2).pdf“ speichern; die Meldung nennt den Namen.

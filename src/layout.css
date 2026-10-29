@@ -346,3 +346,12 @@ label.pflicht-offen>input,label.pflicht-offen>select{border-color:#d9a400!import
 #crop-info{width:100%;margin:0 0 4px;color:var(--kit-muted)}
 #crop-info.warn{color:#9a4b00;font-weight:600}
 #stage[data-mode=crop] #drawing{touch-action:none}
+
+/* Weiter-Platzieren (ab 1.47): Hinweisfeld oben auf der Fläche, solange eine Laborprobe zum Platzieren gewählt ist */
+.weiter-chip{position:absolute;top:56px;left:50%;transform:translateX(-50%);z-index:3;background:#fff;border:1px solid var(--kit-line2);border-left:4px solid var(--kit-line2);border-radius:8px;box-shadow:0 2px 8px rgba(40,72,116,.15);padding:8px 12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;width:max-content;max-width:calc(100% - 24px)}
+.weiter-chip[hidden],#stage:not([data-mode=lab-place]) .weiter-chip{display:none!important}
+.weiter-chip span{font-size:13px;font-weight:600}
+.weiter-chip button{width:auto;margin:0;min-height:36px}
+#stage[data-weiter=on][data-mode=lab-place] #next-field{display:none!important}
+.weiter-switch{display:flex;align-items:center;gap:6px;margin:6px 0;font-size:12px;color:var(--kit-muted)}
+.weiter-switch input{width:auto;margin:0}
