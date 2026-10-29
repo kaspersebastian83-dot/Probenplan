@@ -11,6 +11,7 @@ registerHooks({
 });
 const L=await import('../src/probenliste.ts');
 const {validLab}=await import('../src/import.ts');
+const {pendingShape}=await import('../src/model.ts');
 let n=0;const ok=(name,fn)=>{fn();n++;console.log('OK Probenliste: '+name);};
 const labels=list=>list.map(r=>r.label);
 const offen=(label,raum,desc,extra={})=>({label,ref:'Probe '+label.slice(1),desc:desc??'',art:'PAK · Wischprobe',...(raum!==undefined?{raum}:{}),...extra});
@@ -89,6 +90,12 @@ ok('Zurück zu offen: Punkt entfernen, Probe sortiert in die offene Liste, Typ/F
   const back=p.pending[1];assert.equal(back.typ,'Chlorid');assert.equal(back.shape,'square');assert.equal(back.surface,'ceiling');assert.equal(back.raum,'EG Flur');assert.equal(back.desc,'EG Flur, Decke');assert.equal(back.labNr,'L7');assert.equal(back.reportId,'r1');assert.deepEqual(back.werte,[{p:'Chlorid',r:'3',u:'µg/cm²'}]);
   assert.equal(validLab({...back}),true,'gültige Laborzeile');
   const wieder=L.zeilen(p).find(r=>r.label==='P2');assert.equal(wieder.art,'offen');assert.equal(wieder.shape,'square');
+});
+ok('Zurück zu offen: von Hand gewählter Kreis bei Chlorid bleibt Kreis (nicht wieder Quadrat aus dem Probentyp)',()=>{
+  const kreis=punkt('P5','EG Flur','EG Flur, Wand',{typ:'Chlorid',shape:'circle'}),ohne=punkt('P6','EG Flur','EG Flur, Wand',{typ:'Chlorid'});
+  const p=projekt({markers:[kreis,ohne]});L.zurueckZuOffen(p,'mP5');L.zurueckZuOffen(p,'mP6');
+  const [a,b]=p.pending;assert.equal(a.shape,'circle');assert.equal(pendingShape(a),'circle');
+  assert.equal(b.shape,undefined,'ohne eigene Wahl keine Form gespeichert');assert.equal(pendingShape(b),'square','Form aus dem Probentyp');
 });
 ok('Zurück zu offen auf einem anderen Plan; nicht erlaubt für Brandherde, Proben ohne Labor und Kennungen ohne P-Nummer',()=>{
   const og=punkt('P7','Bad','Bad, Wand');

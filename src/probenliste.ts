@@ -76,7 +76,7 @@ export const filterStandard=(offen:number):Filter=>offen>0?'offen':'alle';
 /** Probe aus einem platzierten Punkt zurück in die offene Liste (ohne Lage und ohne Notiz). */
 export function markerZuProbe(m:Marker):LabSample|null{
   if(m.kind!=='sample'||!m.lab||!/^P[1-9]\d{0,8}$/.test(m.label))return null;
-  return {...copyLab(m.lab),label:m.label,...(m.typ?{typ:m.typ}:{}),...(m.shape&&m.shape!=='circle'?{shape:m.shape}:{}),...(m.surface?{surface:m.surface}:{}),...(m.raum?{raum:m.raum}:{})};
+  return {...copyLab(m.lab),label:m.label,...(m.typ?{typ:m.typ}:{}),...(m.shape?{shape:m.shape}:{}),/* auch ein von Hand gewählter Kreis bleibt */...(m.surface?{surface:m.surface}:{}),...(m.raum?{raum:m.raum}:{})};
 }
 /** Entfernt den Punkt (auch auf einem anderen Plan) und legt die Probe nach P-Nummer sortiert in `pending`. */
 export function zurueckZuOffen(p:Project,id:string):LabSample|null{
