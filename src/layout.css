@@ -355,3 +355,60 @@ label.pflicht-offen>input,label.pflicht-offen>select{border-color:#d9a400!import
 #stage[data-weiter=on][data-mode=lab-place] #next-field{display:none!important}
 .weiter-switch{display:flex;align-items:center;gap:6px;margin:6px 0;font-size:12px;color:var(--kit-muted)}
 .weiter-switch input{width:auto;margin:0}
+
+/* Seitenleiste mit Reitern und eine Probenliste (ab 1.48): welcher Abschnitt in welchem Reiter steht, entscheidet allein das CSS */
+.panel-tabs{display:flex;gap:2px;padding:6px 8px 0;border-bottom:1px solid var(--kit-line);flex:0 0 auto}
+.panel-tabs[hidden]{display:none}
+.panel-tab{flex:1 1 auto;min-width:0;width:auto;margin:0;border:0;border-bottom:3px solid transparent;border-radius:0;background:none;padding:7px 4px 6px;font-size:12px;white-space:nowrap}
+.panel-tab:hover{background:var(--kit-panel2)}
+.panel-tab.active{border-bottom-color:var(--kit-accent);color:var(--kit-accent)}
+.tab-count{display:inline-block;min-width:16px;margin-left:5px;padding:0 5px;border-radius:8px;background:var(--kit-accent);color:#fff;font-size:10px;line-height:16px}
+.tab-count[hidden]{display:none}
+.liste-switch{display:flex;align-items:center;gap:5px;margin:0 6px 0 auto;font-size:10.5px;color:var(--kit-muted);white-space:nowrap}
+.liste-switch input{width:auto;margin:0}
+#side-panel:not([data-liste=neu]) #proben-section{display:none}
+#side-panel[data-liste=neu] #lab-panel,#side-panel[data-liste=neu] .markers-section .section-heading,#side-panel[data-liste=neu] #marker-list{display:none}
+#side-panel[data-liste=neu] .markers-section:has(#inspector[hidden]){display:none}
+#side-panel[data-liste=neu][data-tab=proben] :is(#size-section,#scale-section,#label-section,#results-section,#raumbuch-section,.areas-section){display:none!important}
+#side-panel[data-liste=neu][data-tab=plan] :is(#proben-section,.markers-section,#raumbuch-section){display:none!important}
+#side-panel[data-liste=neu][data-tab=raumbuch] :is(#proben-section,.markers-section,#size-section,#scale-section,#label-section,#results-section,.areas-section){display:none!important}
+.proben-section .section-heading{display:flex;align-items:center;justify-content:space-between}
+.pl-progress{margin:2px 0 6px;font-size:12px}
+.pl-bar{height:6px;margin-bottom:8px;border-radius:3px;background:var(--kit-line);overflow:hidden}
+.pl-bar[hidden]{display:none}
+.pl-fill{height:100%;width:0;background:var(--kit-accent);transition:width .2s}
+.pl-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.pl-chip{flex:0 0 auto;width:auto;min-height:28px;margin:0;padding:3px 10px;border-radius:14px;font-size:11px}
+.pl-chip.active{background:var(--kit-focus);border-color:var(--kit-accent);color:var(--kit-accent-2)}
+.pl-search{width:100%;margin-bottom:6px;font-size:12px}
+.pl-floor{margin:10px 0 2px;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--kit-muted)}
+.pl-group{display:flex;align-items:center;gap:6px;width:100%;min-height:28px;margin:4px 0 2px;padding:3px 6px;border:0;border-radius:6px;background:var(--kit-panel2);font-size:12px;text-align:left}
+.pl-caret{flex:none;width:10px;font-size:10px;color:var(--kit-muted)}
+.pl-gname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-gcount{flex:none;font-size:11px;color:var(--kit-muted)}
+.pl-gcount.fertig{color:#2f7d4f}
+.pl-item{display:flex;align-items:center;gap:2px}
+.pl-row{flex:1;min-width:0;display:flex;align-items:center;gap:8px;min-height:32px;margin:0;padding:2px 6px;border:1px solid transparent;border-radius:6px;background:none;text-align:left;font-size:12px;font-weight:400}
+.pl-row.offen{touch-action:pan-y}
+.pl-row:hover{background:var(--kit-panel2)}
+.pl-row.selected,.pl-row[aria-pressed=true]{background:var(--kit-focus);border-color:var(--kit-accent)}
+.pl-row.hl{background:#fff4d6}
+.pl-badge{flex:none;min-width:36px;padding:1px 5px;border:2px solid #17665e;border-radius:50%;color:#17665e;font-size:11px;font-weight:700;line-height:1.25;text-align:center}
+.pl-badge.square{border-radius:3px}
+.pl-badge.diamond{position:relative;border-color:transparent}
+.pl-badge.diamond::before{content:'';position:absolute;inset:1px;border:2px solid #17665e;border-radius:2px;transform:rotate(45deg)}
+.pl-badge.open{border-style:dashed}
+.pl-badge.diamond.open{border-style:solid;border-color:transparent}
+.pl-badge.diamond.open::before{border-style:dashed}
+.pl-badge.fire{border:none;font-size:0;color:transparent}
+.pl-badge.fire::before{content:'★';font-size:18px;line-height:1.1;color:#d42a1f}
+.pl-text{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-art{flex:none;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--kit-muted)}
+.pl-more,.pl-more-top{flex:none;width:28px;min-height:28px;margin:0;padding:0;border:0;background:none;font-size:16px;line-height:1;opacity:.6}
+.pl-more:hover,.pl-more:focus-visible,.pl-more[aria-expanded=true],.pl-more-top:hover,.pl-more-top[aria-expanded=true]{opacity:1;background:var(--kit-panel2)}
+.pl-menu{display:flex;flex-direction:column;margin:0 0 4px 38px;border:1px solid var(--kit-line2);border-radius:7px;background:#fff;box-shadow:0 2px 8px rgba(40,72,116,.15);overflow:hidden}
+.pl-menu[hidden]{display:none}
+.pl-menu-top{margin:2px 0 8px}
+.pl-menu button{width:100%;margin:0;padding:7px 10px;border:0;border-radius:0;font-size:12px;text-align:left}
+.pl-menu button[hidden]{display:none}
+#marks .pl-hl{filter:drop-shadow(0 0 3px #e0ae42) drop-shadow(0 0 6px #e0ae42)}

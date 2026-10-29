@@ -9,10 +9,11 @@ export function weiterOn(){try{return localStorage.getItem(WEITER_KEY)!=='0';}ca
 export function setWeiter(on:boolean){try{localStorage.setItem(WEITER_KEY,on?'1':'0');}catch{/* ohne Speicher */}}
 
 export interface RaumRef {key:string;floor:string;name:string;ohne:boolean}
-/** Geschoss und Raum einer offenen Probe; das Geschoss kommt aus dem Präfix im Raumnamen („EG Flur“). Ohne Raum: Gruppe „Ohne Raum“. */
-export function raumVon(r:{raum?:string}):RaumRef{
+/** Geschoss und Raum einer Probe; das Geschoss kommt aus dem Plan (`sheetFloor`) oder dem Präfix im Raumnamen („EG Flur“).
+ *  Ohne Raum: Gruppe „Ohne Raum“. */
+export function raumVon(r:{raum?:string},sheetFloor=''):RaumRef{
   const raw=(r.raum||'').trim();if(!raw)return {key:'',floor:'',name:'',ohne:true};
-  const {floor,name}=splitRoom('',raw);return {key:roomKey(floor,name),floor,name,ohne:false};
+  const {floor,name}=splitRoom(sheetFloor,raw);return {key:roomKey(floor,name),floor,name,ohne:false};
 }
 const natur=(a:string,b:string)=>a.localeCompare(b,'de',{numeric:true,sensitivity:'base'});
 /** Reihenfolge der Räume: Geschoss (KG … EG … OG … DG), dann Raumname natürlich sortiert, „Ohne Raum“ zuletzt. */
