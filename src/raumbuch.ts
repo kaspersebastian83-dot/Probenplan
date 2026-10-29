@@ -55,7 +55,7 @@ export function splitRoom(sheetFloor:string,raw:string):{floor:string;name:strin
   if(pre&&pre.rest)return {floor:pre.floor,name:pre.rest};
   return {floor:'',name};
 }
-function floorRank(f:string){const n=norm(f);if(!n)return 1000;if(n==='kg'||n==='ug'||/^\dug$/.test(n))return -1;if(n==='eg')return 0;
+export function floorRank(f:string){const n=norm(f);if(!n)return 1000;const ug=/^(\d+)ug$/.exec(n);if(ug)return -Number(ug[1]);if(n==='kg'||n==='ug')return -1;if(n==='eg')return 0;   // 2. UG vor 1. UG vor KG/UG
   const og=/^(\d+)og$/.exec(n);if(og)return Number(og[1]);if(n==='og')return 1;if(n==='dg')return 50;if(n==='sb')return 60;return 500;}
 function resolve(alias:Record<string,string>|undefined,key:string){let k=key;for(let i=0;i<10&&alias?.[k];i++)k=alias[k];return k;}
 
