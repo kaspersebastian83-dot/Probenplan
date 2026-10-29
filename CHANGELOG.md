@@ -1,5 +1,11 @@
 # Änderungen
 
+## 1.46.0 – 29. Oktober 2026
+
+- **Exporte überschreiben nichts mehr** (Prüfbericht 29.10.): Gibt es das PDF oder Bild in „Pläne“ schon (z. B. von Hand ergänzt), kommt die neue Fassung daneben als „… (2).pdf“; die Meldung nennt den Namen.
+- Gemeinsame Skalen: Hat ein Kollege die Datei inzwischen geändert, wird nichts überschrieben; die eigene Skala bleibt „noch nicht geteilt“ und geht beim nächsten Mal mit.
+- Hilfe und Meldungen nennen den tatsächlichen Ort der PlanKit-Datei („_Spektron/PlanKit“ oder „Pläne“) und der Daten von LabelKit und ResultKit.
+
 ## 1.45.1 – 29. Oktober 2026
 
 - Gemeinsames Modul spektron-ordner.js: Beim Umzug und bei der Ortswahl zählen in „Abrechnung“ nur noch die Dateien, die BelegKit selbst schreibt (Aufwand_<Kürzel>.json, _Abrechnung.json, <Nr>_Aufwand_<Datum>.json, _BelegKit_Sicherungen) – andere JSON dort bleiben liegen. Für PlanKit ändert sich nichts.

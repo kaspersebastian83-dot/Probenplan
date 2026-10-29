@@ -69,6 +69,25 @@ export async function findSubdir(dir:Dir,name:string):Promise<Dir|null>{try{retu
 export async function listFiles(dir:Dir,pattern:RegExp):Promise<FolderFile[]>{const out:FolderFile[]=[];for await(const h of dir.values())if(h.kind==='file'&&pattern.test(h.name)){const f=await (h as FileSystemFileHandle).getFile();out.push({name:h.name,handle:h as FileSystemFileHandle,lastModified:f.lastModified});}return out.sort((a,b)=>b.lastModified-a.lastModified);}
 export async function fileInfo(dir:Dir,name:string){try{const h=await dir.getFileHandle(name);return await h.getFile();}catch(e){if((e as DOMException).name==='NotFoundError')return null;throw e;}}
 export async function writeFile(dir:Dir,name:string,data:Blob|string){const h=await dir.getFileHandle(name,{create:true}),w=await h.createWritable();try{await w.write(data);await w.close();}catch(e){await w.abort().catch(()=>{});throw e;}return (await h.getFile()).lastModified;}
+
+/** Exporte (PDF, Bilder) nie über eine vorhandene Datei schreiben – sie kann außerhalb von PlanKit nachbearbeitet sein
+ *  (Prüfbericht 29.10., F09). Gibt es den Namen schon (auch in anderer Groß-/Kleinschreibung oder Unicode-Schreibweise),
+ *  kommt die neue Fassung daneben als „… (2).pdf“. Rückgabe: der tatsächlich verwendete Name. */
+export async function writeExportFile(dir:Dir,name:string,data:Blob|string):Promise<string>{
+ const key=(n:string)=>n.normalize('NFC').toLowerCase();
+ const run=async()=>{
+  const names=new Set<string>();for await(const h of dir.values())names.add(key(h.name));
+  const dot=name.lastIndexOf('.'),stem=dot<0?name:name.slice(0,dot),ext=dot<0?'':name.slice(dot);
+  let target=name;for(let n=2;names.has(key(target));n++)target=`${stem} (${n})${ext}`;
+  const h=await dir.getFileHandle(target,{create:true});
+  if((await h.getFile()).size)throw Error(`„${target}“ wurde gerade von jemand anderem angelegt – bitte erneut exportieren.`);
+  const w=await h.createWritable();try{await w.write(data);await w.close();}catch(e){await w.abort().catch(()=>{});throw e;}
+  return target;
+ };
+ const locks=typeof navigator!=='undefined'?navigator.locks:undefined;
+ return locks?locks.request('plankit:export:'+key(name),run):run();
+}
+
 /** Read errors must propagate; an empty object is only valid JSON or a verified missing file. */
 export async function readProjectData(f:ProjectFolder):Promise<Record<string,unknown>>{
  const so=spektron(),d=so?(await so.ort(f.dir,'projekt')).dir:f.dir;if(!d)return {};   // _Projekt.json im Projektordner oder künftig in „_Spektron“
