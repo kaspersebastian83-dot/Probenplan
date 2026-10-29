@@ -106,7 +106,7 @@ export class Probenliste{
   readonly root=el('section','','proben-section');
   /** Platz für Schalter unter der Liste. */
   readonly slot=el('div','','pl-slot');
-  private filter:Filter|null=null;private query='';private expanded=new Map<string,boolean>();private menu='';private more=false;
+  private filter:Filter|null=null;private query='';private expanded=new Map<string,boolean>();/** Filter der letzten Anzeige; Auf-/Zuklappen gilt je Filter (unter „Platziert“ sind fertige Räume offen). */private zeigt:Filter='offen';private menu='';private more=false;
   private progress=el('p','','pl-progress');private fill=el('div','','pl-fill');private bar=el('div','','pl-bar');private chips=new Map<Filter,HTMLButtonElement>();private search=el('input');
   private body=el('div','','pl-body');private moreBtn=btn('⋯','pl-more-top');private moreMenu=el('div','','pl-menu pl-menu-top');private clearBtn:HTMLButtonElement;private last:Project|null=null;
   constructor(private hooks:ListeHooks){
@@ -127,7 +127,8 @@ export class Probenliste{
     this.body.addEventListener('pointerover',e=>{if((e as PointerEvent).pointerType==='touch')return;const id=(e.target as HTMLElement).closest<HTMLElement>('[data-pid]')?.dataset.pid;hooks.hover(id||null);});
     this.body.addEventListener('pointerleave',()=>hooks.hover(null));
     document.addEventListener('pointerdown',e=>{const t=e.target as HTMLElement;if(this.more&&!t.closest('#proben-more,#proben-more-menu')){this.more=false;this.renderMenu();}if(this.menu&&!t.closest('.pl-item,.pl-menu')){this.menu='';this.last&&this.render(this.last);}},true);
-    r.addEventListener('keydown',e=>{if(e.key==='Escape'&&(this.menu||this.more)){e.preventDefault();e.stopPropagation();this.menu='';this.more=false;this.renderMenu();this.last&&this.render(this.last);}});
+    // Esc schließt ein offenes Menü zuerst (auf dem Dokument: nach dem Neuzeichnen hat die Liste keinen Fokus mehr).
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&(this.menu||this.more)){e.preventDefault();e.stopPropagation();const m=this.menu;this.menu='';this.more=false;this.renderMenu();this.last&&this.render(this.last);if(m)this.body.querySelector<HTMLElement>(`[data-more="${CSS.escape(m)}"]`)?.focus();}},true);
   }
   /** Behälter der Zeilen (für Ziehen aus der Liste). */
   get container(){return this.body;}
@@ -138,7 +139,7 @@ export class Probenliste{
   scrollToSelected(){this.body.querySelector('.pl-row.selected')?.scrollIntoView?.({block:'nearest'});}
   private click(e:Event){
     const t=e.target as HTMLElement;
-    const g=t.closest<HTMLElement>('[data-group]');if(g){const key=g.dataset.group!;this.expanded.set(key,g.getAttribute('aria-expanded')!=='true');this.last&&this.render(this.last);return;}
+    const g=t.closest<HTMLElement>('[data-group]');if(g){const key=g.dataset.group!;this.expanded.set(`${this.zeigt}|${key}`,g.getAttribute('aria-expanded')!=='true');this.last&&this.render(this.last);return;}
     const m=t.closest<HTMLElement>('[data-more]');if(m){this.menu=this.menu===m.dataset.more?'':m.dataset.more!;this.last&&this.render(this.last);return;}
     const a=t.closest<HTMLElement>('[data-act]');
     if(a){const act=a.dataset.act!,label=a.dataset.label||'',id=a.dataset.id||'',sheet=Number(a.dataset.sheet);this.menu='';
@@ -149,7 +150,7 @@ export class Probenliste{
   }
   render(p:Project){
     this.last=p;
-    const rows=zeilen(p,this.hooks.wert),z=zaehler(rows),filter=this.filter??filterStandard(z.offen),q=norm(this.query);
+    const rows=zeilen(p,this.hooks.wert),z=zaehler(rows),filter=this.filter??filterStandard(z.offen),q=norm(this.query);this.zeigt=filter;
     const percent=z.gesamt?Math.round(z.platziert/z.gesamt*100):0;
     this.progress.textContent=z.gesamt?`${z.platziert} von ${z.gesamt} platziert${!z.offen?' · Alle Laborproben platziert.':''}`:'Noch kein Laborbericht übernommen.';
     this.bar.hidden=!z.gesamt;this.fill.style.width=`${percent}%`;this.bar.setAttribute('aria-valuenow',String(percent));
@@ -161,7 +162,7 @@ export class Probenliste{
     for(const g of list){
       if(mitGeschoss&&!g.weitere&&g.floor!==floor){floor=g.floor;nodes.push(el('div',g.floor||'Ohne Geschoss','pl-floor'));}
       const enthaelt=!!sel&&g.alle.some(x=>x.art==='offen'&&x.label===sel)||!!selId&&g.alle.some(x=>x.id===selId);
-      const open=!!q||enthaelt||(this.expanded.get(g.key)??!g.fertig);
+      const open=!!q||enthaelt||(this.expanded.get(`${filter}|${g.key}`)??(filter==='platziert'||!g.fertig));
       const head=el('button','','pl-group');head.type='button';head.dataset.group=g.key;head.setAttribute('aria-expanded',String(open));
       const name=g.weitere?'Brandherde & weitere Markierungen':g.ohne?'Ohne Raum':g.name||'Ohne Raum';
       head.append(el('span',open?'▾':'▸','pl-caret'),el('span',name,'pl-gname'),el('span',g.weitere?String(g.alle.length):`${g.gesamt-g.offen}/${g.gesamt}${g.fertig?' ✓':''}`,`pl-gcount${g.fertig?' fertig':''}`));

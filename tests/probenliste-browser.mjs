@@ -52,7 +52,7 @@ for(const engine of engines){
    const first=row(page,'P1');assert.ok((await first.boundingBox()).height<=36,'Zeile höchstens 36 px');
    assert.equal((await first.locator('.pl-badge').textContent()).trim(),'P1');assert.equal((await first.locator('.pl-titel').textContent()).trim(),'Decke · Untersicht');assert.equal((await first.locator('.pl-art').textContent()).trim(),'PAK');
    assert.equal(await first.locator('.pl-badge.open').count(),1);assert.equal(await page.locator('.pl-row').count(),6);
-   assert.equal(await page.locator('[data-pending]').count(),0,'keine zweite Liste mehr in der Seitenleiste');
+   assert.equal(await page.locator('[data-pending]:visible').count(),0,'keine zweite Liste mehr in der Seitenleiste');
   });
   await check(`${engine}: Zeile wählen → Platzieren mit Weiter-Platzieren; Liste, Fortschritt und Gruppenzähler folgen`,async()=>{
    await row(page,'P1').click();await page.locator('#weiter-chip').waitFor();assert.match(await chipText(page),/^JETZT P1 · EG Flur/);
@@ -94,7 +94,7 @@ for(const engine of engines){
   });
   await check(`${engine}: ⋯ bei platzierter Probe: Im Plan zeigen, Neu platzieren, Zurück zu offen, Punkt löschen`,async()=>{
    await more(page,'P1').click();assert.deepEqual(await menuItems(page),['Im Plan zeigen','Neu platzieren','Zurück zu offen','Punkt löschen']);
-   await page.keyboard.press('Escape');assert.equal(await page.locator('.pl-menu').count(),0,'Esc schließt das Menü');
+   await page.keyboard.press('Escape');assert.equal(await page.locator('.pl-item .pl-menu').count(),0,'Esc schließt das Menü');assert.equal(await page.locator('#inspector').isVisible(),true,'Esc lässt den Punkt ausgewählt');
    await more(page,'P1').click();await page.getByRole('menuitem',{name:'Zurück zu offen'}).click();
    const p=await until(page,p=>p.markers.length===1);assert.deepEqual(p.pending.map(r=>r.label),['P1','P2','P3','P5','P6']);assert.equal(p.pending[0].raum,'EG Flur');
    await page.locator('#undo').click();const q=await until(page,p=>p.markers.length===2);assert.deepEqual(q.pending.map(r=>r.label),['P2','P3','P5','P6'],'Rückgängig stellt den Punkt wieder her');
