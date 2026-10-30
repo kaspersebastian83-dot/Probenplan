@@ -145,6 +145,29 @@ export function stampTime(rest:string):number|null{
  m=rest.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2})-(\d{2})-(\d{2})-(\d{3})(?=[ )])/);if(m)return new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6],+m[7]).getTime();
  return null;
 }
+/** Art und Zeitpunkt einer Kopie aus ihrem Namen „Probenplan <Projekt> (<Art> <Zeit> …).probenplan“; andere Namen: Art null. */
+const COPY_KINDS=['Kopie vor dem Ersetzen','Speicherkandidat','Wiederherstellung','vorher','Kopie'];
+export function copyInfo(folderName:string,name:string):{kind:string|null;time:number|null}{
+ const prefix=`Probenplan ${folderName} (`;
+ if(!name.startsWith(prefix)||!name.endsWith(').probenplan'))return {kind:null,time:null};
+ const inner=name.slice(prefix.length,-').probenplan'.length),kind=COPY_KINDS.find(k=>inner.startsWith(`${k} `));
+ return kind?{kind,time:stampTime(inner.slice(kind.length+1))}:{kind:null,time:null};
+}
+export interface StoredCopy{name:string;kind:string|null;revision:string|null;lastModified:number}
+/** Ist die Projektdatei gültig, fragt PlanKit beim Öffnen nur noch nach Kopien, die etwas enthalten, das sonst fehlt:
+ * - Wiederherstellung oder Speicherkandidat, neuer als die Projektdatei (abgebrochenes Speichern, Projektwechsel ohne Speichern);
+ * - Speicherkandidat, dessen Inhalt nie Projektdatei wurde und auch sonst in keiner Kopie liegt (unterbrochenes Speichern,
+ *   oder zwei PCs speichern im selben Augenblick und der zweite überschreibt den ersten – dann ist der Kandidat des ersten älter).
+ * „(vorher …)“-Kopien, „Kopie …“ und fremde Namen nie: sie entstehen bei jedem normalen Speichern bzw. bewusst. */
+export function copiesToOffer(copies:StoredCopy[],main:{revision:string|null;lastModified:number}):StoredCopy[]{
+ const secured=new Set<string|null>([main.revision]);for(const c of copies)if(c.kind!=='Speicherkandidat')secured.add(c.revision);
+ return copies.filter(c=>{
+  if(c.revision===main.revision)return false;
+  if(c.kind==='Wiederherstellung')return c.lastModified>=main.lastModified;
+  if(c.kind==='Speicherkandidat')return c.lastModified>=main.lastModified||!secured.has(c.revision);
+  return false;
+ });
+}
 const uniqueName=(f:ProjectFolder,kind:string)=>`Probenplan ${f.name} (${kind} ${localStamp()} ${crypto.randomUUID()}).probenplan`;
 /** Always use a fresh filename: backups/recovery files are never recycled. */
 export async function writeProjectCopy(f:ProjectFolder,kind:string,data:string|Blob){const name=uniqueName(f,kind);if(await fileInfo(planOrdner(f),name))throw Error('Der Name einer Sicherungsdatei ist bereits belegt. Bitte erneut versuchen.');const wanted=await fileRevision(new File([data],name));await writeFile(planOrdner(f),name,data);if(await fileRevision(await fileInfo(planOrdner(f),name))!==wanted)throw Error('Sicherungsdatei konnte nicht bestätigt werden.');return name;}

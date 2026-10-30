@@ -53,6 +53,16 @@ try{
  assert.ok(candidates.some(([,t])=>t===textA),'the confirmed A version survives the later successful B write');
  assert.ok(candidates.some(([,t])=>t===textB),'the confirmed B version has its own durable candidate');
  candidateA=candidates.find(([,t])=>t===textA)[0];
+ // Öffnen bei gültiger Projektdatei: nur A wird angeboten (nie Projektdatei geworden, älter als B) – keine „(vorher …)“-Kopie, nicht B (= Projektdatei).
+ {const rev=t=>A.m.fileRevision(new File([t],'x')),time=async n=>(await stat(join(plaene.path,n))).mtimeMs;
+  const list=await Promise.all(Object.entries(files).filter(([n])=>n!==main).map(async([n,t])=>({name:n,kind:A.m.copyInfo(name,n).kind,revision:await rev(t),lastModified:await time(n)})));
+  assert.ok(list.some(c=>c.kind==='vorher')&&list.some(c=>c.kind==='Speicherkandidat'));
+  assert.deepEqual([...A.m.copiesToOffer(list,{revision:await rev(files[main]),lastModified:await time(main)}).map(c=>c.name)],[candidateA]);}
+ assert.deepEqual({...A.m.copyInfo(name,`Probenplan ${name} (Kopie vor dem Ersetzen 2026-10-30 19-23-05-123 x).probenplan`)},{kind:'Kopie vor dem Ersetzen',time:new Date(2026,9,30,19,23,5,123).getTime()});
+ assert.deepEqual({...A.m.copyInfo(name,'Probenplan anderes Projekt (vorher x).probenplan')},{kind:null,time:null});
+ {const c=(name,kind,revision,lastModified)=>({name,kind,revision,lastModified});
+  assert.deepEqual([...A.m.copiesToOffer([c('W alt','Wiederherstellung','w1',5),c('W neu','Wiederherstellung','w2',15),c('W wie Datei','Wiederherstellung','m',15),c('vorher neu','vorher','v',20),c('Kopie','Kopie','k',20),
+   c('K in vorher','Speicherkandidat','v',5),c('K in Kopie','Speicherkandidat','k',5),c('K verloren','Speicherkandidat','q',5),c('K neu','Speicherkandidat','v',12),c('fremd',null,'f',30)],{revision:'m',lastModified:10}).map(x=>x.name)],['W neu','K verloren','K neu']);}
  // Explicit saving of identical content reuses the protected copy, without deleting it.
  const count=candidates.length;await B.m.saveFolderProject(folder,textB,resultB.revision);
  assert.equal((await readdir(plaene.path)).filter(n=>n.includes('(Speicherkandidat ')).length,count);
@@ -98,9 +108,12 @@ if(!process.env.F2_NODE_ONLY){
    await page.goto(`${base}/#projekt=${encodeURIComponent(name)}`);await page.reload();
    await page.locator('#ask-title',{hasText:damaged?'Projektdatei fehlt oder ist beschädigt':'Gespeicherte Fassungen prüfen'}).waitFor();
    assert.match(await page.locator('#ask-text').textContent(),/unlesbare\/beschädigte/);
-   for(let i=0;!await page.getByRole('button',{name:candidateA,exact:true}).isVisible();i++){assert.ok(i<5);await page.getByRole('button',{name:'Weitere Fassungen',exact:true}).click();}
+   // „Datei verwenden“ ist der grüne Hauptknopf; Fassungen heißen nach Art und Zeit, nicht nach Dateiname; keine „(vorher …)“-Kopie bei gültiger Datei.
+   const knoepfe=await page.locator('#ask-actions button').allTextContents();assert.ok(!knoepfe.some(t=>t.endsWith('.probenplan')),knoepfe.join(' | '));
+   if(!damaged){assert.equal(await page.locator('#ask-actions button.primary').textContent(),'Datei verwenden');assert.ok(!knoepfe.some(t=>t.startsWith('Vorheriger Stand')),knoepfe.join(' | '));}
+   for(let i=0;!await page.locator(`#ask-actions button[title="${candidateA}"]`).isVisible();i++){assert.ok(i<5);await page.getByRole('button',{name:'Weitere Fassungen',exact:true}).click();}
    if(changed)await page.evaluate(async({name,candidateA})=>{const dir=await(await(await(await navigator.storage.getDirectory()).getDirectoryHandle('F2 Archiv')).getDirectoryHandle(name)).getDirectoryHandle('Pläne'),w=await(await dir.getFileHandle(candidateA)).createWritable();await w.write('{replaced-during-choice');await w.close();},{name,candidateA});
-   await page.getByRole('button',{name:candidateA,exact:true}).click();
+   await page.locator(`#ask-actions button[title="${candidateA}"]`).click();
    if(changed){await page.locator('#toast.error',{hasText:'während der Auswahl verändert'}).waitFor();assert.equal(await page.locator('#welcome').isVisible(),true);assert.deepEqual(errors,[]);await context.close();return;}
    await page.locator('#saved',{hasText:'Wiederhergestellt'}).waitFor({state:'attached'});
    assert.equal(await page.locator('#report').inputValue(),'NEU A');

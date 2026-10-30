@@ -1,5 +1,17 @@
 # Änderungen
 
+## 1.50.0 – 30. Oktober 2026
+
+- **Keine Frage „Gespeicherte Fassungen prüfen“ mehr bei fast jedem Öffnen** (Workflow-Review, Befund 5): Bisher bot PlanKit jede `.probenplan` im Planordner an, die von der Projektdatei abweicht – und weil jedes Speichern eine „(vorher …)“-Kopie anlegt, kam die Frage praktisch immer. Jetzt gilt: Ist die Projektdatei gültig, öffnet PlanKit sie ohne Frage. Nachgefragt wird nur noch bei einer Fassung, die nicht in der Projektdatei steht:
+  - Wiederherstellung oder Speicherstand, neuer als die Projektdatei (abgebrochenes Speichern, Projektwechsel ohne Speichern);
+  - Speicherstand, dessen Inhalt nie Projektdatei wurde und in keiner anderen Kopie liegt – auch wenn er älter ist. Das ist der Fall „zwei PCs speichern im selben Augenblick, der zweite überschreibt den ersten“: ohne diese Regel wäre die Arbeit des ersten nur noch auf der Festplatte zu finden.
+  - „(vorher …)“-Kopien, „(Kopie …)“, „(Kopie vor dem Ersetzen …)“ und fremde Dateinamen nie; unlesbare Kopien allein auch nicht.
+- Im Dialog ist **„Datei verwenden“ der grüne Hauptknopf** (bisher war es der letzte Knopf, also ein alter Dateiname).
+- Fassungen heißen nach **Art und Zeit** statt nach dem Dateinamen: „Speicherstand vom 30.10.2026, 19:23:05 Uhr“, „Wiederherstellung vom …“, „Vorheriger Stand vom …“. Der Dateiname steht im Tooltip.
+- Fehlt die Projektdatei oder ist sie beschädigt, bleibt alles wie bisher (alle abweichenden Fassungen, seitenweise).
+- Neue Texte im Dialog in „du“.
+- Tests: Die Folder-Suite klickt den Dialog nicht mehr automatisch weg – sie läuft ohne ihn durch. F2-Test (gleichzeitiges Speichern) prüft die Auswahlregel zusätzlich in Node und im Dialog den grünen Knopf und die Namen.
+
 ## 1.49.0 – 30. Oktober 2026
 
 - Spektron-Leiste: neuer Schritt „BerichtKit“ (Asbest-Untersuchungsbericht) zwischen PlanKit und BelegKit – Haken, sobald ein Bericht in „Mitteilungen“ liegt. Gemeinsames Modul spektron-ordner.js: neuer Bereich „BerichtKit“ (Angaben zum Bericht in „_Spektron/BerichtKit“).
