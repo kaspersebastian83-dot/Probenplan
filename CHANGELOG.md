@@ -1,5 +1,9 @@
 # Änderungen
 
+## 1.49.0 – 30. Oktober 2026
+
+- Spektron-Leiste: neuer Schritt „BerichtKit“ (Asbest-Untersuchungsbericht) zwischen PlanKit und BelegKit – Haken, sobald ein Bericht in „Mitteilungen“ liegt. Gemeinsames Modul spektron-ordner.js: neuer Bereich „BerichtKit“ (Angaben zum Bericht in „_Spektron/BerichtKit“).
+
 ## 1.48.0 – 29. Oktober 2026
 
 - **Seitenleiste mit Reitern und einer Probenliste (Test, abschaltbar):** Die lange Spalte ist in drei Reiter geteilt – **Proben** (Standard), **Plan & Ausgabe** (Punktgröße, Beschriftung, Maßstab & Norden, Ergebniskarte, Flächen) und **Raumbuch**. Am Reiter „Proben“ steht die Zahl der offenen Proben.
