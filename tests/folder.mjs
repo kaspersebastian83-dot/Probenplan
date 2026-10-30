@@ -28,9 +28,6 @@ const recoveryProjects=async page=>Promise.all((await fs(page,'list',[NAME,'Plä
 const browser=await chromium.launch();
 try{
  const context=await browser.newContext({viewport:{width:1366,height:768},acceptDownloads:true}),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
- // These existing cases explicitly keep the main file when opening their accumulated history.
- // folder-concurrency.mjs tests conscious candidate selection separately.
- await page.addLocatorHandler(page.locator('#ask-title',{hasText:'Gespeicherte Fassungen prüfen'}),()=>page.locator('#ask-actions button',{hasText:'Datei verwenden'}).click());
  await page.goto(base);await fs(page,'setup',NAME,svg,labXML(),labErgebnisse());
  await check('Fragmentprojekt mit Sonderzeichen hat Vorrang; andere URL-Bestandteile bleiben erhalten',async()=>{
   const special='26.0987 Köln & Süd + 50% #Hof';await fs(page,'setup',special,svg,labXML());
@@ -122,7 +119,7 @@ try{
   await fs(page,'write',[NAME,'Pläne'],candidate,valid);await fs(page,'write',[NAME,'Pläne'],FILE,'{interrupted');
   await page.evaluate(name=>new Promise((res,rej)=>{const r=indexedDB.open('probenplan',1);r.onsuccess=()=>{const tx=r.result.transaction('projects','readwrite');tx.objectStore('projects').delete(`projekt:${name}`);tx.oncomplete=()=>{r.result.close();res();};tx.onerror=()=>rej(tx.error);};}),NAME);
   await page.reload();await page.locator('#ask-title',{hasText:'Projektdatei fehlt oder ist beschädigt'}).waitFor();assert.equal(await fs(page,'read',[NAME,'Pläne'],FILE),'{interrupted');
-  await page.locator('#ask-actions button',{hasText:candidate}).click();await page.locator('#saved',{hasText:'Wiederhergestellt'}).waitFor();assert.equal(await page.locator('#count').textContent(),'2');assert.equal(await fs(page,'read',[NAME,'Pläne'],FILE),'{interrupted');
+  assert.match(await page.locator(`#ask-actions button[title="${candidate}"]`).textContent(),/^Wiederherstellung vom \d\d\.\d\d\.\d{4}, \d\d:\d\d:\d\d Uhr( \(\d+\))?$/);await page.locator(`#ask-actions button[title="${candidate}"]`).click();await page.locator('#saved',{hasText:'Wiederhergestellt'}).waitFor();assert.equal(await page.locator('#count').textContent(),'2');assert.equal(await fs(page,'read',[NAME,'Pläne'],FILE),'{interrupted');
   await page.locator('#save-project').click();await page.locator('#toast',{hasText:'Gespeichert'}).waitFor();assert.equal((await saved(page)).markers.length,2);
   const names=await fs(page,'list',[NAME,'Pläne']);assert.ok((await Promise.all(names.filter(n=>n.includes('(vorher ')).map(n=>fs(page,'read',[NAME,'Pläne'],n)))).includes('{interrupted'));
  });
