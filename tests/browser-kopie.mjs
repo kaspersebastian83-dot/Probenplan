@@ -9,7 +9,7 @@ const svg='<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rec
 const plan=name=>({name,mimeType:'image/svg+xml',buffer:Buffer.from(svg)});
 async function check(name,fn){await fn();console.log(`OK ${name}`);}
 const idb=(page,key)=>page.evaluate(key=>new Promise((resolve,reject)=>{const r=indexedDB.open('probenplan',1);r.onsuccess=()=>{const q=r.result.transaction('projects').objectStore('projects').get(key);q.onsuccess=()=>{r.result.close();resolve(q.result??null);};q.onerror=()=>reject(q.error);};r.onerror=()=>reject(r.error);}),key);
-const idbDelete=(page,key)=>page.evaluate(key=>new Promise((resolve,reject)=>{const r=indexedDB.open('probenplan',1);r.onsuccess=()=>{const tx=r.result.transaction('projects','readwrite');tx.objectStore('projects').delete(key);tx.oncomplete=()=>{r.result.close();resolve();};tx.onerror=()=>reject(tx.error);};r.onerror=()=>reject(r.error);}),key);
+const idbPut=(page,key,value)=>page.evaluate(([key,value])=>new Promise((resolve,reject)=>{const r=indexedDB.open('probenplan',1);r.onsuccess=()=>{const tx=r.result.transaction('projects','readwrite');tx.objectStore('projects').put(value,key);tx.oncomplete=()=>{r.result.close();resolve();};tx.onerror=()=>reject(tx.error);};r.onerror=()=>reject(r.error);}),[key,value]);
 async function tap(page,fx,fy){const pt=await page.locator('#drawing').evaluate((el,[fx,fy])=>{const r=el.querySelector('#plan-clip rect'),q=new DOMPoint(fx*Number(r.getAttribute('width')),fy*Number(r.getAttribute('height'))).matrixTransform(el.getScreenCTM());return{x:q.x,y:q.y};},[fx,fy]);await page.mouse.click(pt.x,pt.y);}
 const gesichert=page=>page.locator('#saved').filter({hasText:'nicht in einem Projektordner'}).waitFor({state:'attached'});
 const browser=await chromium.launch();
@@ -27,7 +27,7 @@ try{
  await check('Freie Sicherung: Status sagt „nicht in einem Projektordner“, Vermerk zur Herkunft wird geschrieben',async()=>{
   await page.keyboard.press('p');await tap(page,.4,.5);await gesichert(page);
   assert.equal((await idb(page,'current')).markers.length,1);
-  const meta=await idb(page,'current-meta');assert.ok(meta&&meta.savedAt>0&&typeof meta.name==='string','Vermerk vorhanden');
+  const k=(await idb(page,'current')).browserKopie;assert.ok(k&&k.frei===true&&k.savedAt>0,'Vermerk im selben Datensatz');
  });
  await check('„Grundriss ersetzen …“ fragt und sagt, was verloren geht; Abbrechen ändert nichts',async()=>{
   await page.locator('#file').setInputFiles(plan('Neu.svg'));await page.locator('#replace-dialog').waitFor();
@@ -41,7 +41,9 @@ try{
   assert.match(await page.locator('#toast').textContent(),/Browser-Zwischenspeicherung.*in keinem Projektordner/);
  });
  await check('Sicherung ohne Herkunftsvermerk (ältere Version): wird nicht still geöffnet – erst fragen, Datei sichern geht ohne Öffnen',async()=>{
-  await idbDelete(page,'current-meta');await page.reload();
+  // Wie ein alter Tab (vor 1.52), der „current“ überschreibt: derselbe Plan, aber ohne Vermerk – ein übrig gebliebener Vermerk an anderer Stelle zählt nicht
+  const {browserKopie,...alt}=await idb(page,'current');assert.ok(browserKopie);await idbPut(page,'current',alt);await idbPut(page,'current-meta',{savedAt:Date.now(),name:'alt'});
+  await page.reload();
   await page.locator('#ask-dialog[open]').waitFor();
   assert.equal((await page.locator('#ask-title').textContent()).trim(),'Browser-Zwischenspeicherung gefunden');
   assert.match(await page.locator('#ask-text').textContent(),/Kopie eines Projekts.*Projektzentrale/s);
@@ -55,11 +57,11 @@ try{
  await check('… „Trotzdem öffnen“ öffnet sie als freien Plan und schreibt ab jetzt den Vermerk; der nächste Start fragt nicht mehr',async()=>{
   await page.reload();await page.locator('#ask-dialog[open]').waitFor();
   await page.locator('#ask-actions button',{hasText:'Trotzdem öffnen'}).click();await page.locator('.marker-row').first().waitFor();
-  await gesichert(page);for(let i=0;i<30&&!await idb(page,'current-meta');i++)await page.waitForTimeout(100);assert.ok(await idb(page,'current-meta'));
+  await gesichert(page);for(let i=0;i<30&&!(await idb(page,'current')).browserKopie;i++)await page.waitForTimeout(100);assert.ok((await idb(page,'current')).browserKopie?.frei);
   await page.reload();await page.locator('.marker-row').first().waitFor();assert.equal(await page.locator('#ask-dialog[open]').count(),0);
  });
  await check('Projekt aus dem Projektordner überschreibt die freie Sicherung nicht und kommt nie als freier Plan zurück',async()=>{
-  const vorher=JSON.stringify(await idb(page,'current'));const metaVorher=JSON.stringify(await idb(page,'current-meta'));
+  const vorher=JSON.stringify(await idb(page,'current'));
   await page.evaluate(async([name,svg])=>{const root=await navigator.storage.getDirectory(),archiv=await root.getDirectoryHandle('Mosaik Archivordner',{create:true});
    const proj=await archiv.getDirectoryHandle(name,{create:true});
    for(const sub of ['Pläne','Laborergebnisse','Laboraufträge','Fotos'])await proj.getDirectoryHandle(sub,{create:true});
@@ -70,7 +72,7 @@ try{
   await page.locator('#folder-plans button',{hasText:'Grundriss EG.svg'}).click();await page.locator('#welcome').waitFor({state:'hidden'});
   await page.keyboard.press('p');await tap(page,.3,.4);await page.locator('#saved',{hasText:/^✓ In „Pläne“ gespeichert$/}).waitFor({state:'attached'});
   assert.ok(await idb(page,`projekt:${NAME}`),'Fassung liegt unter dem Ordnerschlüssel');
-  assert.equal(JSON.stringify(await idb(page,'current')),vorher,'freie Sicherung unverändert');assert.equal(JSON.stringify(await idb(page,'current-meta')),metaVorher);
+  assert.equal(JSON.stringify(await idb(page,'current')),vorher,'freie Sicherung samt Vermerk unverändert');
  });
  assert.deepEqual(errors,[]);
 }finally{await browser.close();}

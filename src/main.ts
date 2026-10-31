@@ -13,7 +13,7 @@ import {build as buildDocx} from './docx';
 import {vorlaeufigeBerichte,vorlaeufigText,verwendeteBerichte} from './lab-provenance';
 import {kwPaar,wandStand,wandSvg,wandBlocks,wandCSV,wandName,wandHinweise,vorschlag as wandVorschlag,type WandStand,type WandBildDatei} from './wandansicht';
 import {candidates,loadImage,readPlan,validateProject,type Candidate} from './import';
-import {download,restoreLocal,saveLocal,type CurrentMeta} from './storage';
+import {download,restoreLocal,saveLocal,type FreieKopie} from './storage';
 import {labelkitReport,stornierteProben} from './labelkit';
 import {stornoTreffer,stornoText,stornoDetail,stornoKey,stornoPunktEntfernen,type Storno,type StornoTreffer} from './storno';
 import {berichtAlsReport,liesErgebnisse,standKennung,planHinterResultKit,hinterText,ERGEBNIS_DATEI,type Ergebnisse} from './ergebnisse';
@@ -133,7 +133,6 @@ type SketchTool='room'|'wall'|'door'|'window'|'text'|'select';
 let sketching:{s:Sketch;tool:SketchTool;sel:{type:SketchKind;id:string}|null;drag:{id:number;kind:'draw'|'move'|'resize'|'pan';start:Point;screen:{x:number;y:number};room?:SketchRoom;wall?:SketchWall;text?:SketchText;cam?:typeof camera;moved:boolean}|null;draft:SketchRoom|null;draftWall:SketchWall|null}|null=null;
 let camera={x:0,y:0,width:1000,height:1000},fitWidth=1000,saveRevision=0,exportURL='';
 let saveQueue:Promise<void>=Promise.resolve();
-const CURRENT_META='current-meta';
 let toastTimer=0,savedToastRevision:number|null=null;
 function toast(message:string,error=false){savedToastRevision=null;$('toast').textContent=message;$('toast').className=error?'error':'';$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>$('toast').hidden=true,error?12000:4500);}
 function fail(e:unknown){toast(e instanceof Error?e.message:'Die Aktion konnte nicht abgeschlossen werden.',true);}
@@ -144,7 +143,7 @@ function persist(toFolder=true){
  $('saved').textContent=target?(dirty?'Änderungen noch nicht im Projektordner gespeichert':'✓ Aus „Pläne“ geladen'):'Wird lokal gesichert …';
  // Die freie Browsersicherung („current“) gehört nur zu Plänen ohne Projektordner. Ein Projekt im Ordner sichert seine Fassung unter dem Ordnerschlüssel –
  // sonst käme es beim nächsten Start ohne Projektordner als freier Plan zurück, und Änderungen daran landeten nicht im Projekt.
- saveQueue=saveQueue.catch(()=>{}).then(()=>target?saveLocal({savedAt,project:p,dirty,baseRevision},folderKey(target)):saveLocal(p).then(()=>saveLocal({savedAt,name:p.report||p.plan.name} satisfies CurrentMeta,CURRENT_META))).then(()=>{if(revision===saveRevision&&!folder)$('saved').textContent='✓ Lokal gesichert – nicht in einem Projektordner';}).catch(()=>{
+ saveQueue=saveQueue.catch(()=>{}).then(()=>target?saveLocal({savedAt,project:p,dirty,baseRevision},folderKey(target)):saveLocal({...p,browserKopie:{frei:true,savedAt}} satisfies FreieKopie)).then(()=>{if(revision===saveRevision&&!folder)$('saved').textContent='✓ Lokal gesichert – nicht in einem Projektordner';}).catch(()=>{
   if(revision===saveRevision&&target===folder){$('saved').textContent='⚠ Browsersicherung fehlgeschlagen';toast('Browserspeicher nicht verfügbar oder voll. Bitte das Projekt als Datei sichern.',true);}
  });
 }
@@ -1459,11 +1458,12 @@ const startAktion=PROJEKT_URL.aktion;   // vor dem Öffnen merken – die Adress
 function startAction(){if(startAktion!=='anlage')return;
   if(!project){toast('Anlage Probenahme: In diesem Projekt gibt es noch keinen Plan – zuerst einen Grundriss laden und die Proben setzen.',true);return;}
   input('format').value='anlage';if(!exportCard.open)exportCard.show();dimensions();}
-void (async()=>{if(startProject){await openFromZentrale(startProject);void offline();return;}try{const saved=await restoreLocal();if(saved){const next=await validateProject(saved),herkunft=await restoreLocal(CURRENT_META).catch(()=>null) as CurrentMeta|null;
-  // Mit Vermerk ist es ein freier Plan (ohne Projektordner) – er kommt zurück, aber nicht stillschweigend als „Projekt“.
-  // Ohne Vermerk (Sicherung einer älteren Version) kann es die Kopie eines Projektordner-Plans sein: erst fragen, nie still öffnen.
-  let offen=!!herkunft;
-  if(!herkunft){const wahl=await ask('Browser-Zwischenspeicherung gefunden',`Im Browser liegt noch ein Probenplan („${next.report||next.plan.name}“), der zu keinem Projektordner gehört. Er kann die Kopie eines Projekts aus dem Projektordner sein; Änderungen daran landen nicht im Projekt. Öffne das Projekt besser aus der Projektzentrale („Plan bearbeiten“).`,[{label:'Als Datei sichern',value:'sichern'},{label:'Trotzdem öffnen',value:'oeffnen'}],'sichern');
+void (async()=>{if(startProject){await openFromZentrale(startProject);void offline();return;}try{const saved=await restoreLocal();if(saved){const frei=(saved as Partial<FreieKopie>).browserKopie?.frei===true,next=await validateProject(saved);   // validateProject lässt den Vermerk weg
+  // Mit Vermerk im Datensatz ist es ein freier Plan (ohne Projektordner) – er kommt zurück, aber nicht stillschweigend als „Projekt“.
+  // Ohne Vermerk (geschrieben von einer älteren Version, auch aus einem noch offenen alten Tab) kann es die Kopie eines
+  // Projektordner-Plans sein: erst fragen, nie still öffnen.
+  let offen=frei;
+  if(!frei){const wahl=await ask('Browser-Zwischenspeicherung gefunden',`Im Browser liegt noch ein Probenplan („${next.report||next.plan.name}“), der zu keinem Projektordner gehört. Er kann die Kopie eines Projekts aus dem Projektordner sein; Änderungen daran landen nicht im Projekt. Öffne das Projekt besser aus der Projektzentrale („Plan bearbeiten“).`,[{label:'Als Datei sichern',value:'sichern'},{label:'Trotzdem öffnen',value:'oeffnen'}],'sichern');
    if(wahl==='sichern')await download(new Blob([JSON.stringify(next)],{type:'application/json'}),`${next.report||'Probenplan'} (Browserkopie).probenplan`);
    offen=wahl==='oeffnen';}
   if(offen){await install(next);$('saved').textContent='✓ Lokal gesichert – nicht in einem Projektordner';toast('Letzte Browser-Zwischenspeicherung geöffnet. Sie liegt in keinem Projektordner.');}}}catch{toast('Die letzte Browsersicherung konnte nicht geladen werden. Sie können eine Projektdatei öffnen.',true);}finally{void offline();}})();
