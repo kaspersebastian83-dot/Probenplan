@@ -1,5 +1,16 @@
 # Änderungen
 
+## 1.52.0 – 31. Oktober 2026
+
+- **Keine stille Browserkopie mehr** (Workflow-Review, Befund 20): Öffnest du PlanKit ohne Projekt (`#projekt`), kam bisher die zuletzt gesicherte Fassung als freier Plan zurück – auch wenn sie die Kopie eines Projekts aus dem Projektordner war. Änderungen daran landeten dann nur im Browser, nicht im Projekt.
+  - **Projekte im Projektordner** sichern ihre Browserfassung nur noch unter dem Ordnerschlüssel (`projekt:<Ordner>`), nicht mehr als „letzte Sicherung“. Die freie Sicherung gehört damit nur noch zu Plänen ohne Projektordner und wird durch ein Projekt aus dem Ordner nicht mehr überschrieben.
+  - **Freier Plan:** Der Status oben sagt „✓ Lokal gesichert – nicht in einem Projektordner“. Beim Neustart kommt er mit dem Hinweis „Sie liegt in keinem Projektordner“ zurück.
+  - **Sicherung aus einer älteren Version** (ohne Herkunftsvermerk) wird nicht mehr still geöffnet: Eine Rückfrage „Browser-Zwischenspeicherung gefunden“ bietet „Als Datei sichern“ (öffnet nichts, die Sicherung bleibt liegen) oder „Trotzdem öffnen“. Danach fragt PlanKit nicht mehr.
+- **„Grundriss ersetzen …“ statt „＋ Plan“ oben:** Der Knopf oben ersetzt den ganzen Plan – mit allen Markierungen und Flächen –, nicht nur den Hintergrund. Mit offenem Plan heißt er jetzt „Grundriss ersetzen …“ (ohne Plan weiter „＋ Plan“). Ein weiteres Geschoss legt „＋ Plan“ unter dem Plan an; der Tooltip und die Kurzanleitung sagen das.
+- **Rückfrage beim Ersetzen:** „Aktuellen Plan ersetzen?“ nennt, dass Markierungen und Flächen mit ersetzt werden, und bei einem Plan ohne Projektordner, dass er nur in diesem Browser liegt (Knopf „Projekt sichern & weiter“ wie bisher). Im Projektordner bleibt die Kopie „(Kopie vor dem Ersetzen …)“ wie bisher. Beim Öffnen eines Projekts aus dem Ordner über einen freien Plan lautet der Text entsprechend.
+- Projektdatei unverändert. Neue Texte in „du“.
+- Test: `tests/browser-kopie.mjs` (Chromium; Projektordner in Chromium).
+
 ## 1.51.0 – 31. Oktober 2026
 
 - **Stornierte Proben aus LabelKit** (Folgeänderung zu LabelKit 4.49.0 „Proben stornieren“): Eine Probe mit `storniert` in der LabelKit-Projektdatei ist keine Probe mehr. PlanKit behandelt sie wie gelöscht, ihre Nummer bleibt aber vergeben.
