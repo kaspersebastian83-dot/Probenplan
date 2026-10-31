@@ -54,8 +54,12 @@ export function mergeLab(old:LabData|undefined,row:LabData):LabData{
 // Each accepted import gets its own immutable origin, even for equal report numbers.
 export function applyLabImport(project:Project,report:LabReport,choices:ReadonlyMap<LabSample,string>):Project{
  const next=clone(project),origin=originFromReport(report);next.pending||=[];
- const occupied=new Set([...allMarkers(next),...allAreas(next),...next.pending,...report.rows].map(r=>r.label.toUpperCase()));
- let number=Math.max(next.nextSample,...report.rows.map(r=>Number(r.label.slice(1))+1)),accepted=0;
+ // In LabelKit stornierte Proben: aus „Noch zu platzieren“ nehmen (wie gelöscht); ihre Nummern bleiben belegt und werden nie neu vergeben.
+ // Platzierte Punkte bleiben – darüber entscheidest du im Hinweis „P7 ist storniert – Punkt entfernen?“.
+ const storno=new Set((report.storniert||[]).map(s=>s.label.toUpperCase())),offen=next.pending.length;
+ next.pending=next.pending.filter(r=>!storno.has(r.label.toUpperCase()));const genommen=offen-next.pending.length;
+ const occupied=new Set([...allMarkers(next),...allAreas(next),...next.pending,...report.rows].map(r=>r.label.toUpperCase()).concat([...storno]));
+ let number=Math.max(next.nextSample,...[...report.rows.map(r=>r.label),...(report.storniert||[]).map(s=>s.label)].map(l=>Number(l.slice(1))+1).filter(Number.isSafeInteger)),accepted=0;
  for(const input of report.rows){
   const choice=choices.get(input),hit=[...allMarkers(next),...allAreas(next),...next.pending].find(r=>r.label.toUpperCase()===input.label.toUpperCase());
   if(choice==='skip')continue;
@@ -80,11 +84,11 @@ export function applyLabImport(project:Project,report:LabReport,choices:Readonly
   accepted++;number=Math.max(number,Number(row.label.slice(1))+1);
  }
  // Preserve identity for a no-op so callers can skip history and persistence.
- if(!accepted)return project;
+ if(!accepted&&!genommen)return project;
  if(next.pending.length>1000||allMarkers(next).length+next.pending.length>3000)throw Error('Zu viele Proben im Projekt (maximal 1000 offen, 3000 insgesamt).');
  if(number>=1e9)throw Error('Probenzähler ausgeschöpft.');
  if((next.labReports?.length||0)>=3000)throw Error('Zu viele gespeicherte Laborberichte (maximal 3000).');
- next.nextSample=number;next.version=Math.max(next.version,4) as Project['version'];next.labReports=[...(next.labReports||[]),origin];return next;
+ next.nextSample=number;next.version=Math.max(next.version,4) as Project['version'];if(accepted)next.labReports=[...(next.labReports||[]),origin];return next;
 }
 
 export function projectLabRows(p:Project):LabSample[]{return [...(p.pending||[]),...allMarkers(p).filter(m=>m.lab).map(m=>({label:m.label,...m.lab!}))];}

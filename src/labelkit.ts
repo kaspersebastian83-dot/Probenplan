@@ -5,8 +5,9 @@
 import {blankReport,validDate,type LabReport} from './labreport';
 import {MAX_RAUM,SURFACE_FROM_LABELKIT,type LabSample} from './model';
 import {parseProjName} from './folder';
+import type {Storno} from './storno';
 
-type Probe={_nr?:unknown;chloridNr?:unknown;id?:unknown;matrix?:string;datum?:string;z2?:string;z3?:string;z4?:string;cm2?:string|number;tiefe?:string;bkBez?:string;bkId?:string;bkMaterial?:string;bkStatus?:string;notiz?:string;bkVon?:string|number;bkBis?:string|number;bkGesamt?:string|number;bkRueck?:string};
+type Probe={_nr?:unknown;chloridNr?:unknown;id?:unknown;matrix?:string;datum?:string;z2?:string;z3?:string;z4?:string;cm2?:string|number;tiefe?:string;bkBez?:string;bkId?:string;bkMaterial?:string;bkStatus?:string;notiz?:string;bkVon?:string|number;bkBis?:string|number;bkGesamt?:string|number;bkRueck?:string;storniert?:unknown};
 /** Bohrkern-Segment „R“: nur gesägt und aufbewahrt, kein Laborwert – kommt nicht als offene Probe in den Plan. */
 export const RUECKSTELLPROBE='Rückstellprobe – nicht analysieren';
 const isRueckstellprobe=(p:Probe)=>p.matrix==='Bohrkern'&&(str(p.bkStatus).toUpperCase()==='R'||str(p.notiz)===RUECKSTELLPROBE);
@@ -19,6 +20,18 @@ function description(p:Probe){
 }
 function isoDate(v:unknown){const s=str(v);if(validDate(s))return s;const m=/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(s);if(m){const iso=`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;if(validDate(iso))return iso;}return '';}
 
+/** Stornierte Proben einer LabelKit-Projektdatei (`storniert` an der Probe, ab LabelKit 4.49.0), je P-Nummer einmal, sortiert.
+ *  Jeder wahre Wert gilt als storniert; LabelKit schreibt `{am, kuerzel, grund}`. */
+export function stornierteProben(data:unknown):Storno[]{
+  const d=data as Record<string,unknown>|null,out=new Map<number,Storno>();if(!d||typeof d!=='object')return [];
+  for(const [key] of LISTS)for(const raw of (Array.isArray(d[key])?d[key] as Probe[]:[])){
+    if(!raw||typeof raw!=='object'||!raw.storniert)continue;const n=number(raw);if(!n||out.has(n))continue;
+    const s=(typeof raw.storniert==='object'?raw.storniert:{}) as {am?:unknown;kuerzel?:unknown;grund?:unknown};
+    out.set(n,{label:`P${n}`,am:str(s.am).slice(0,40),kuerzel:str(s.kuerzel).slice(0,40),grund:str(s.grund).slice(0,300)});
+  }
+  return [...out.entries()].sort((a,b)=>a[0]-b[0]).map(([,s])=>s);
+}
+
 /** LabelKit-Projektdatei → Prüfliste (ohne Messwerte). null bezeichnet ausdrücklich einen freien Plan ohne Projektzuordnung. */
 export function labelkitReport(text:string,quelle:string,project:string|null,confirmMissingProject?:(message:string)=>boolean):LabReport{
   let data:Record<string,unknown>;try{data=JSON.parse(text);}catch{throw Error(`„${quelle}“ ist keine gültige LabelKit-Projektdatei.`);}
@@ -29,9 +42,11 @@ export function labelkitReport(text:string,quelle:string,project:string|null,con
   if(target&&nr&&nr!==target)throw Error(`Projektzuordnung blockiert: „${quelle}“ gehört zu Projekt ${nr}, das aktive Projekt zu ${target}. Bitte die Datei und den Projektordner prüfen und das passende Projekt öffnen.`);
   if(!nr&&!confirmMissingProject?.(`„${quelle}“ enthält keine Projektnummer (ältere Datei). ${target?`Die Zugehörigkeit zu Projekt ${target}`:'Die Zugehörigkeit zum geöffneten freien Plan'} kann nicht automatisch geprüft werden.\n\nHaben Sie die Datei geprüft und gehört sie zu diesem Projekt? Nur dann mit OK übernehmen.`))throw Error('LabelKit-Import abgebrochen: Die Datei ohne Projektnummer wurde nicht ausdrücklich dem aktiven Projekt zugeordnet.');
   const report=blankReport();report.quelle=quelle;report.labor='LabelKit (Probenerfassung)';report.bericht='';report.auftragsreferenz=nr||target||'';report.sources={};
-  const seen=new Set<number>();let rueckstell=0;
+  const seen=new Set<number>();let rueckstell=0;report.storniert=stornierteProben(data);
   for(const [key,type] of LISTS)for(const raw of (Array.isArray(data[key])?data[key] as Probe[]:[])){
-    if(!raw||typeof raw!=='object')continue;const n=number(raw);
+    if(!raw||typeof raw!=='object')continue;
+    if(raw.storniert)continue;   // storniert (LabelKit ab 4.49.0): keine Probe mehr – nicht anbieten, Nummer bleibt vergeben
+    const n=number(raw);
     if(!n){report.warnings.push(`${type}: eine Probe ohne Nummer wurde übersprungen.`);continue;}
     if(isRueckstellprobe(raw)){rueckstell++;continue;}
     if(seen.has(n)){report.warnings.push(`Probe ${n} ist in LabelKit doppelt vergeben (${type}) und wurde übersprungen.`);continue;}seen.add(n);
@@ -41,6 +56,7 @@ export function labelkitReport(text:string,quelle:string,project:string|null,con
     const raum=str(raw.z2).slice(0,MAX_RAUM);if(raum)row.raum=raum;
     report.rows.push(row);
   }
+  const st=report.storniert;if(st.length)report.warnings.push(`${st.map(x=>x.label).join(', ')} ${st.length===1?'ist':'sind'} in LabelKit storniert und ${st.length===1?'wird':'werden'} nicht übernommen – ${st.length===1?'die Nummer bleibt':'die Nummern bleiben'} vergeben.`);
   if(rueckstell)report.warnings.push(`${rueckstell} Bohrkern-Rückstellprobe${rueckstell===1?'':'n'} (nur gesägt und aufbewahrt, keine Analyse) nicht übernommen – dafür gibt es keinen Laborwert.`);
   report.rows.sort((a,b)=>Number(a.label.slice(1))-Number(b.label.slice(1)));report.expected=report.rows.length;
   if(!report.rows.length)report.warnings.push('Die LabelKit-Datei enthält noch keine PAK-, Chlorid-, Asbest- oder sonstigen Proben.');
