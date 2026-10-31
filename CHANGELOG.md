@@ -1,5 +1,18 @@
 # Änderungen
 
+## 1.51.0 – 31. Oktober 2026
+
+- **Stornierte Proben aus LabelKit** (Folgeänderung zu LabelKit 4.49.0 „Proben stornieren“): Eine Probe mit `storniert` in der LabelKit-Projektdatei ist keine Probe mehr. PlanKit behandelt sie wie gelöscht, ihre Nummer bleibt aber vergeben.
+  - **„Proben übernehmen …“** bietet sie nicht an; die Prüftabelle nennt sie („P2 ist in LabelKit storniert und wird nicht übernommen – die Nummer bleibt vergeben.“). Eine früher übernommene offene Probe kommt beim Übernehmen aus **„Noch zu platzieren“** und zählt nicht mehr als offen (Zähler, Reiter, Weiter-Platzieren).
+  - Die Nummer wird **nicht neu vergeben**: „Nächste freie P-Nummer“ überspringt sie, und neue Proben im Plan beginnen hinter der höchsten übernommenen oder stornierten Nummer.
+  - **Schon gesetzter Punkt:** Oben erscheint je Probe „P7 ist storniert – Punkt entfernen?“ (Tooltip: wann, Kürzel, Grund). **„Punkt entfernen …“** fragt noch einmal und entfernt den Punkt (rückgängig mit Strg+Z; er kommt nicht zurück in die offene Liste). **„Behalten“** lässt ihn stehen, wie er ist – der Browser merkt sich das je Projekt und Stornierung; wird später neu storniert, kommt der Hinweis wieder. Nichts wird von selbst entfernt.
+  - **Im Projektordner** liest PlanKit dafür die neueste `…_Daten.json` (wie die Ergebnisse aus ResultKit: beim Öffnen, beim Zurückkommen ins Fenster und alle 20 s). Steht eine stornierte Probe noch unter „Noch zu platzieren“, fragt derselbe Hinweis („… aus „Noch zu platzieren“ nehmen?“). Datei eines anderen Projekts: kein Hinweis. Ohne Projektordner gilt der letzte LabelKit-Import.
+  - **Storno aufgehoben:** Der Hinweis verschwindet, „Proben übernehmen …“ bietet die Probe wieder an – mit derselben Nummer.
+  - **Alle Proben storniert** (z. B. alle schon platziert): „Übernehmen“ ist trotzdem möglich – die Prüftabelle sagt „Alle Proben der LabelKit-Datei sind storniert.“, die Nummern werden belegt und der Hinweis erscheint auch im freien Plan.
+  - Korrigiert LabelKit Kürzel oder Grund einer Stornierung, zeigt der Hinweis den neuen Stand.
+  - Projektdatei unverändert. Neue Texte in „du“.
+- Tests: `tests/storno.mjs` (Node) und `tests/storno-browser.mjs` (Chromium und WebKit, Projektordner in Chromium).
+
 ## 1.50.0 – 30. Oktober 2026
 
 - **Keine Frage „Gespeicherte Fassungen prüfen“ mehr bei fast jedem Öffnen** (Workflow-Review, Befund 5): Bisher bot PlanKit jede `.probenplan` im Planordner an, die von der Projektdatei abweicht – und weil jedes Speichern eine „(vorher …)“-Kopie anlegt, kam die Frage praktisch immer. Jetzt gilt: Ist die Projektdatei gültig, öffnet PlanKit sie ohne Frage. Nachgefragt wird nur noch bei einer Fassung, die nicht in der Projektdatei steht:
