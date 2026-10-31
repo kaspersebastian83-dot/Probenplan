@@ -59,6 +59,6 @@ export function labelkitReport(text:string,quelle:string,project:string|null,con
   const st=report.storniert;if(st.length)report.warnings.push(`${st.map(x=>x.label).join(', ')} ${st.length===1?'ist':'sind'} in LabelKit storniert und ${st.length===1?'wird':'werden'} nicht übernommen – ${st.length===1?'die Nummer bleibt':'die Nummern bleiben'} vergeben.`);
   if(rueckstell)report.warnings.push(`${rueckstell} Bohrkern-Rückstellprobe${rueckstell===1?'':'n'} (nur gesägt und aufbewahrt, keine Analyse) nicht übernommen – dafür gibt es keinen Laborwert.`);
   report.rows.sort((a,b)=>Number(a.label.slice(1))-Number(b.label.slice(1)));report.expected=report.rows.length;
-  if(!report.rows.length)report.warnings.push('Die LabelKit-Datei enthält noch keine PAK-, Chlorid-, Asbest- oder sonstigen Proben.');
+  if(!report.rows.length)report.warnings.push(st.length?'Alle Proben der LabelKit-Datei sind storniert.':'Die LabelKit-Datei enthält noch keine PAK-, Chlorid-, Asbest- oder sonstigen Proben.');
   return report;
 }

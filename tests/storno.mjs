@@ -98,4 +98,16 @@ check('Punkt entfernen: aktiver und anderer Plan, kommt nicht zurück in die off
  assert.equal(stornoPunktEntfernen(p,'m-P2'),true);assert.deepEqual(p.markers,[]);assert.deepEqual(p.pending,[]);
  assert.equal(stornoPunktEntfernen(p,'gibt-es-nicht'),false);
 });
+check('nur stornierte Proben, alle schon platziert: Nummern trotzdem belegt, Meldung passt (Codex-Review #83)',()=>{
+ const d={nrSchutz:1,projekt:{nr:'26.0101'},proben:[{_nr:3,z2:'EG',nrFest:fest,storniert:STORNO}],chloridProben:[],asbestProben:[],sonstigeProben:[{_nr:9,nrFest:fest,storniert:STORNO}]};
+ const r=report(d);assert.deepEqual(r.rows,[]);assert.deepEqual(r.storniert.map(s=>s.label),['P3','P9']);
+ assert.ok(r.warnings.includes('Alle Proben der LabelKit-Datei sind storniert.'));
+ assert.ok(!r.warnings.some(w=>/noch keine PAK/.test(w)),'nicht „noch keine Proben“, wenn alle storniert sind');
+ const p={...leer(),markers:[punkt('P3'),punkt('P9')],nextSample:4};
+ const next=applyLabImport(p,r,new Map());
+ assert.notEqual(next,p,'Zähler muss nachgezogen werden');assert.equal(next.nextSample,10,'P9 bleibt vergeben');
+ assert.equal(next.markers.length,2,'Punkte bleiben – darüber entscheidet der Hinweis');assert.deepEqual(next.pending,[]);
+ assert.equal(applyLabImport({...p,nextSample:10},r,new Map()).nextSample,10);
+ const schon={...p,nextSample:12};assert.equal(applyLabImport(schon,r,new Map()),schon,'Zähler schon weiter: unverändert');
+});
 console.log(`OK Storno: ${checks} Prüfungen`);

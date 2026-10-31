@@ -84,7 +84,13 @@ export function applyLabImport(project:Project,report:LabReport,choices:Readonly
   accepted++;number=Math.max(number,Number(row.label.slice(1))+1);
  }
  // Preserve identity for a no-op so callers can skip history and persistence.
- if(!accepted&&!genommen)return project;
+ // Ausnahme: Stornierte Nummern liegen über dem Zähler – dann nur den Zähler nachziehen (Nummer bleibt vergeben).
+ if(!accepted&&!genommen){
+  const stornoNr=Math.max(0,...[...storno].map(l=>Number(l.slice(1))+1).filter(Number.isSafeInteger));
+  if(stornoNr<=project.nextSample)return project;
+  if(stornoNr>=1e9)throw Error('Probenzähler ausgeschöpft.');
+  next.nextSample=stornoNr;return next;
+ }
  if(next.pending.length>1000||allMarkers(next).length+next.pending.length>3000)throw Error('Zu viele Proben im Projekt (maximal 1000 offen, 3000 insgesamt).');
  if(number>=1e9)throw Error('Probenzähler ausgeschöpft.');
  if((next.labReports?.length||0)>=3000)throw Error('Zu viele gespeicherte Laborberichte (maximal 3000).');

@@ -75,6 +75,21 @@ for(const engine of engines){
    assert.deepEqual(await offen(page),['P2','P4']);await page.locator('#storno-hinweis').waitFor({state:'hidden'});
    const p=await until(page,p=>(p.pending||[]).length===2);assert.deepEqual(p.markers.map(m=>m.label).sort(),['P1','P3']);
   });
+  await check(`${engine}: alle Proben platziert, dann alle storniert – Übernehmen geht, Hinweis je Punkt (freier Plan)`,async()=>{
+   await platzieren(page,'P2',300,500);await platzieren(page,'P4',900,300);await until(page,p=>p.markers.length===4&&!(p.pending||[]).length);
+   const r=await uebernehmen(page,file([1,2,3,4]));   // keine Zeile übrig – „Übernehmen“ darf trotzdem nicht gesperrt sein
+   assert.deepEqual(r.rows,[]);assert.match(r.warnungen,/Alle Proben der LabelKit-Datei sind storniert\./);assert.doesNotMatch(r.warnungen,/noch keine PAK/);
+   await page.locator('#storno-hinweis').waitFor();
+   // P1 wurde oben für genau diese Stornierung (gleicher Zeitpunkt) behalten – kein Hinweis
+   assert.deepEqual(await zeilen(page),['⚠ P2 ist storniert – Punkt entfernen?','⚠ P3 ist storniert – Punkt entfernen?','⚠ P4 ist storniert – Punkt entfernen?']);
+   assert.equal((await savedProject(page)).markers.length,4,'nichts still entfernt');
+  });
+  await check(`${engine}: LabelKit korrigiert Kürzel/Grund (gleicher Zeitpunkt) – Tooltip zeigt den neuen Stand`,async()=>{
+   const d=daten([1,2,3,4]);for(const p of d.proben)p.storniert={...p.storniert,kuerzel:'Ric',grund:'Raum korrigiert'};
+   await uebernehmen(page,{name:'26.0101_Daten.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(d))});
+   await page.locator('#storno-hinweis [data-storno="P2"] span[title*="Raum korrigiert"]').waitFor();
+   assert.equal(await page.locator('#storno-hinweis [data-storno="P2"] span').getAttribute('title'),'In LabelKit storniert am 30.10.2026 (Ric) – Grund: Raum korrigiert. Die Nummer bleibt vergeben.');
+  });
   assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}
 }

@@ -1237,7 +1237,7 @@ function behalten(t:StornoTreffer){const scope=stornoScope(),set=behaltene(scope
 function stornoHinweisZeigen(){
   const box=document.getElementById('storno-hinweis');if(!box)return;
   const st=stornoStand,treffer=st&&project&&st.folder===folder?stornoTreffer(project,st.liste,behaltene(stornoScope())):[];
-  box.hidden=!treffer.length;const bild=treffer.map(t=>`${t.art}|${t.storno.label}|${t.art==='punkt'?t.id:''}|${t.storno.am}`).join(',');if(bild===stornoBild)return;stornoBild=bild;
+  box.hidden=!treffer.length;const bild=treffer.map(t=>`${t.art}|${t.storno.label}|${t.art==='punkt'?t.id:''}|${t.storno.am}|${t.storno.kuerzel}|${t.storno.grund}`).join('\u0001');   // Kürzel/Grund mit: LabelKit kann sie nachträglich korrigierenif(bild===stornoBild)return;stornoBild=bild;
   box.replaceChildren(...treffer.map(t=>{
     const row=document.createElement('div'),text=document.createElement('span'),weg=document.createElement('button'),bleibt=document.createElement('button');
     row.className='storno-zeile';row.dataset.storno=t.storno.label;text.textContent=`⚠ ${stornoText(t)}`;text.title=stornoDetail(t.storno);
