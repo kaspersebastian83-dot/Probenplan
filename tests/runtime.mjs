@@ -27,10 +27,11 @@ export async function openExport(page){if(!await page.locator('#export-dialog').
 export async function closeExport(page){if(await page.locator('#export-dialog').evaluate(d=>d.open))await page.locator('#export-dialog .close').click();}
 
 // Observe durable state for repeated assertions; project downloads are tested separately.
+// Ab 1.52 trägt die freie Sicherung den Vermerk browserKopie (nur Browser, nie in der Projektdatei) – für den Vergleich mit dem Projekt weglassen.
 export async function savedProject(page){
  await page.locator('#save-project').click({trial:true});
  await page.locator('#saved').filter({hasText:'Lokal gesichert'}).waitFor({state:'attached'});
- return page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('probenplan',1);request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,read=db.transaction('projects').objectStore('projects').get('current');read.onsuccess=()=>{db.close();resolve(read.result);};read.onerror=()=>{db.close();reject(read.error);};};}));
+ return page.evaluate(()=>new Promise((resolve,reject)=>{const request=indexedDB.open('probenplan',1);request.onerror=()=>reject(request.error);request.onsuccess=()=>{const db=request.result,read=db.transaction('projects').objectStore('projects').get('current');read.onsuccess=()=>{db.close();const r=read.result;if(r&&typeof r==='object'){const {browserKopie,...p}=r;resolve(p);}else resolve(r);};read.onerror=()=>{db.close();reject(read.error);};};}));
 }
 export async function downloadedProject(page){
  const pending=page.waitForEvent('download');await page.locator('#save-project').click();
