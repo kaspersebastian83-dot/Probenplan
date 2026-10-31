@@ -21,6 +21,10 @@ body{height:100dvh;overflow:hidden;display:flex;flex-direction:column}
 #canvas-name{font:12px var(--kit-mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;max-width:280px}
 .tb-doc .tag{background:rgba(255,255,255,.18);color:#fff;font-size:9px;flex:0 0 auto}
 .tb-spacer{flex:1 1 0;min-width:4px}
+/* „Grundriss ersetzen …“ nur mit Platz; sonst die kürzere Fassung – sie darf die Statusanzeige (#saved) im Projektordner nicht verdrängen */
+#load .lang{display:none}@media(min-width:1700px){#load .lang{display:inline}#load .kurz{display:none}}
+/* Im Projektordner ist die Kopfzeile unter 1700 px voll: Die Versionsnummer steht dort im Tooltip von „PlanKit“ statt als eigenes Feld. */
+@media(max-width:1699px){body.in-project #app-version{display:none}}
 #saved{font-size:11px;color:rgba(255,255,255,.8);white-space:nowrap}
 .topbar .status{flex:0 0 auto}
 #saved{max-width:170px;overflow:hidden;text-overflow:ellipsis}
