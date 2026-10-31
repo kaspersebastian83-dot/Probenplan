@@ -19,7 +19,8 @@ try{
  await check('Knopf oben: ohne Plan „＋ Plan“, mit Plan „Grundriss ersetzen …“ (ein weiteres Geschoss legt „＋ Plan“ unter dem Plan an)',async()=>{
   assert.equal((await page.locator('#load').textContent()).trim(),'＋ Plan');
   await page.locator('#file').setInputFiles(plan('Erdgeschoss.svg'));await page.locator('#welcome').waitFor({state:'hidden'});
-  assert.equal((await page.locator('#load').textContent()).trim(),'Grundriss ersetzen …');
+  assert.equal((await page.locator('#load').innerText()).trim(),'Plan ersetzen …','im schmalen Fenster die kürzere Fassung (die Statusanzeige bleibt sichtbar)');
+  await page.setViewportSize({width:1800,height:900});assert.equal((await page.locator('#load').innerText()).trim(),'Grundriss ersetzen …');await page.setViewportSize({width:1366,height:768});
   assert.match(await page.locator('#load').getAttribute('title'),/Markierungen und Flächen.*weiteres Geschoss.*„＋ Plan“/s);
   await page.locator('#sheet-add').first().waitFor({state:'attached'}).catch(()=>{});
  });
