@@ -1,5 +1,10 @@
 # Änderungen
 
+## 1.53.0 – 1. November 2026
+
+- Spektron-Leiste v2: Schritt „BerichtKit · Brandbericht“ bzw. „· Asbestbericht“, wenn BerichtKit sich die Berichtsart des Projekts gemerkt hat (der Link öffnet genau diese); Haken bei BerichtKit nur für einen gespeicherten Bericht dieser Art, dessen Datei noch in „Mitteilungen“ liegt (Projekte ohne BerichtKit-Angaben wie bisher nach dem Dateinamen). Nach dem gespeicherten Bericht heißt der Knopf „Weiter: Ans Büro übergeben →“ (Projektzentrale, eigenes Fenster). „Weiter“ nennt im Tooltip Ziel und Grund. Keine Nummern mehr an den Schritten (✓ reicht), die eigene App ist deutlicher markiert, „Aktuelles Projekt“ im Projektmenü lädt nicht mehr neu.
+- Projektdatei unverändert.
+
 ## 1.52.0 – 31. Oktober 2026
 
 - **Keine stille Browserkopie mehr** (Workflow-Review, Befund 20): Öffnest du PlanKit ohne Projekt (`#projekt`), kam bisher die zuletzt gesicherte Fassung als freier Plan zurück – auch wenn sie die Kopie eines Projekts aus dem Projektordner war. Änderungen daran landeten dann nur im Browser, nicht im Projekt.
