@@ -42,7 +42,11 @@ for(const engine of engines){
   await page.locator('#file').setInputFiles({name:'fluchtplan.png',mimeType:'image/png',buffer:photo});await page.locator('#welcome').waitFor({state:'hidden'});
   // Probe in der Planmitte (im Foto)
   // P wechselt nach ② – die Ansicht passt sich im nächsten Frame unter die Leisten ein, erst danach die Bildschirmlage berechnen
-  await page.keyboard.press('p');await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));const pm=await toScreen(page,mid[0],mid[1]);await page.mouse.click(pm.x,pm.y);await page.keyboard.press('v');
+  await page.keyboard.press('p');
+  // warten, bis die Ansicht ruht (gleiche Abbildung über mehrere Frames)
+  await page.waitForFunction(()=>new Promise(r=>{const el=document.getElementById('drawing'),m=()=>{const q=el.getScreenCTM();return q?[q.a,q.e,q.f].map(v=>v.toFixed(2)).join():'';},a=m();let n=0;const f=()=>{if(m()!==a)return r(false);if(++n>=6)return r(true);requestAnimationFrame(f);};requestAnimationFrame(f);}),null,{polling:100,timeout:10000});
+  const pm=await toScreen(page,mid[0],mid[1]);await page.mouse.click(pm.x,pm.y);await page.keyboard.press('v');
+  {const s=await savedProject(page),m=s.markers[0];assert.ok(m&&Math.hypot(m.x-mid[0],m.y-mid[1])<1,`Probe nicht an der Klickstelle: ${m&&[m.x,m.y]} statt ${mid}`);}
 
   await check(`${engine}: Werkzeug „Entzerren“ mit vier Ecken, Lupe beim Ziehen, überkreuztes Viereck abgewiesen`,async()=>{
    // Hinweis „Plan geladen …“ noch sichtbar: darf das Ziehen der Ecken nicht behindern
