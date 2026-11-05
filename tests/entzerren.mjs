@@ -41,7 +41,8 @@ for(const engine of engines){
   await page.goto(base);
   await page.locator('#file').setInputFiles({name:'fluchtplan.png',mimeType:'image/png',buffer:photo});await page.locator('#welcome').waitFor({state:'hidden'});
   // Probe in der Planmitte (im Foto)
-  await page.keyboard.press('p');const pm=await toScreen(page,mid[0],mid[1]);await page.mouse.click(pm.x,pm.y);await page.keyboard.press('v');
+  // P wechselt nach ② – die Ansicht passt sich im nächsten Frame unter die Leisten ein, erst danach die Bildschirmlage berechnen
+  await page.keyboard.press('p');await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));const pm=await toScreen(page,mid[0],mid[1]);await page.mouse.click(pm.x,pm.y);await page.keyboard.press('v');
 
   await check(`${engine}: Werkzeug „Entzerren“ mit vier Ecken, Lupe beim Ziehen, überkreuztes Viereck abgewiesen`,async()=>{
    // Hinweis „Plan geladen …“ noch sichtbar: darf das Ziehen der Ecken nicht behindern
