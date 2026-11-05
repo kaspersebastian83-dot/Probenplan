@@ -46,7 +46,8 @@ for(const engine of engines){
   // warten, bis die Ansicht ruht (gleiche Abbildung über mehrere Frames)
   await page.waitForFunction(()=>new Promise(r=>{const el=document.getElementById('drawing'),m=()=>{const q=el.getScreenCTM();return q?[q.a,q.e,q.f].map(v=>v.toFixed(2)).join():'';},a=m();let n=0;const f=()=>{if(m()!==a)return r(false);if(++n>=6)return r(true);requestAnimationFrame(f);};requestAnimationFrame(f);}),null,{polling:100,timeout:10000});
   const pm=await toScreen(page,mid[0],mid[1]);await page.mouse.click(pm.x,pm.y);await page.keyboard.press('v');
-  {const s=await savedProject(page),m=s.markers[0];assert.ok(m&&Math.hypot(m.x-mid[0],m.y-mid[1])<1,`Probe nicht an der Klickstelle: ${m&&[m.x,m.y]} statt ${mid}`);}
+  // WebKit rundet Mausklicks auf ganze Pixel – im verkleinerten Plan sind das gut 1 Planpixel; Rückgängig vergleicht mit der gespeicherten Lage
+  const vorher=(await savedProject(page)).markers[0];assert.ok(vorher&&Math.hypot(vorher.x-mid[0],vorher.y-mid[1])<4,`Probe nicht an der Klickstelle: ${vorher&&[vorher.x,vorher.y]} statt ${mid}`);
 
   await check(`${engine}: Werkzeug „Entzerren“ mit vier Ecken, Lupe beim Ziehen, überkreuztes Viereck abgewiesen`,async()=>{
    // Hinweis „Plan geladen …“ noch sichtbar: darf das Ziehen der Ecken nicht behindern
@@ -81,7 +82,7 @@ for(const engine of engines){
   });
   await check(`${engine}: Rückgängig stellt das Foto wieder her`,async()=>{
    await page.evaluate(()=>document.activeElement?.blur());await page.keyboard.press('Control+z');
-   const s=await savedProject(page);assert.equal(s.plan.width,FW);assert.equal(s.plan.height,FH);assert.ok(Math.abs(s.markers[0].x-mid[0])<1);
+   const s=await savedProject(page);assert.equal(s.plan.width,FW);assert.equal(s.plan.height,FH);assert.ok(Math.abs(s.markers[0].x-vorher.x)<.01&&Math.abs(s.markers[0].y-vorher.y)<.01,'Probe wieder an der alten Stelle');
   });
   await check(`${engine}: DIN quer ergibt √2, Abbrechen ändert nichts`,async()=>{
    await page.keyboard.press('w');await page.locator('#warp-aspect').selectOption('din-landscape');
