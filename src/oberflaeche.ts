@@ -11,7 +11,7 @@ import {PLAENE} from './folder';
 
 export type Schritt='1'|'2'|'3'|'f';
 export interface PkHooks{
- project():Project|null; mode():string; setMode(m:string):void; render():void; fit():void;
+ project():Project|null; mode():string; setMode(m:string):void; render():void; fit():void; refit():void;
  blocked():boolean; cropping():boolean; folder():string|null; labUI():LabUI|null;
  showSheet(i:number):void; openSheetMenu(i:number):void; deselect():void; selectedId():string|null;
  exportCard:HTMLDialogElement; dimensions():void; folderSupported():boolean;
@@ -146,7 +146,7 @@ export class Oberflaeche{
   // Werkzeuge gehören zu ihrem Schritt: beim Wechsel zurück zur Ansicht (Platzieren, Brandherd … sind in ① und ③ nicht sichtbar)
   if(mode==='lab-place')lab?.fertig();else if(mode!=='navigate'&&!(s==='1'&&mode==='measure'))this.hooks.setMode('navigate');
   if(s==='2')this.autoStart=true;
-  this.anzeigen(s);this.hooks.render();
+  this.anzeigen(s);this.hooks.render();requestAnimationFrame(()=>this.hooks.refit());
  }
  private anzeigen(s:Schritt){
   this.schritt=s;document.body.dataset.pkSchritt=s;

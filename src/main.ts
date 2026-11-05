@@ -174,7 +174,10 @@ function updateCamera(){svg.setAttribute('viewBox',`${camera.x} ${camera.y} ${ca
 function fit(){if(!project)return;const b=bounds(labeledView(project)),rect=svg.getBoundingClientRect(),ratio=rect.width/rect.height||1;let w=b.width*1.14,h=b.height*1.14;if(w/h<ratio)w=h*ratio;else h=w/ratio;camera={x:b.x+(b.width-w)/2,y:b.y+(b.height-h)/2,width:w,height:h};
   // 2.0: Schritte/Plan-Chips oben und Hinweiskarte/Zoom unten schweben auf der Karte – „Einpassen“ legt den Plan in den freien Teil.
   const r=pk?.rand();if(r&&(r.top||r.bottom)&&rect.width>0&&rect.height>0){const aw=rect.width,ah=Math.max(80,rect.height-r.top-r.bottom),k=Math.max(b.width*1.08/aw,b.height*1.08/ah);camera={x:b.x+b.width/2-aw/2*k,y:b.y+b.height/2-(r.top+ah/2)*k,width:rect.width*k,height:rect.height*k};}
-  fitWidth=camera.width;updateCamera();}
+  fitWidth=camera.width;updateCamera();letzteEinpassung=JSON.stringify(camera);}
+/** 2.0: Ansicht noch genau „eingepasst“ (nicht gezoomt/verschoben)? Dann nach einem Schrittwechsel neu einpassen – die schwebenden Leisten oben sind je Schritt verschieden hoch. */
+let letzteEinpassung='';
+function nachEinpassen(){if(project&&!cropping&&letzteEinpassung===JSON.stringify(camera))fit();}
 function point(e:{clientX:number;clientY:number}){const matrix=svg.getScreenCTM();if(!matrix)return{x:0,y:0};const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(matrix.inverse());return{x:p.x,y:p.y};}
 function zoom(factor:number,anchor?:{x:number;y:number}){if(!project)return;const ratio=Math.min(20,Math.max(.25,fitWidth/(camera.width*factor)));factor=fitWidth/(ratio*camera.width);const c=anchor||{x:camera.x+camera.width/2,y:camera.y+camera.height/2};camera={x:c.x-(c.x-camera.x)*factor,y:c.y-(c.y-camera.y)*factor,width:camera.width*factor,height:camera.height*factor};updateCamera();}
 function setMode(next:string){mode=next;if(next!=='navigate')hideCropOffer();document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(b=>{b.classList.toggle('active',b.dataset.mode===mode);b.setAttribute('aria-pressed',String(b.dataset.mode===mode));});$('stage').dataset.mode=mode;if(next!=='measure'&&measurePoints.length){measurePoints=[];renderMeasure();}$('mode-hint').textContent=({measure:'Strecke messen: ersten Punkt anklicken · Ziehen verschiebt die Ansicht · Esc bricht ab',navigate:'Ansicht bewegen · Mausrad oder zwei Finger zum Zoomen',sample:'Tippen setzt eine Probe · Ziehen verschiebt die Ansicht',fire:'Tippen setzt einen Brandherd · Ziehen verschiebt die Ansicht',edit:'Markierung wählen · Punkt oder Beschriftung ziehen','area-draw':'Eckpunkte setzen · anschließend Fläche abschließen','area-edit':'Fläche wählen · Eckpunkte oder Fläche ziehen','lab-place':'Ausgewählte Laborprobe durch Tippen platzieren · Ziehen verschiebt die Ansicht'} as Record<string,string>)[mode];}
@@ -1545,7 +1548,7 @@ document.getElementById('wand-title')!.insertAdjacentHTML('afterend',`<p class="
   const versionZeile=document.createElement('p');versionZeile.id='pk-version-zeile';versionZeile.className='tiny';versionZeile.append(`PlanKit ${$('app-version').textContent?.replace(/^v/,'')} · `,$('offline'));
   for(const h3 of hilfe.querySelectorAll('h3'))if(/^Neu in PlanKit/.test(h3.textContent||'')){h3.before(neu,versionZeile,neuP);break;}
 }
-pk=new Oberflaeche({project:()=>project,mode:()=>mode,setMode:m=>setMode(m),render,fit,blocked:()=>busy||cropping||!!draftPoints.length,cropping:()=>cropping,folder:()=>folder?.name||null,labUI:()=>labUI,
+pk=new Oberflaeche({project:()=>project,mode:()=>mode,setMode:m=>setMode(m),render,fit,refit:nachEinpassen,blocked:()=>busy||cropping||!!draftPoints.length,cropping:()=>cropping,folder:()=>folder?.name||null,labUI:()=>labUI,
   showSheet,openSheetMenu,deselect:()=>{selected=null;selectedArea=null;render();},selectedId:()=>selected,exportCard,dimensions,folderSupported,toast});
 document.getElementById('pk-ordner-start')!.hidden=!folderSupported();
 render();
