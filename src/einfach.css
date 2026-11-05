@@ -100,6 +100,8 @@ body.panel-open .pk-lasche,body.pk-ohne-plan .pk-lasche{display:none}
 /* Vollbild-Leisten (unverändert) und Zuschnitt-Angebot */
 body.pk2 #crop-actions,body.pk2 #import-status{top:12px}
 body.pk2 #crop-offer{top:auto;bottom:70px;left:10px;transform:none;z-index:5}
+/* „Plan zuschneiden?“ gehört zu ① – in ②/③ nicht über der Hinweiskarte */
+body:not([data-pk-schritt="1"]) #crop-offer{display:none!important}
 
 /* ---- Startkarte (① ohne Plan) ---- */
 body.pk2 #welcome{background:radial-gradient(ellipse at center,#f8fafcee,transparent)}
@@ -227,7 +229,7 @@ body.pk2 #pk-fuss #save-project:disabled{opacity:.45}
 #pk-haupt{height:var(--sp-h-haupt);padding:0 24px;white-space:nowrap}
 #pk-haupt:disabled{opacity:.45;cursor:not-allowed}
 /* Meldungen über der Fußleiste */
-body.pk2 #toast{top:122px;bottom:auto;z-index:2147483200;font-family:var(--sp-font);font-size:14px;background:var(--pk-schwarz)}
+body.pk2 #toast{top:var(--pk-toast-top,122px);bottom:auto;z-index:2147483200;font-family:var(--sp-font);font-size:14px;background:var(--pk-schwarz)}
 /* Dialoge über dem Kopfband */
 body.pk2 dialog:modal{font-family:var(--sp-font)}
 #mosaikMehrPop button[id^="pk-m-"]{white-space:normal}
@@ -237,13 +239,18 @@ body.pk2 dialog:modal{font-family:var(--sp-font)}
 @media(max-width:700px){
   body.pk2{height:auto;overflow:auto}
   body.pk2 .kit-panel{width:100%}
-  #pk-hinweis{max-width:calc(100% - 20px);bottom:62px}
+  body.pk2:not(.pk-vollbild):not(.pk-ohne-plan) #drawing{top:var(--pk-oben-h,0px);bottom:auto;height:calc(100% - var(--pk-oben-h,0px) - var(--pk-unten-h,0px))}
+  body.pk2 .kit-canvas{height:80dvh;min-height:480px}
+  #pk-hinweis{bottom:62px}
+  #pk-oben{max-width:calc(100% - 20px)}
+  #pk-hinweis{max-width:calc(100% - 20px)}
   #pk-plaene{top:auto;bottom:62px;right:10px;max-width:calc(100% - 20px)}
   #pk-hinweis:not([hidden])~#pk-plaene{display:none}
   #pk-fuss{padding:8px 10px;position:sticky;bottom:0}
   #pk-haupt{flex:1 1 100%;font-size:16px}
   .pk-wz{padding:0 10px;font-size:13px}
-  .pk-lasche{display:none}
+  /* Lasche bleibt – auf dem Telefon der einzige Weg zur Liste (kein L) –, schmaler und über der Hinweiskarte */
+  .pk-lasche{padding:10px 6px;top:40%}
   .pk-wort{display:none}
   body.pk2 .zoom-controls button{padding:0 9px}
 }

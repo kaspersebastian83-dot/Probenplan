@@ -108,7 +108,7 @@ export class LabUI {
   const label=m.label;this.hooks.mutate(q=>{zurueckZuOffen(q,id);});
   if(neu)this.choose(label);else this.render(this.hooks.project());
  }
- reset(){this.selected=null;this.note='';this.cancelDrag();}
+ reset(){this.selected=null;this.letzteWahl=null;this.note='';this.cancelDrag();}
  /** Gewählte offene Probe (für die Hinweiskarte „Pause – nächste wäre …“). */
  gewaehlt(){return this.selected;}
  /** Zuletzt gewählte offene Probe vor „Pause“ (Hinweiskarte „Pause – nächste wäre …“). */

@@ -43,7 +43,7 @@ for(const engine of ['chromium','webkit']){
   });
   await check(`${engine}: ② ohne Laborproben pausiert (6.1 b) – „Probe von Hand“ mit Nummer und Form, Pause`,async()=>{
    await page.locator('#pk-haupt').click();assert.equal(await pk.aktuell(page),'2');assert.equal(await page.locator('#stage').getAttribute('data-mode'),'navigate','kein automatisches Setzen ohne offene Probe');
-   assert.equal(await text(page,'#pk-hinweis-text'),'„Probe von Hand“ wählen, dann in den Plan tippen');assert.equal(await text(page,'#pk-w-setzen'),'Probe von Hand');
+   assert.equal(await text(page,'#pk-hinweis-text'),'„Probe von Hand“ wählen, dann in den Plan tippen');assert.equal(await text(page,'#pk-w-setzen'),'Probe von Hand');assert.equal(await page.locator('#pk-w-hand').isVisible(),false,'ohne offene Proben nur ein Knopf');
    assert.equal(await page.locator('#pk-import-gross').isVisible(),true,'Leer-Zustand: großer Knopf');
    await page.locator('#pk-w-setzen').click();assert.equal(await page.locator('#stage').getAttribute('data-mode'),'sample');
    assert.equal(await text(page,'#pk-hinweis-text'),'Nächste eigene Probe:');assert.equal(await page.locator('#next').isVisible(),true);assert.equal(await page.locator('#next-shape').isVisible(),true);
@@ -58,6 +58,7 @@ for(const engine of ['chromium','webkit']){
    assert.equal(await text(page,'#weiter-text'),'Als Nächstes setzen: P11 · EG Flur · Wand · Ansicht · einfach in den Plan tippen');
    assert.equal(await page.locator('#stage').getAttribute('data-mode'),'lab-place','Platziermodus ist beim Öffnen schon an');
    assert.equal(await text(page,'#pk-kopf-zahl'),'0 gesetzt · 3 offen');assert.equal(await text(page,'#pk-w-setzen'),'Proben setzen');
+   assert.equal(await page.locator('#pk-w-hand').isVisible(),true,'mit offenen Proben steht „Probe von Hand“ daneben');assert.equal(await page.locator('#pk-w-setzen').getAttribute('aria-pressed'),'true');
    await tap(page,200,200);await until(page,p=>p.markers.some(m=>m.label==='P11'),'P11 gesetzt');
    await page.locator('#weiter-chip').waitFor();assert.match(await text(page,'#weiter-text'),/^Als Nächstes setzen: P13 · EG Flur/,'gleicher Raum zuerst');
    await page.locator('#weiter-skip').click();assert.match(await text(page,'#weiter-text'),/P12 · EG Küche/,'Überspringen');
@@ -86,6 +87,7 @@ for(const engine of ['chromium','webkit']){
   await check(`${engine}: ③ Ausgabe – PDF A4 vorgewählt (ohne Ordner), Hinweis auf offene Proben, Hauptaktion folgt dem Format, „erledigt“ an den Datenstand gebunden`,async()=>{
    await page.locator('[data-pk-step="2"]').click();await page.locator('#pk-haupt').click();assert.equal(await pk.aktuell(page),'3');
    assert.equal(await page.locator('#format').inputValue(),'pdf-a4');assert.equal(await text(page,'#pk-haupt'),'PDF speichern →');
+   assert.equal(await page.evaluate(()=>localStorage.getItem('plankit-format')),null,'Vorwahl ist keine Wahl – nicht gemerkt');
    assert.match(await text(page,'#pk-offen-warnung'),/^2 Proben noch nicht im Plan/);
    await page.locator('#format').selectOption('png');assert.equal(await text(page,'#pk-haupt'),'Bild speichern →');
    await page.locator('#format').selectOption('anlage');assert.equal(await text(page,'#pk-haupt'),'Anlage Probenahme speichern →');
@@ -102,6 +104,8 @@ for(const engine of ['chromium','webkit']){
    await page.keyboard.press('b');assert.equal(await pk.aktuell(page),'2');assert.equal(await page.locator('#stage').getAttribute('data-mode'),'fire');
    await page.keyboard.press('f');assert.equal(await pk.aktuell(page),'f');assert.equal(await page.locator('#stage').getAttribute('data-mode'),'area-draw');
    assert.equal(await page.locator('#pk-w-fzeichnen').getAttribute('aria-pressed'),'true');assert.equal(await page.locator('.areas-section').isVisible(),true);
+   await tap(page,250,250);await page.locator('[data-pk-step="2"]').click();assert.equal(await pk.aktuell(page),'f','angefangene Fläche: erst abschließen oder abbrechen');
+   await page.locator('#area-cancel').click();await pk.modus(page,'area-draw');
    await page.locator('#pk-w-ffertig').click();assert.equal(await pk.aktuell(page),'2','Fertig: zurück');assert.equal(await page.locator('#stage').getAttribute('data-mode'),'lab-place','zurück in ②: die nächste offene Probe ist gleich dran');
   });
   await check(`${engine}: „Mehr …“ – „Nach jeder Probe gleich die nächste wählen“ schaltet um`,async()=>{

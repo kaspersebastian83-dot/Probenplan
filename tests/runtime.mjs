@@ -15,7 +15,7 @@ async function lokalBrowser(options){
  return {newContext:roh,async newPage(o){return (await roh(o)).newPage();},async close(){for(const c of offen)await c.close();},contexts:()=>offen,isConnected:()=>true};
 }
 function instrument(type){return new Proxy(type,{get(target,key){if(key!=='launch')return typeof target[key]==='function'?target[key].bind(target):target[key];return async options=>{
- const browser=lokal?await lokalBrowser(options):await target.launch(options),newContext=browser.newContext.bind(browser),contexts=new Map();
+ const browser=lokal?(process.env.PK_INKOGNITO?await chromiumType.launch({...options,executablePath:lokal}):await lokalBrowser(options)):await target.launch(options),newContext=browser.newContext.bind(browser),contexts=new Map();
  browser.newContext=async options=>{const context=await newContext(options),id=++sequence,logs=[];
   // Die Liste rechts ist standardmäßig eingeklappt. Die Funktionssuites arbeiten mit geöffneter Liste;
   // layout.mjs prüft den Standard (Aufruf mit ?layout-default).

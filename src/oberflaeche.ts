@@ -11,9 +11,9 @@ import {PLAENE} from './folder';
 
 export type Schritt='1'|'2'|'3'|'f';
 export interface PkHooks{
- project():Project|null; mode():string; setMode(m:string):void; render():void; fit():void; refit():void;
+ project():Project|null; entwurf():boolean; mode():string; setMode(m:string):void; render():void; fit():void; refit():void;
  blocked():boolean; cropping():boolean; folder():string|null; labUI():LabUI|null;
- showSheet(i:number):void; openSheetMenu(i:number):void; deselect():void; selectedId():string|null;
+ showSheet(i:number):void; openSheetMenu(i:number):void; deselect(still?:boolean):void; selectedId():string|null;
  exportCard:HTMLDialogElement; dimensions():void; folderSupported():boolean;
  toast(text:string,error?:boolean):void;
 }
@@ -26,13 +26,13 @@ const FORMAT_KEY='plankit-format';
 const SCHRITT_VON:Record<string,Schritt>={'inspector':'2','proben-section':'2','lab-panel':'2','size-section':'3','label-section':'3','raumbuch-section':'3','scale-section':'1','area-inspector':'f','area-list':'f'};
 /** Tastenkürzel, deren Knopf in einem anderen Schritt liegt: erst dorthin wechseln, nie still in einem unsichtbaren Schritt auslösen. */
 const KUERZEL:Record<string,Schritt>={p:'2',b:'2',e:'2',f:'f',g:'f',r:'1',c:'1',a:'1',w:'1'};
+const KNOPF:Record<string,string>={p:'button[data-mode="sample"]',b:'button[data-mode="fire"]',e:'button[data-mode="edit"]',f:'button[data-mode="area-draw"]',g:'button[data-mode="area-edit"]',r:'#rotate-right',R:'#rotate-left',c:'#crop-start',a:'#align-start',w:'#warp-start'};
 const MEHR_ICON='<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>';
 
 export class Oberflaeche{
  private schritt:Schritt='1';private vorFlaechen:Schritt='2';
- private autoStart=false;private letzteProbe:string|null=null;private offenVorher=-1;
+ private autoStart=false;private letzteProbe:string|null=null;
  private formatGesetzt=false;private ausgabeStand:string|null=null;private ausgabeFormat='';
- private hatteProjekt=false;
  constructor(private hooks:PkHooks){this.aufbauen();}
 
  get aktuell(){return this.schritt;}
@@ -52,6 +52,7 @@ export class Oberflaeche{
   const werkzeuge=h('div',{id:'pk-werkzeuge',role:'group','aria-label':'Werkzeug'});
   const wz=(id:string,text:string,title:string,fn:()=>void)=>{const b=h('button',{type:'button',id,class:'pk-wz',title},text);b.onclick=fn;werkzeuge.append(b);return b;};
   wz('pk-w-setzen','Proben setzen','Nächste offene Probe setzen – ein Tipp in den Plan setzt sie (P: Probe von Hand)',()=>this.setzen());
+  const hand=wz('pk-w-hand','Probe von Hand','Eigene Probe setzen: Nummer und Form unten links, dann in den Plan tippen (P)',()=>this.altModus('sample'));hand.hidden=true;
   wz('pk-w-brand','Brandherd','Brandherd setzen – in den Plan tippen (B)',()=>this.altModus('fire'));
   wz('pk-w-schieben','Punkte verschieben','Punkt oder Schild ziehen, antippen zeigt die Probe (E)',()=>this.altModus('edit'));
   wz('pk-w-fzeichnen','Fläche zeichnen','Schadensfläche zeichnen: Eckpunkte setzen und abschließen (F)',()=>this.altModus('area-draw'));
@@ -60,9 +61,13 @@ export class Oberflaeche{
   oben.append(schritte,werkzeuge);
   const chips=h('div',{id:'pk-plaene',role:'group','aria-label':'Pläne des Projekts'});
   stage.append(oben,chips);
+  // Telefon (≤ 700 px): die Leisten stehen über der Zeichenfläche statt darauf – ihre Höhe rückt die Zeichenfläche nach unten (CSS --pk-oben-h)
+  this.mobilBeobachter=new ResizeObserver(()=>this.mobilMass());this.mobilBeobachter.observe(oben);
+  // Nach der LabelKit-Übernahme mit offenen Proben: ② startet mit der nächsten (6.1 b) – auch wenn ② schon offen war
+  document.addEventListener('plankit:reveal',e=>{if((e as CustomEvent<string>).detail==='lab-panel'&&this.schritt==='2'&&this.hooks.mode()==='navigate'){this.autoStart=true;this.nachRender();this.autoStart=false;}});
   // ---- Hinweiskarte unten links: „Als Nächstes setzen …“, Probe von Hand, Brandherd, Pause ----
-  const hinweis=h('div',{id:'pk-hinweis',role:'status'});stage.append(hinweis);
-  const text=h('span',{id:'pk-hinweis-text'});const knoepfe=h('span',{class:'pk-hinweis-knoepfe'});
+  const hinweis=h('div',{id:'pk-hinweis'});stage.append(hinweis);
+  const text=h('span',{id:'pk-hinweis-text','aria-live':'polite'});const knoepfe=h('span',{class:'pk-hinweis-knoepfe'});
   const weiterSetzen=h('button',{type:'button',id:'pk-weiter-setzen'},'Weiter setzen');weiterSetzen.onclick=()=>this.setzen();
   const pause=h('button',{type:'button',id:'pk-pause',title:'Setzen anhalten – Ziehen und Zoomen gehen weiter (Esc)'},'Pause');pause.onclick=()=>this.pause();
   knoepfe.append(weiterSetzen,pause);
@@ -98,7 +103,6 @@ export class Oberflaeche{
   const label=$('label').closest('label')!;label.after(h('p',{id:'pk-kennung-fest',class:'tiny',hidden:''},'Kennung kommt aus LabelKit – dort ändern.'));
   const proben=$('proben-section');
   const listeKopf=proben.querySelector('.section-heading')!;listeKopf.querySelector('h2')!.textContent='Proben aus LabelKit';listeKopf.classList.add('pk-listenkopf');
-  const zahl=h('p',{id:'pk-proben-zahl',class:'pk-proben-zahl',hidden:''});listeKopf.after(zahl);
   const importKnopf=$('lab-import');importKnopf.className='sp-knopf pk-import';listeKopf.querySelector('h2')!.replaceWith(importKnopf);
   s2.append(markers,proben);
   const leer=h('div',{id:'pk-proben-leer',class:'pk-leer',hidden:''});const gross=h('button',{type:'button',id:'pk-import-gross',class:'sp-knopf-app sp-knopf'},'Proben aus LabelKit übernehmen …');gross.onclick=()=>$('lab-import').click();   // derselbe Weg wie der kleine Knopf (im Projekt: Auswahl aus „Laborergebnisse“/„Laboraufträge“)
@@ -130,10 +134,10 @@ export class Oberflaeche{
   const welcome=$('welcome');welcome.querySelector('.eyebrow')!.textContent='SCHRITT 1 · PLAN LADEN';welcome.querySelector('h2')!.innerHTML='Womit zeichnest du<br>den Probenplan?';
   const ordner=h('button',{type:'button',id:'pk-ordner-start',class:'welcome-sketch'},'📁 Projektordner öffnen …');ordner.onclick=()=>$('open-folder').click();(welcome.querySelector('.welcome-sketch-hint')||$('welcome-sketch')).after(ordner);
   // ---- Format merken (E10) ----
-  $('format').addEventListener('change',()=>{try{localStorage.setItem(FORMAT_KEY,(document.getElementById('format') as HTMLSelectElement).value);}catch{/* privates Fenster */}});
+  $('format').addEventListener('change',()=>{if(this.vorwahl)return;try{localStorage.setItem(FORMAT_KEY,(document.getElementById('format') as HTMLSelectElement).value);}catch{/* privates Fenster */}});
   // Hinweis auf offene Proben und der „erledigt“-Zustand hängen an den Ausgabe-Feldern
   for(const id of ['format','view','scope','quality','framed','values-export','annex-title','annex-photos','report','date'])document.getElementById(id)?.addEventListener('change',()=>this.nachRender());
-  window.addEventListener('resize',()=>this.fussHoehe());new ResizeObserver(()=>this.fussHoehe()).observe(fuss);
+  for(const e of [hinweis,stage.querySelector('.zoom-controls')])if(e)this.mobilBeobachter.observe(e);window.addEventListener('resize',()=>this.mobilMass());
   this.anzeigen('1');
  }
 
@@ -142,7 +146,11 @@ export class Oberflaeche{
   if(this.hooks.cropping())return;
   const vorher=this.schritt;if(s==='f'&&vorher!=='f')this.vorFlaechen=vorher;
   if(vorher===s){this.nachRender();return;}
+  // Unfertige Fläche: erst abschließen oder abbrechen – ihre Knöpfe stehen nur in der Flächen-Ansicht
+  if(vorher==='f'&&this.hooks.entwurf()){this.hooks.toast('Bitte die gezeichnete Fläche zuerst abschließen oder abbrechen.',true);return;}
   const mode=this.hooks.mode(),lab=this.hooks.labUI();
+  // Auswahl gehört zu ② bzw. zur Flächen-Ansicht: sonst wirkte Entf in ①/③ auf einen unsichtbaren Punkt
+  if(s==='1'||s==='3')this.hooks.deselect(true);
   // Werkzeuge gehören zu ihrem Schritt: beim Wechsel zurück zur Ansicht (Platzieren, Brandherd … sind in ① und ③ nicht sichtbar)
   if(mode==='lab-place')lab?.fertig();else if(mode!=='navigate'&&!(s==='1'&&mode==='measure'))this.hooks.setMode('navigate');
   if(s==='2')this.autoStart=true;
@@ -162,11 +170,12 @@ export class Oberflaeche{
  }
  /** ?aktion=anlage: Schritt ③ mit „Word · Anlage Probenahme“ (hat Vorrang vor der gemerkten Wahl). */
  anlage(){this.formatGesetzt=true;this.zeige('3');}
+ private vorwahl=false;
  private formatVorwahl(){
   if(this.formatGesetzt)return;this.formatGesetzt=true;
   const sel=document.getElementById('format') as HTMLSelectElement;let wahl='';try{wahl=localStorage.getItem(FORMAT_KEY)||'';}catch{/* privates Fenster */}
   if(![...sel.options].some(o=>o.value===wahl))wahl=this.hooks.folder()?'anlage':'pdf-a4';
-  if(sel.value!==wahl){sel.value=wahl;sel.dispatchEvent(new Event('change'));}
+  if(sel.value!==wahl){sel.value=wahl;this.vorwahl=true;try{sel.dispatchEvent(new Event('change'));}finally{this.vorwahl=false;}}   // Vorwahl ist keine Wahl – nicht merken
  }
  /** Abschnitt sichtbar machen (reveal): in den passenden Schritt wechseln. */
  abschnitt(id:string){
@@ -180,14 +189,18 @@ export class Oberflaeche{
   if(!this.hooks.project())return true;
   if(key==='v'){this.pause();return false;}
   const ziel=KUERZEL[key]||(shift&&key==='r'?'1':undefined);
-  if(ziel&&ziel!==this.schritt){if(this.hooks.cropping())return false;this.zeige(ziel);}
+  if(ziel&&ziel!==this.schritt){
+   const id=KNOPF[shift&&key==='r'?'R':key],b=id?document.querySelector<HTMLButtonElement>(id):null;
+   if(this.hooks.cropping()||!b||b.disabled)return false;   // gesperrtes Werkzeug: nicht erst den Schritt wechseln
+   this.zeige(ziel);if(this.schritt!==ziel)return false;
+  }
   return true;
  }
  /** Ränder der Karte, die von schwebenden Leisten bedeckt sind (für „Einpassen“). */
  rand(){
-  const stage=$('stage').getBoundingClientRect();if(!this.hooks.project()||this.hooks.cropping())return {top:0,right:0,bottom:0,left:0};
+  const stage=$('drawing').getBoundingClientRect();if(!this.hooks.project()||this.hooks.cropping())return {top:0,right:0,bottom:0,left:0};   // gemessen an der Zeichenfläche: auf dem Telefon liegen die Leisten darüber, nicht darauf
   let top=0,bottom=0;
-  for(const id of ['pk-oben','pk-plaene']){const e=document.getElementById(id);if(!e||!e.offsetParent)continue;const r=e.getBoundingClientRect();if(r.height)top=Math.max(top,r.bottom-stage.top+6);}
+  for(const id of ['pk-oben','pk-plaene']){const e=document.getElementById(id);if(!e||!e.offsetParent)continue;const r=e.getBoundingClientRect();if(r.height&&r.bottom>stage.top&&r.top<stage.bottom)top=Math.max(top,r.bottom-stage.top+6);}
   for(const sel of ['#pk-hinweis','.zoom-controls']){const e=document.querySelector<HTMLElement>(sel);if(!e||!e.offsetParent)continue;const r=e.getBoundingClientRect();if(r.height)bottom=Math.max(bottom,stage.bottom-r.top+6);}
   return {top:Math.min(top,stage.height*.3),right:0,bottom:Math.min(bottom,stage.height*.25),left:0};
  }
@@ -228,11 +241,15 @@ export class Oberflaeche{
  private ausgeben(){const e=$<HTMLButtonElement>('export');if(e.disabled)return;this.laufend=true;e.click();}
  private laufend=false;
  /** Nach runExport: nur bei Erfolg „erledigt“ (an den Datenstand gebunden). */
- ausgegeben(ok:boolean){this.laufend=false;if(ok){this.ausgabeStand=this.fingerabdruck();this.ausgabeFormat=(document.getElementById('format') as HTMLSelectElement).value;}this.nachRender();}
+ /** runExport ist zu Ende (auch bei Abbruch ohne Erfolg) – Hauptaktion nicht mehr an den Exportknopf gebunden. */
+ ausgabeEnde(){if(!this.laufend)return;this.laufend=false;this.nachRender();}
+ ausgegeben(ok:boolean){this.laufend=false;if(ok){(window as unknown as {MosaikLeiste?:{aktualisieren?:()=>void}}).MosaikLeiste?.aktualisieren?.();this.ausgabeStand=this.fingerabdruck();this.ausgabeFormat=(document.getElementById('format') as HTMLSelectElement).value;}this.nachRender();}
  private fingerabdruck(){
   const p=this.hooks.project();if(!p)return '';
   const felder=['format','view','scope','quality','framed','values-export','annex-title','annex-photos','report','date'].map(id=>{const e=document.getElementById(id) as HTMLInputElement|null;return e?(e.type==='checkbox'?String(e.checked):e.value):'';});
-  return JSON.stringify([felder,this.hooks.folder(),JSON.stringify(p,(k,v)=>k==='data'&&typeof v==='string'?`${v.length}:${v.slice(-24)}`:k==='active'?undefined:v)]);
+  // je Plan in fester Reihenfolge (der aktive Plan steht in plan/markers/areas, die anderen in sheets) – ein Planwechsel ist keine Änderung
+  const {plan,markers,areas,sheets,active,...rest}=p,ai=active??0,blaetter=(sheets||[{id:'',name:''}]).map((sh,i)=>i===ai?{...sh,plan,markers,areas}:sh);
+  return JSON.stringify([felder,this.hooks.folder(),JSON.stringify([rest,blaetter],(k,v)=>k==='data'&&typeof v==='string'?`${v.length}:${v.slice(-24)}`:v)]);
  }
 
  // ---- „Mehr …“ ----
@@ -254,32 +271,37 @@ export class Oberflaeche{
  }
 
  // ---- Stand in der Fußleiste (kurz; #saved behält den vollen Text) ----
+ private letzterStand='';private gespeichertUm:Date|null=null;
  private standZeigen(){
   const roh=($('saved').textContent||'').trim(),t=$('pk-stand-text'),folder=this.hooks.folder(),save=$<HTMLButtonElement>('save-project');
   let text=roh,klasse='';
   if(/^⚠/.test(roh)){klasse='fehler';}
-  else if(/^✓ In „/.test(roh)){const d=new Date();text=`✓ automatisch gespeichert ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;klasse='ok';}
+  else if(/^✓ In „/.test(roh)){if(roh!==this.letzterStand||!this.gespeichertUm)this.gespeichertUm=new Date();const d=this.gespeichertUm;text=`✓ automatisch gespeichert ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;klasse='ok';}
   else if(/^✓ Aus „/.test(roh)){text='✓ gespeichert';klasse='ok';}
   else if(/^Wird in „/.test(roh)){text='Wird gespeichert …';}
   else if(/noch nicht im Projektordner|Wiederhergestellt/.test(roh)){klasse='gelb';}
   else if(/Lokal gesichert|lokal gesichert|Wird lokal/.test(roh)||!folder&&this.hooks.project()){text='Nur im Browser gesichert';klasse='gelb';}
   else if(!this.hooks.project()){text='';}
-  if(t.textContent!==text)t.textContent=text;t.className=`pk-stand-text ${klasse}`;t.title=roh;
+  this.letzterStand=roh;if(t.textContent!==text)t.textContent=text;t.className=`pk-stand-text ${klasse}`;t.title=roh;
   const st=folder?'Speichern':'Als Datei speichern';if(save.textContent!==st)save.textContent=st;
   save.title=folder?'Jetzt in den Projektordner schreiben (PlanKit speichert sonst automatisch kurz nach jeder Änderung)':'Projekt als .probenplan-Datei herunterladen – ohne Projektordner liegt der Plan nur im Browser';
  }
- private fussHoehe(){const f=document.getElementById('pk-fuss');if(f)document.documentElement.style.setProperty('--pk-fuss',`${f.offsetHeight}px`);}
+ private mobilBeobachter!:ResizeObserver;
+ /** Telefon (≤ 700 px): Schritte/Werkzeuge stehen über, Hinweiskarte und Zoom unter der Zeichenfläche – nichts liegt auf dem Plan. */
+ private mobilMass(){
+  const stage=$('stage'),schmal=matchMedia('(max-width:700px)').matches,h=(e:Element|null)=>e instanceof HTMLElement&&e.offsetParent?e.getBoundingClientRect().height:0;
+  const oben=schmal?h(document.getElementById('pk-oben'))+20:0,unten=schmal?h(document.getElementById('pk-hinweis'))+h(stage.querySelector('.zoom-controls'))+28:0;
+  stage.style.setProperty('--pk-oben-h',`${Math.ceil(oben)}px`);stage.style.setProperty('--pk-unten-h',`${Math.ceil(unten)}px`);
+  const ob=document.getElementById('pk-oben'),r=ob&&ob.offsetParent?ob.getBoundingClientRect():null;document.documentElement.style.setProperty('--pk-toast-top',`${Math.round(r?r.bottom+10:122)}px`);
+ }
 
  // ---- nach jedem Zeichnen ----
  nachRender(){
   const p=this.hooks.project(),mode=this.hooks.mode(),lab=this.hooks.labUI(),crop=this.hooks.cropping();
   if(!p&&this.schritt!=='1')this.anzeigen('1');
-  if(p&&!this.hatteProjekt){/* erster Plan: geladen() entscheidet */}
-  this.hatteProjekt=!!p;
   document.body.classList.toggle('pk-vollbild',crop);document.body.classList.toggle('pk-ohne-plan',!p);
   const pending=p?.pending||[],gesetzt=p?allMarkers(p).filter(m=>m.lab).length:0;
   // Auto-Start in ② (E5, mit 6.1 b): nur mit einer nächsten offenen Probe und eingeschaltetem „gleich die nächste“
-  if(this.offenVorher===0&&pending.length>0)this.autoStart=true;this.offenVorher=pending.length;
   if(this.schritt==='2'&&this.autoStart&&p&&!crop&&mode==='navigate'&&!this.hooks.blocked()&&!document.querySelector('dialog:modal')){
    this.autoStart=false;if(pending.length&&weiterOn()){const next=this.naechsteProbe();if(next!==null){lab?.choose(next);return;}}
   }
@@ -291,8 +313,10 @@ export class Oberflaeche{
   const setzenB=$<HTMLButtonElement>('pk-w-setzen');setzenB.textContent=pending.length?'Proben setzen':'Probe von Hand';
   setzenB.title=pending.length?'Nächste offene Probe setzen – ein Tipp in den Plan setzt sie':'Eigene Probe setzen: Nummer und Form unten links, dann in den Plan tippen (P)';
   const aktiv=(id:string,an:boolean)=>{const b=$(id);b.classList.toggle('aktiv',an);b.setAttribute('aria-pressed',String(an));};
-  aktiv('pk-w-setzen',mode==='lab-place'||mode==='sample');aktiv('pk-w-brand',mode==='fire');aktiv('pk-w-schieben',mode==='edit');aktiv('pk-w-fzeichnen',mode==='area-draw');aktiv('pk-w-fbearbeiten',mode==='area-edit');
-  for(const id of ['pk-w-setzen','pk-w-brand','pk-w-schieben','pk-w-fzeichnen','pk-w-fbearbeiten'])$<HTMLButtonElement>(id).disabled=!p||this.hooks.blocked();
+  // mit offenen Laborproben steht „Probe von Hand“ als eigenes Werkzeug daneben, sonst übernimmt „Proben setzen“ seine Rolle
+  $('pk-w-hand').hidden=!pending.length;
+  aktiv('pk-w-setzen',mode==='lab-place'||(mode==='sample'&&!pending.length));aktiv('pk-w-hand',mode==='sample'&&!!pending.length);aktiv('pk-w-brand',mode==='fire');aktiv('pk-w-schieben',mode==='edit');aktiv('pk-w-fzeichnen',mode==='area-draw');aktiv('pk-w-fbearbeiten',mode==='area-edit');
+  for(const id of ['pk-w-setzen','pk-w-hand','pk-w-brand','pk-w-schieben','pk-w-fzeichnen','pk-w-fbearbeiten'])$<HTMLButtonElement>(id).disabled=!p||this.hooks.blocked();
   this.chipsZeigen(p);this.hinweisZeigen(p,mode,pending.length,gesetzt);this.spalteZeigen(p,pending.length,gesetzt);this.fussZeigen();this.standZeigen();
  }
  private chipsSig='';
