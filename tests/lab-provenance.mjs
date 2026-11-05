@@ -1,3 +1,4 @@
+import * as pk from './pk-ui.mjs';
 import {chromium,webkit,savedProject,downloadedProject,openExport,closeExport} from './runtime.mjs';
 import {labRows,labXML,labPDF} from './lab-fixtures.mjs';
 import assert from 'node:assert/strict';
@@ -36,13 +37,13 @@ await check('Modell: Herkunft validieren, Felder erlauben, Dateipfade und Rohdat
 });
 
 const file=(name,buffer)=>({name,mimeType:name.endsWith('.xml')?'application/xml':name.endsWith('.svg')?'image/svg+xml':'application/pdf',buffer:Buffer.isBuffer(buffer)?buffer:Buffer.from(buffer)});
-async function plan(page){await page.locator('#file').setInputFiles(file('synthetic.svg','<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800"><rect width="600" height="800" fill="white"/></svg>'));await page.locator('#lab-panel').waitFor();return savedProject(page);}
+async function plan(page){await page.locator('#file').setInputFiles(file('synthetic.svg','<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800"><rect width="600" height="800" fill="white"/></svg>'));await page.locator('#welcome').waitFor({state:'hidden'});await pk.schritt(page,2);await page.locator('#proben-section').waitFor();return savedProject(page);}
 async function review(page,files,meta={}){await page.locator('#lab-files').setInputFiles(files);await page.locator('#lab-review').waitFor();for(const [key,value] of Object.entries(meta))await page.locator(`[data-meta=${key}]`).fill(value);}
 async function accept(page){assert.equal(await page.locator('#lab-confirm').isEnabled(),true);await page.locator('#lab-confirm').click();await page.locator('#lab-review').waitFor({state:'hidden'});return savedProject(page);}
-async function placeFirst(page,x,y){await page.locator('[data-pending]').first().click();await page.locator('#drawing').scrollIntoViewIfNeeded();const q=await page.locator('#drawing').evaluate((el,p)=>{const q=new DOMPoint(p.x,p.y).matrixTransform(el.getScreenCTM());return{x:q.x,y:q.y};},{x,y});await page.mouse.click(q.x,q.y);return savedProject(page);}
+async function placeFirst(page,x,y){await page.locator('[data-plabel]').first().click();await page.locator('#drawing').scrollIntoViewIfNeeded();const q=await page.locator('#drawing').evaluate((el,p)=>{const q=new DOMPoint(p.x,p.y).matrixTransform(el.getScreenCTM());return{x:q.x,y:q.y};},{x,y});await page.mouse.click(q.x,q.y);return savedProject(page);}
 async function openProject(page,p,replace=false){await page.locator('#project-file').setInputFiles({name:'synthetic.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(p))});if(replace)await page.locator('#replace-yes').click();await page.locator('#import-status').waitFor({state:'hidden'});return savedProject(page);}
 async function jsonExport(page,id,edits={}){
- await page.locator('#lab-panel').getByText('Probenliste speichern',{exact:true}).click();
+ await pk.probenlisteSpeichern(page);
  if(id)await page.locator('#lab-report-select').selectOption(id);
  const values={};for(const key of ['bericht','labor','auftragsreferenz','quelle'])values[key]=await page.locator(`[data-summary=${key}]`).inputValue();
  for(const [key,value] of Object.entries(edits))await page.locator(`[data-summary=${key}]`).fill(value);
@@ -96,7 +97,7 @@ for(const engine of ['chromium','webkit']){
    // Messwerte je Probe werden seit 1.7 bewusst gespeichert (Ergebniskarte); Rohdateien weiterhin nicht.
    assert.doesNotMatch(JSON.stringify(saved),/AnalyticalReportLine|%PDF|<AnalyticalReport|"loq"/);
    await context.close();context=await browser.newContext({viewport:{width:1500,height:1050},acceptDownloads:true});page=await context.newPage();await page.goto(base);assert.deepEqual(await openProject(page,saved),saved);
-   await page.reload();await page.locator('[data-pending]').first().waitFor();assert.deepEqual(await savedProject(page),saved);
+   await page.reload();await page.locator('[data-plabel]').first().waitFor();assert.deepEqual(await savedProject(page),saved);
    const {json,values}=await jsonExport(page);assert.equal(values.labor,metadata.labor);assert.equal(values.auftragsreferenz,metadata.auftragsreferenz);assert.equal(values.quelle,origins.sourceText(origin.sources));
    assert.equal(json.bericht,metadata.bericht);assert.equal(json.proben.length,9);assert.deepEqual(json.proben.map(r=>r.label),labRows.map(r=>r.label));assert.equal(json.proben[8].beschreibung,labRows[8].desc);
    assert.deepEqual(await savedProject(page),saved);await context.close();
@@ -109,7 +110,7 @@ for(const engine of ['chromium','webkit']){
     await accept(page);
    }
    const p=await downloadedProject(page);assert.equal(p.labReports.length,4);assert.equal(new Set(p.labReports.map(r=>r.id)).size,4);assert.equal(p.pending.length,6);
-   await page.reload();await page.locator('[data-pending]').first().waitFor();
+   await page.reload();await page.locator('[data-plabel]').first().waitFor();
    for(const r of p.labReports){const {json}=await jsonExport(page,r.id);assert.equal(json.bericht,r.bericht);assert.equal(json.labor,r.labor);assert.equal(json.auftragsreferenz,r.auftragsreferenz);assert.deepEqual(json.proben.map(r=>r.label),p.pending.filter(row=>row.reportId===r.id).map(r=>r.label));}
    const selected=p.labReports[1],edited=await jsonExport(page,selected.id,{bericht:'Manuell korrigierte Nummer',quelle:'C:\\private\\manual.xml'});assert.equal(edited.json.bericht,'Manuell korrigierte Nummer');assert.equal(edited.json.quelle,'manual.xml');assert.equal(edited.json.proben.length,2);assert.deepEqual(await savedProject(page),p);
   });
@@ -121,14 +122,15 @@ for(const engine of ['chromium','webkit']){
    const after=await accept(page);assert.notEqual(after.pending[0].reportId,before.pending[0].reportId);assert.equal(after.pending[1].reportId,before.pending[1].reportId);assert.deepEqual(after.labReports.slice(0,4),before.labReports);
    await page.locator('#undo').click();assert.deepEqual(await savedProject(page),before);await page.locator('#redo').click();assert.deepEqual(await savedProject(page),after);
   });
-  await check(`${engine}: platzierte Probe ersetzen/umnummerieren, History und Herkunftsexport bleiben konsistent`,async()=>{
+  await check(`${engine}: platzierte Probe ersetzen, History und Herkunftsexport bleiben konsistent, Kennung schreibgeschützt (E12)`,async()=>{
    await placeFirst(page,210,310);const before=await savedProject(page),m=before.markers[0];
    await review(page,[file('placed.xml',labXML(labRows.slice(0,1)))]);await page.locator('[data-lab-row]').first().locator('.lab-conflict select').selectOption('update');const after=await accept(page);
    assert.notEqual(after.markers[0].lab.reportId,m.lab.reportId);for(const k of ['id','x','y','lx','ly','label','kind'])assert.equal(after.markers[0][k],m[k]);
    await page.locator('#undo').click();assert.deepEqual(await savedProject(page),before);await page.locator('#redo').click();assert.deepEqual(await savedProject(page),after);
-   await page.locator('[data-select]').first().click();await page.locator('#label').fill('P20');await page.locator('#label').press('Tab');const numbered=await savedProject(page);assert.equal(numbered.markers[0].lab.reportId,after.markers[0].lab.reportId);
-   await page.locator('#undo').click();assert.deepEqual(await savedProject(page),after);await page.locator('#redo').click();assert.deepEqual(await savedProject(page),numbered);
-   const {json}=await jsonExport(page,numbered.markers[0].lab.reportId);assert.deepEqual(json.proben.map(r=>r.label),['P20']);
+   // 2.0 (E12): Die Kennung einer Laborprobe kommt aus LabelKit und ist in PlanKit nur Anzeige – kein Umnummerieren mehr.
+   await pk.markierung(page,0);assert.equal(await page.locator('#label').evaluate(e=>e.readOnly),true,'Kennung schreibgeschützt');assert.equal(await page.locator('#pk-kennung-fest').isVisible(),true);
+   await page.keyboard.press('Escape');assert.deepEqual(await savedProject(page),after);
+   const {json}=await jsonExport(page,after.markers[0].lab.reportId);assert.deepEqual(json.proben.map(r=>r.label),[after.markers[0].label]);
   });
   await check(`${engine}: ungültige/fehlende/doppelte Herkunft abweisen; bisheriges Projekt bleibt erhalten`,async()=>{
    const current=await savedProject(page),cases=[];
@@ -142,7 +144,7 @@ for(const engine of ['chromium','webkit']){
    const current=await savedProject(page);
    for(const version of [1,2,3,4]){const p={...current,version,markers:[]};delete p.labReports;delete p.pending;delete p.areas;delete p.nextArea;if(version===3){p.areas=[];p.nextArea=1;}assert.deepEqual(await openProject(page,p,true),p);}
    const legacy=structuredClone(current);delete legacy.labReports;legacy.pending.forEach(r=>delete r.reportId);legacy.markers.forEach(m=>delete m.lab.reportId);assert.deepEqual(await openProject(page,legacy,true),legacy);
-   await page.locator('#lab-panel').getByText('Probenliste speichern',{exact:true}).click();assert.equal(await page.locator('[data-summary=labor]').inputValue(),'');await page.locator('#lab-summary').getByText('Abbrechen',{exact:true}).click();
+   await pk.probenlisteSpeichern(page);assert.equal(await page.locator('[data-summary=labor]').inputValue(),'');await page.locator('#lab-summary').getByText('Abbrechen',{exact:true}).click();
   });
   await check(`${engine}: widersprüchliches XML/PDF-Paar verworfen; Abbruch legt keine Herkunft an`,async()=>{
    const before=await savedProject(page);

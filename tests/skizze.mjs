@@ -1,6 +1,7 @@
 // Skizze (ab 1.21): Plan zeichnen, wenn kein Grundriss vorliegt – Räume mit Maßen, Türen, Maßstab automatisch,
 // Proben wie auf jedem Plan, später weiter bearbeitbar, Rückgängig, Projektdatei mit Validierung.
-import {chromium,webkit,savedProject,downloadedProject} from './runtime.mjs';
+import * as pk from './pk-ui.mjs';
+import {chromium,webkit,savedProject,downloadedProject,openExport} from './runtime.mjs';
 import assert from 'node:assert/strict';
 const base=process.env.TEST_URL||'http://localhost:4173';
 async function check(name,fn){await fn();console.log(`OK ${name}`);}
@@ -16,9 +17,8 @@ for(const engine of engines){
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(base);
 
-  await check(`${engine}: ohne Plan ist „✎ Skizze“ oben und auf der Startseite sichtbar`,async()=>{
-   assert.ok(await page.locator('#sketch-tb').isVisible());assert.ok(await page.locator('#sketch-tb').isEnabled());assert.match(await page.locator('#sketch-tb').getAttribute('title'),/Kein Plan vorhanden/);
-   assert.ok(await page.locator('#welcome-sketch').isVisible());
+  await check(`${engine}: ohne Plan ist „Kein Plan? Skizze zeichnen“ auf der Startkarte gleichwertig neben „Grundriss auswählen“`,async()=>{
+   assert.ok(await page.locator('#welcome-sketch').isVisible());assert.ok(await page.locator('#welcome-load').isVisible());assert.equal(await page.locator('#sketch-tb').isVisible(),false,'kein zweiter Skizze-Knopf');
   });
   await check(`${engine}: „Kein Plan? Skizze zeichnen“ öffnet eine leere Skizze mit Maßstab`,async()=>{
    await page.locator('#welcome-sketch').click();await page.locator('#sketch-actions').waitFor();
@@ -69,35 +69,35 @@ for(const engine of engines){
    await blur(page);await page.keyboard.press('p');await tapPlan(page,300,300);await page.keyboard.press('v');
    const s=await savedProject(page);assert.equal(s.markers.length,1);assert.ok(Math.abs(s.markers[0].x-300)<3&&Math.abs(s.markers[0].y-300)<3);
    assert.equal(await page.locator('#rotate-right').isDisabled(),true);assert.equal(await page.locator('#warp-start').isDisabled(),true);
-   assert.equal(await page.locator('#sketch-edit').isVisible(),true);
+   await pk.schritt(page,1);assert.equal(await page.locator('#sketch-edit').isVisible(),true);
    assert.deepEqual([s.plan.width,s.plan.height],[880,950],'Zeichenfläche auf den Inhalt zugeschnitten (1 m Rand)');
-   assert.equal(await page.locator('#sketch-tb').isVisible(),false,'auf einer Skizze bearbeitet „✎ Skizze“ aus „Plan vorbereiten“ – kein doppelter Knopf');
+   assert.equal(await page.locator('#sketch-tb').isVisible(),false,'auf einer Skizze: „Skizze bearbeiten“ in „Plan vorbereiten“ – kein doppelter Knopf');
    if(process.env.SHOT){await page.waitForTimeout(500);await page.screenshot({path:process.env.SHOT+'-2.png'});}
    // Planbild enthält Raumnamen und Fläche
    const svgText=await page.evaluate(d=>new TextDecoder().decode(Uint8Array.from(atob(d.split(',')[1]),c=>c.charCodeAt(0))),s.plan.data);assert.match(svgText,/Wohnen/);assert.match(svgText,/Küche/);assert.match(svgText,/Treppe/);assert.match(svgText,/rotate\(30\)/);assert.match(svgText,/16,4 m²/);
   });
   await check(`${engine}: später weiter bearbeiten – Raum verschieben, Proben bleiben an ihrer Stelle`,async()=>{
-   await page.locator('#sketch-edit').click();await page.locator('#sketch-actions').waitFor();
+   await pk.schritt(page,1);await page.locator('#sketch-edit').click();await page.locator('#sketch-actions').waitFor();
    assert.equal(await page.locator('[data-sketch-tool="select"]').getAttribute('aria-pressed'),'true');
    await drag(page,[650,250],[650,350]);   // Küche 1 m nach unten
    const s=await savedProject(page);assert.equal(s.plan.sketch.rooms[1].y,200);assert.ok(Math.abs(s.markers[0].x-300)<3&&Math.abs(s.markers[0].y-300)<3);
    assert.deepEqual(s.plan.sketch.openings.filter(o=>o.kind==='door').map(d=>[d.x,d.y]),[[520,400]],'Tür auf der Küchenwand wandert mit');
   });
   await check(`${engine}: Maßstab im Export (PDF A4 mit genormtem Maßstab)`,async()=>{
-   await page.locator('#sketch-done').click();await page.locator('#export-open').click();await page.locator('#export').waitFor();
+   await page.locator('#sketch-done').click();await openExport(page);
    await page.locator('#format').selectOption('pdf-a4');await page.locator('#dimensions',{hasText:'M 1:'}).waitFor();
-   await page.locator('#export-dialog .close').click();
+   await pk.schritt(page,2);
   });
   await check(`${engine}: Projektdatei behält die Skizze; ungültige Skizze wird abgewiesen`,async()=>{
    const file=await downloadedProject(page);assert.equal(file.plan.sketch.rooms.length,2);
    await page.locator('#project-file').setInputFiles({name:'x.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(file))});await page.locator('#replace-yes').click();
-   await page.locator('#welcome').waitFor({state:'hidden'});assert.equal(await page.locator('#sketch-edit').isVisible(),true);assert.equal((await savedProject(page)).plan.sketch.rooms[0].name,'Wohnen');
+   await page.locator('#welcome').waitFor({state:'hidden'});await pk.schritt(page,1);assert.equal(await page.locator('#sketch-edit').isVisible(),true);assert.equal((await savedProject(page)).plan.sketch.rooms[0].name,'Wohnen');
    const bad=structuredClone(file);bad.plan.sketch.rooms[0].w=-5;
    await page.locator('#project-file').setInputFiles({name:'bad.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(bad))});
    await page.locator('#toast.error',{hasText:'Skizze'}).waitFor();
   });
   await check(`${engine}: „＋ Skizze“ legt einen weiteren Plan an`,async()=>{
-   await page.locator('#sheet-sketch').click();await page.locator('#sketch-actions').waitFor();
+   await pk.schritt(page,1);await page.locator('#sheet-sketch').click();await page.locator('#sketch-actions').waitFor();
    const s=await savedProject(page);assert.equal(s.sheets.length,2);assert.deepEqual(s.plan.sketch.rooms,[]);assert.deepEqual(s.plan.sketch.walls,[]);
    await page.locator('#sketch-done').click();
   });

@@ -1,5 +1,6 @@
 // Raumbuch im Browser: Raum aus LabelKit, Werte aus dem Laborbericht, Dialog mit Eingaben, Raum ohne Probe,
 // Zusammenführen, CSV-Export und Projektdatei-Rundlauf. Synthetische Daten.
+import * as pk from './pk-ui.mjs';
 import {chromium,webkit,savedProject,downloadedProject} from './runtime.mjs';
 import {labXML} from './lab-fixtures.mjs';
 import assert from 'node:assert/strict';
@@ -16,24 +17,24 @@ for(const engine of engines){
   const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(base);
   await page.locator('#file').setInputFiles({name:'eg.svg',mimeType:'image/svg+xml',buffer:Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><rect width="1200" height="800" fill="white"/></svg>')});await page.locator('#welcome').waitFor({state:'hidden'});
-  if(await page.locator('#panel-toggle').getAttribute('aria-pressed')!=='true')await page.locator('#panel-toggle').click();
+  await pk.spalte(page);
   const lk={version:'4.34.0',projekt:{nr:''},proben:[1,2,3,4].map(i=>({id:i,_nr:i,z2:['EG Küche','EG Kueche','EG Flur','EG Bad'][i-1],z4:['Untersicht','Ansicht','Ansicht','Ansicht'][i-1],matrix:'Wischprobe',cm2:'600',datum:'2026-10-20'}))};
   page.once('dialog',d=>d.accept());
   await page.locator('#lab-files').setInputFiles([{name:'x_Daten.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(lk))}]);await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});
   const pts=[[200,200],[300,200],[600,200],[900,500]];
-  for(const [x,y] of pts){await page.locator('[data-pending]').first().click();const p=await toScreen(page,x,y);await page.mouse.click(p.x,p.y);}
+  for(const [i,[x,y]] of pts.entries()){await page.locator(`[data-plabel="P${i+1}"]`).click();const p=await toScreen(page,x,y);await page.mouse.click(p.x,p.y);}
   await page.keyboard.press('Escape');
   const rows=[1,2,3,4].map(i=>({ref:`Probe ${i}`,desc:'',art:'Wischprobe',labNr:`L${i}`,lines:[{p:SUM,r:['480','210','38','6'][i-1],u:U}]}));
   await page.locator('#lab-files').setInputFiles([{name:'bericht.xml',mimeType:'application/xml',buffer:Buffer.from(labXML(rows))}]);
   await page.locator('#lab-review').waitFor();const conflicts=page.locator('[data-lab-row] .lab-conflict select');for(let i=0;i<await conflicts.count();i++)await conflicts.nth(i).selectOption('update');
   await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});
-  (await page.locator('#results-toggle').getAttribute('aria-pressed')==='true'||await page.locator('#results-toggle').click());await page.locator('#result-usage').selectOption('residential');await page.locator('#results-toggle').click();
+  (await page.locator('#results-toggle').getAttribute('aria-pressed')==='true'||await pk.ergebnisse(page));await pk.ergebniskarte(page);await page.locator('#result-usage').selectOption('residential');await pk.ergebnisse(page);
 
   await check(`${engine}: Raum kommt aus LabelKit und bleibt mit Laborwerten am Marker`,async()=>{
    const s=await savedProject(page);assert.deepEqual(s.markers.map(m=>m.raum),['EG Küche','EG Kueche','EG Flur','EG Bad']);assert.ok(s.markers.every(m=>m.lab?.werte?.length));
   });
   await check(`${engine}: Raumbuch – gleiche Schreibweise zusammen, Bewertung, Maßnahme fehlt markiert`,async()=>{
-   await page.locator('#raumbuch-open').click();await page.locator('#raumbuch-dialog').waitFor();
+   await pk.schritt(page,3);await page.locator('#raumbuch-open').click();await page.locator('#raumbuch-dialog').waitFor();
    const names=await page.locator('#raumbuch-rows td.raum').allTextContents();assert.deepEqual(names,['Küche','Flur','Bad']);
    const kueche=page.locator('#raumbuch-rows tr').nth(0);
    assert.match(await kueche.locator('td.befund').innerText(),/P1 480 µg\/m² · Untersicht[\s\S]*P2 210 µg\/m² · Ansicht/);
@@ -55,7 +56,7 @@ for(const engine of engines){
    await page.locator('#raumbuch-add-name').fill('Küche');await page.locator('#raumbuch-add button').click();await page.locator('#toast.error').waitFor();await page.locator('#toast').evaluate(t=>{t.hidden=true;t.className='';});
    await page.locator('#raumbuch-close').click();
    const s=await savedProject(page);assert.deepEqual(s.raumbuch.rooms,[{floor:'EG',name:'Küche',massnahme:'Reinigung, Kontrollmessung'},{floor:'EG',name:'HWR',status:'nicht_begangen'}]);
-   await page.locator('#raumbuch-open').click();await page.locator('#raumbuch-dialog').waitFor();
+   await pk.schritt(page,3);await page.locator('#raumbuch-open').click();await page.locator('#raumbuch-dialog').waitFor();
    if(process.env.SHOT){await page.waitForTimeout(300);await page.locator('#raumbuch-dialog').screenshot({path:process.env.SHOT+'-raumbuch.png'});}
   });
   await check(`${engine}: CSV-Export ohne Flächen, mit Hinweis zur Mengenermittlung`,async()=>{
@@ -73,7 +74,7 @@ for(const engine of engines){
    assert.equal((await savedProject(page)).markers[3].raum,'EG Badezimer');
    const p2=await toScreen(page,...pts[2]);await page.mouse.click(p2.x,p2.y);await page.locator('#raum').fill('EG Badezimmer');await page.locator('#raum').press('Tab');
    await page.keyboard.press('Escape');
-   await page.locator('#raumbuch-open').click();await page.locator('.raumbuch-merge').waitFor();
+   await pk.schritt(page,3);await page.locator('#raumbuch-open').click();await page.locator('.raumbuch-merge').waitFor();
    await page.locator('.raumbuch-merge').first().click();
    await page.waitForFunction(()=>!document.querySelector('.raumbuch-merge'));
    const names=await page.locator('#raumbuch-rows td.raum').allTextContents();assert.equal(names.filter(n=>/^Badezim/.test(n)).length,1,names.join(', '));

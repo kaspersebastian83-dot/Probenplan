@@ -6,6 +6,9 @@ import './style.css';
 import './theme.css';
 import './layout.css';
 import './suite-bar';
+import './spektron-look.css';
+import './einfach.css';
+import {Oberflaeche} from './oberflaeche';
 import {labeled,shownSVG,ensureInk,inkTried,autoLabels,valueLabels,surfaceBars,type Shown} from './labels';
 import {addMarker,addSheet,bounds,clone,createProject,escape,floorName,History,markerScale,markerSize,markerSVG,MARKER_SCALE,metersPerUnit,northAngle,stepMarkerScale,moveSheet,removeSheet,renameSheet,sheetCount,sheetProject,switchSheet,validLabel,MAX_SHEETS,shapeOf,typeOf,typeFromArt,SHAPES,type Shape,type Project,type Marker,trialOn,SURFACES,type Surface,allMarkers,MAX_RAUM,RAUM_STATUS,type RaumStatus} from './model';
 import {raumbuchStand,setEintrag,addRaum,removeRaum,mergeRaum,pruefhinweise,raumbuchBlocks,raumbuchCSV,raumbuchName,STATUS_TEXT,FOOTNOTE_MENGEN,type RaumZeile,type RaumbuchStand} from './raumbuch';
@@ -83,7 +86,7 @@ const input=(id:string)=>$<HTMLInputElement>(id);
 const svg=$('drawing') as unknown as SVGSVGElement;
 const image=$('base-plan') as unknown as SVGImageElement;
 const marks=$('marks') as unknown as SVGGElement;
-document.querySelector('#welcome p')!.innerHTML='Öffnen Sie eine PDF, einen Polycam-Export oder ein Planbild.<br>Ihre Gebäudedaten bleiben im Browser.';
+document.querySelector('#welcome p')!.innerHTML='Grundriss als PDF, Polycam-Export oder Bild – oder ohne Plan eine Skizze.<br>Die Gebäudedaten bleiben im Browser bzw. im Projektordner.';
 document.querySelector('#help-dialog ol li')!.innerHTML='<b>Plan laden:</b> PDF, Polycam-ZIP, SVG, PNG oder JPG auswählen. Bei mehrseitigen PDFs eine Seite in der Vorschau wählen. Bei Polycam möglichst SVG verwenden.';
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Anlage Probenahme (Word)</h3><p>Export → „Word · Anlage Probenahme“: eine Word-Datei zum Einfügen in den Bericht (Einfügen › Objekt › Text aus Datei) mit Lageplan je Geschoss im genormten Maßstab, Probenverzeichnis mit den Messwerten in der Schreibweise des Prüfberichts und der Einordnung in Ihre Skala, je Probe ein Probenblatt mit Lage, Fotos aus FotoKit (Probe-Nr.) und allen Laborwerten sowie einem Prüfprotokoll mit SHA-256 aller Quelldateien. Im Projektordner landet sie datiert in „Mitteilungen“, ohne etwas zu überschreiben; Lücken (Proben ohne Lage, Wert oder Foto, veränderte Fotos) stehen im Prüfprotokoll.</p>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Ausrichten (fotografierte Pläne)</h3><p>„Ausrichten“ (A) legt ein Raster über die Karte; der Plan dreht sich darunter um seine Mitte. Im Plan ziehen dreht frei (Umschalt = zehnmal feiner), Regler, Zahlenfeld, ±0,1° oder Pfeiltasten (Umschalt = 1°) stellen genau ein. „An Kante ausrichten“: zwei Punkte entlang einer geraden Wand anklicken – der Plan wird so gedreht, dass sie waagerecht oder senkrecht liegt. „Übernehmen“ oder Enter speichert, Escape bricht ab. Bis ±45°, gespeichert wird nur der Winkel; das Original bleibt unverändert. Ecken außerhalb des Fotos werden weiß, danach bei Bedarf zuschneiden. Probenpunkte, Flächen und Nordpfeil drehen mit und bleiben auf ihrer Stelle im Plan.</p>');
@@ -96,7 +99,7 @@ document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Wa
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Raumbuch</h3><p>Liste → „Raumbuch bearbeiten …“: je Raum Befund (Proben mit Messwert und Oberflächenart, Brandherd) und Bewertung nach der Skala der Ergebniskarte – beides berechnet. Sie tragen je Raum Maßnahme und Bemerkung ein; Räume ohne Probe kommen mit Status dazu (Sichtprüfung unauffällig / auffällig, nicht begangen). Der Raum kommt aus LabelKit („Raum / Ort“) oder steht unter „Markierungen“ im Feld „Raum“. Ähnliche Schreibweisen (z. B. „Kü.“ und „Küche“) lassen sich zusammenführen. Ausgabe als Word-Anlage und als Tabelle für Excel (CSV) in „Mitteilungen“. Keine Flächen und Mengen – die Mengenermittlung bleibt beim ausführenden Unternehmen. Der Raum kommt aus „Raum / Ort“ in LabelKit; bei der Bezeichnung nach Handbuch („EG Küche Brandraum Decke“) zählen Geschoss und Raum, Zusatz und Bauteil bleiben bei der Probe. Steht ein eigenes Bauteil dahinter („EG Wohnzimmer Schrank oben“), die Zeilen im Raumbuch zusammenführen.</p><h3>Oberflächenart</h3><p>Aufsicht, Ansicht oder Untersicht je Probe kommt beim „Proben übernehmen“ aus LabelKit (Spalte „Oberflächenart“). Fehlt sie dort, lässt sie sich unter „Markierungen“ wählen; eine Eingabe in PlanKit bleibt auch bei erneutem Import. Am Schild ein Balken unten (Aufsicht), links (Ansicht) oder oben (Untersicht), dazu im Wertkästchen der Ergebniskarte und in der Legende.</p>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Skizze (kein Plan vorhanden)</h3><p>Links in der Werkzeugleiste „✎ Skizze“ (ohne Plan: neue Skizze, sonst als weiterer Plan; auf einer Skizze: bearbeiten), Startseite „Kein Plan? Skizze zeichnen“ oder unten „＋ Skizze“ für ein weiteres Geschoss. <b>Raum</b>: von Ecke zu Ecke aufziehen (Raster 10 cm, Räume rasten an Wänden ein), danach Name, Breite und Tiefe in Metern eintippen. <b>Wand</b>: frei ziehen, auch schräg (15°-Schritte rasten ein, Länge eintippbar). <b>Tür</b>/<b>Fenster</b>: auf eine Wand tippen (Tür 0,90 m mit Aufschlag, Fenster 1,20 m). <b>Text</b>: antippen und eintippen, z. B. „Treppe“. <b>Auswählen</b>: Räume, Wände, Texte ziehen, Ecke unten rechts ändert die Raumgröße, Entf löscht. „Skizze fertig“ schneidet die Zeichenfläche auf die Räume zu; der Maßstab ist automatisch gesetzt. „Skizze“ links bearbeitet sie weiter; Proben bleiben an ihrer Stelle.</p><h3>Schnellskizze (Test)</h3><p>Schneller ohne Maße: „☰ Räume aus Liste“ – Räume eintippen (einer pro Zeile, „Küche Brandraum“ markiert den Brandraum), „Raster erzeugen“, dann die Räume ziehen und anordnen. „Skizze – nicht maßstäblich“ (Standard bei neuen Skizzen): kein Maßstab, keine m², Stempel auf dem Plan. Wird eine Probe in einen Raum gesetzt, steht der Raumname gleich unter „Raum“ (fürs Raumbuch). Abschalten: Haken „Schnellskizze (Test)“ in der Skizzenleiste – die Skizze verhält sich dann wie bisher.</p>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Entzerren (Fluchtplan fotografiert)</h3><p>„Entzerren“ (W) links in der Leiste: die vier Ecken des Plans im Foto antippen oder ziehen – 1 oben links, 2 oben rechts, 3 unten rechts, 4 unten links. Die Lupe zeigt die Ecke vergrößert. Seitenverhältnis „wie im Foto“ oder DIN quer/hoch (Fluchtpläne sind meist A3/A4). „Entzerren“ rechnet ein gerades Bild; Proben und Flächen werden mitgerechnet. Ein vorhandener Maßstab und die Nordrichtung werden dabei entfernt und sind neu zu setzen. Rückgängig stellt das Foto wieder her; die Fotodatei selbst bleibt unverändert.</p>');
-document.getElementById('app-version')!.textContent='v1.53.0';document.querySelector<HTMLElement>('.brand')!.title='PlanKit v1.53.0';
+document.getElementById('app-version')!.textContent='v2.0.0';document.querySelector<HTMLElement>('.brand')!.title='PlanKit v2.0.0';
 document.querySelector('#help-dialog h2')!.insertAdjacentHTML('afterend','<h3>Neu in PlanKit 1.16.1 · 20.10.2026</h3><p>Projektzentrale und Spektron-Leiste übergeben Projekte jetzt über #projekt im Fragment. Sonderzeichen bleiben erhalten; alte ?projekt-Links funktionieren weiterhin und werden nach dem Laden bereinigt. Projektwechsel laden auch bereits geöffnete App-Fenster neu; eine Warnung vor ungesicherten Eingaben kann den Wechsel abbrechen. Die Anlagenaktion aktion=anlage wird ebenfalls im Fragment übergeben. Installiertes PlanKit nach einer Online-Aktualisierung vollständig schließen und erneut öffnen.</p>');
 const colorOptions=PALETTE.map(c=>`<option value="${c.color}">${c.title} · ${c.suggestion}</option>`).join('');
 document.querySelector('.modes')!.insertAdjacentHTML('beforeend','<button data-mode="area-draw" class="mode" disabled><span class="tool-icon">⬡</span><span>Fläche zeichnen<small>Eckpunkte setzen & abschließen</small></span></button><button data-mode="area-edit" class="mode" disabled><span class="tool-icon">◇</span><span>Fläche bearbeiten<small>Ecken oder ganze Fläche ziehen</small></span></button>');
@@ -118,6 +121,8 @@ const areaLayer=document.createElementNS(ns,'g');areaLayer.id='areas';marks.befo
 let selectedArea:string|null=null,draftPoints:Point[]=[],measurePoints:Point[]=[];
 let labUI:LabUI|null=null;
 let project:Project|null=null,selected:string|null=null,mode='navigate',history=new History(),busy=false;
+/** PlanKit 2.0: einfache Oberfläche (Schritte, rechte Spalte je Schritt, Fußleiste) – wird am Dateiende angelegt. */
+let pk:Oberflaeche|null=null;
 /** Zuschneiden (ab 1.43): aufziehen, danach an Ecken/Kanten anpassen, innen verschieben; außerhalb ziehen bewegt die Ansicht, Mausrad zoomt. */
 type CropHandle='n'|'s'|'w'|'e'|'nw'|'ne'|'sw'|'se';
 let cropping=false,cropRect:Rect|null=null,cropDrag:{id:number;start:{x:number;y:number};kind:'draw'|'move'|'resize'|'pan';rect0?:Rect;handle?:CropHandle;screen?:{x:number;y:number};cam?:typeof camera}|null=null;
@@ -134,7 +139,10 @@ let sketching:{s:Sketch;tool:SketchTool;sel:{type:SketchKind;id:string}|null;dra
 let camera={x:0,y:0,width:1000,height:1000},fitWidth=1000,saveRevision=0,exportURL='';
 let saveQueue:Promise<void>=Promise.resolve();
 let toastTimer=0,savedToastRevision:number|null=null;
-function toast(message:string,error=false){savedToastRevision=null;$('toast').textContent=message;$('toast').className=error?'error':'';$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>$('toast').hidden=true,error?12000:4500);}
+function toast(message:string,error=false){savedToastRevision=null;
+  // 2.0: Meldung im offenen nativen Dialog zeigen (Top-Layer) – sonst stünde sie verdeckt hinter „Laborproben prüfen“, Raumbuch usw.
+  {const t=$('toast'),modal=document.querySelector('dialog:modal'),ziel=modal||$('app');if(t.parentElement!==ziel){ziel.append(t);if(modal)modal.addEventListener('close',()=>{if(t.parentElement===modal||!t.isConnected)$('app').append(t);},{once:true});}}
+  $('toast').textContent=message;$('toast').className=error?'error':'';$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=window.setTimeout(()=>$('toast').hidden=true,error?12000:4500);}
 function fail(e:unknown){toast(e instanceof Error?e.message:'Die Aktion konnte nicht abgeschlossen werden.',true);}
 function persist(toFolder=true){
  if(!project)return;const target=folder,p=clone(project),revision=++saveRevision,savedAt=Date.now();
@@ -163,7 +171,10 @@ function markerWert(m:Marker){if(!showResults||!project?.results)return '';const
 marks.addEventListener('pointerover',e=>{if((e as PointerEvent).pointerType==='touch')return;labUI?.listeHover((e.target as Element).closest('[data-id]')?.getAttribute('data-id')||null);});
 marks.addEventListener('pointerleave',()=>labUI?.listeHover(null));
 function updateCamera(){svg.setAttribute('viewBox',`${camera.x} ${camera.y} ${camera.width} ${camera.height}`);$('zoom-value').textContent=`${Math.round(fitWidth/camera.width*100)} %`;renderMarkers();renderCrop();if(aligning)renderAlign();if(warping)renderWarp();if(sketching)renderSketch();if(cropping&&!aligning&&!warping&&!sketching)renderCrop();}
-function fit(){if(!project)return;const b=bounds(labeledView(project)),rect=svg.getBoundingClientRect(),ratio=rect.width/rect.height||1;let w=b.width*1.14,h=b.height*1.14;if(w/h<ratio)w=h*ratio;else h=w/ratio;camera={x:b.x+(b.width-w)/2,y:b.y+(b.height-h)/2,width:w,height:h};fitWidth=w;updateCamera();}
+function fit(){if(!project)return;const b=bounds(labeledView(project)),rect=svg.getBoundingClientRect(),ratio=rect.width/rect.height||1;let w=b.width*1.14,h=b.height*1.14;if(w/h<ratio)w=h*ratio;else h=w/ratio;camera={x:b.x+(b.width-w)/2,y:b.y+(b.height-h)/2,width:w,height:h};
+  // 2.0: Schritte/Plan-Chips oben und Hinweiskarte/Zoom unten schweben auf der Karte – „Einpassen“ legt den Plan in den freien Teil.
+  const r=pk?.rand();if(r&&(r.top||r.bottom)&&rect.width>0&&rect.height>0){const aw=rect.width,ah=Math.max(80,rect.height-r.top-r.bottom),k=Math.max(b.width*1.08/aw,b.height*1.08/ah);camera={x:b.x+b.width/2-aw/2*k,y:b.y+b.height/2-(r.top+ah/2)*k,width:rect.width*k,height:rect.height*k};}
+  fitWidth=camera.width;updateCamera();}
 function point(e:{clientX:number;clientY:number}){const matrix=svg.getScreenCTM();if(!matrix)return{x:0,y:0};const p=new DOMPoint(e.clientX,e.clientY).matrixTransform(matrix.inverse());return{x:p.x,y:p.y};}
 function zoom(factor:number,anchor?:{x:number;y:number}){if(!project)return;const ratio=Math.min(20,Math.max(.25,fitWidth/(camera.width*factor)));factor=fitWidth/(ratio*camera.width);const c=anchor||{x:camera.x+camera.width/2,y:camera.y+camera.height/2};camera={x:c.x-(c.x-camera.x)*factor,y:c.y-(c.y-camera.y)*factor,width:camera.width*factor,height:camera.height*factor};updateCamera();}
 function setMode(next:string){mode=next;if(next!=='navigate')hideCropOffer();document.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(b=>{b.classList.toggle('active',b.dataset.mode===mode);b.setAttribute('aria-pressed',String(b.dataset.mode===mode));});$('stage').dataset.mode=mode;if(next!=='measure'&&measurePoints.length){measurePoints=[];renderMeasure();}$('mode-hint').textContent=({measure:'Strecke messen: ersten Punkt anklicken · Ziehen verschiebt die Ansicht · Esc bricht ab',navigate:'Ansicht bewegen · Mausrad oder zwei Finger zum Zoomen',sample:'Tippen setzt eine Probe · Ziehen verschiebt die Ansicht',fire:'Tippen setzt einen Brandherd · Ziehen verschiebt die Ansicht',edit:'Markierung wählen · Punkt oder Beschriftung ziehen','area-draw':'Eckpunkte setzen · anschließend Fläche abschließen','area-edit':'Fläche wählen · Eckpunkte oder Fläche ziehen','lab-place':'Ausgewählte Laborprobe durch Tippen platzieren · Ziehen verschiebt die Ansicht'} as Record<string,string>)[mode];}
@@ -210,7 +221,7 @@ function dimensions(){if(!project)return;const format=exportFormat(),pdf=format.
   if(!$<HTMLDialogElement>('export-dialog').open)return;
   const resultsView=!$('view-field').hidden&&input('view').value==='results',all=sheetCount(project)>1&&input('scope').value==='all';
   try{const l=sheetLayout(project,format.slice(4) as Paper,resultsView?rateMarkers(project):null);$('dimensions').textContent=`${PAPERS[l.paper].label} ${l.landscape?'quer':'hoch'} · ${l.ratio?`M 1:${l.ratio.toLocaleString('de-DE')}`:'ohne Maßstab'}`;
-    $('dimensions-note').textContent=!metersPerUnit(project.plan)?'Plan nicht kalibriert: Liste → „Strecke messen“ für einen echten Maßstab.':!l.ratio?'Plan zu groß für 1:5.000 – auf Blattgröße eingepasst.':all?'Dieser Plan; jedes Blatt erhält seinen eigenen Maßstab.':'Schriftfeld, Legende, Maßstabsleiste'+(northAngle(project.plan)!==null?', Nordpfeil':'');}
+    $('dimensions-note').textContent=!metersPerUnit(project.plan)?'Plan nicht kalibriert: Schritt ① → „Strecke messen“ für einen echten Maßstab.':!l.ratio?'Plan zu groß für 1:5.000 – auf Blattgröße eingepasst.':all?'Dieser Plan; jedes Blatt erhält seinen eigenen Maßstab.':'Schriftfeld, Legende, Maßstabsleiste'+(northAngle(project.plan)!==null?', Nordpfeil':'');}
   catch(e){$('dimensions').textContent='—';$('dimensions-note').textContent=e instanceof Error?e.message:'';}
 }
 function renderCrop(){
@@ -379,7 +390,7 @@ $('warp-confirm').onclick=async()=>{
   try{const image=await warpImage(target.plan,q,size,t=>{$('mode-hint').textContent=t;});
     if(project!==target||!warping)return;
     const next=clone(project),lost=perspectiveProject(next,q,image);history.push(project);project=next;busy=false;endWarp();persist();
-    toast(`Plan entzerrt (${size.width.toLocaleString('de-DE')} × ${size.height.toLocaleString('de-DE')} px).${lost.calibration?' Maßstab bitte neu messen (Liste → „Strecke messen“).':''}${lost.north?' Nordrichtung bitte neu setzen.':''} Rückgängig stellt das Foto wieder her.`,lost.calibration);}
+    toast(`Plan entzerrt (${size.width.toLocaleString('de-DE')} × ${size.height.toLocaleString('de-DE')} px).${lost.calibration?' Maßstab bitte neu messen (Schritt ① → „Strecke messen“).':''}${lost.north?' Nordrichtung bitte neu setzen.':''} Rückgängig stellt das Foto wieder her.`,lost.calibration);}
   catch(e){fail(e);}finally{busy=false;if(warping){warping.busy=false;renderWarp();}render();}
 };
 svg.addEventListener('pointerdown',e=>{
@@ -539,7 +550,8 @@ window.addEventListener('keydown',e=>{
   if(e.key==='Escape'){e.preventDefault();if(sketching.draft||sketching.draftWall||sketching.sel){sketching.draft=null;sketching.draftWall=null;sketching.sel=null;renderSketch();}else $('sketch-done').click();}
   else if((e.key==='Delete'||e.key==='Backspace')&&sketching.sel){e.preventDefault();removeSel();}
 });
-function render(){
+function render(){renderAlt();pk?.nachRender();}
+function renderAlt(){
   if(project&&!showResults&&!resultsManual&&!busy&&hasValues(project)){showResults=true;if(resultsVorbereiten(project))queueMicrotask(()=>persist(false));}
   const p=project;labUI?.render(p);resultkitHinweisZeigen();stornoHinweisZeigen(); $('welcome').hidden=!!p;ladeKnopf(!!p);
   if(p&&(p.markers.length||p.plan.sketch))cropOffer=false;$('crop-offer').hidden=!(cropOffer&&p&&!cropping&&!busy);   // Angebot verschwindet mit der ersten Markierung
@@ -568,7 +580,7 @@ function render(){
   const m=selectedMarker();$('inspector').hidden=!m;if(m){input('label').value=m.label;input('note').value=m.note;$('shape-row').hidden=m.kind!=='sample';$<HTMLSelectElement>('shape').value=shapeOf(m);$('surface-row').hidden=m.kind!=='sample';$<HTMLSelectElement>('surface').value=m.surface||'';$('raum-row').hidden=false;if(document.activeElement!==input('raum'))input('raum').value=m.raum||'';}let labFields=document.getElementById('marker-lab');if(!labFields){labFields=document.createElement('p');labFields.id='marker-lab';labFields.className='lab-fields';$('inspector').append(labFields);}labFields.textContent=m?.lab?['Referenz: '+m.lab.ref,'Probenart: '+(m.lab.art||'—'),'Labor-Nr.: '+(m.lab.labNr||'—'),'Probenahme: '+(m.lab.datum||'—'),'Bericht: '+(m.lab.bericht||'—')].join(' · '):'';
   renderMarkers();dimensions();renderSheets();renderResults();updateSizeUI();updateLabelUI();updateTrialUI();updateRaumbuchUI();updateScaleUI();
 }
-async function install(p:Project,fromFolder=false,transition?:()=>void){await preserveUnsavedProject();transition?.();if(folder&&!fromFolder){folderDirty=true;if(!p.report)p.report=folder.name;}labUI?.reset();if(!folder)stornoStand=null;project=p;resultsManual=false;showResults=false;selected=null;selectedArea=null;draftPoints=[];history.clear();cropping=false;cropRect=null;aligning=null;renderAlign();setMode('navigate');render();fit();persist(!fromFolder);$('export-result').hidden=true;}
+async function install(p:Project,fromFolder=false,transition?:()=>void){await preserveUnsavedProject();transition?.();if(folder&&!fromFolder){folderDirty=true;if(!p.report)p.report=folder.name;}labUI?.reset();if(!folder)stornoStand=null;project=p;resultsManual=false;showResults=false;selected=null;selectedArea=null;draftPoints=[];history.clear();cropping=false;cropRect=null;aligning=null;renderAlign();setMode('navigate');pk?.geladen(p);render();fit();persist(!fromFolder);$('export-result').hidden=true;}
 function saveProject(){if(project&&requireFinished()&&folder){void saveToFolder(true);return;}if(project&&requireFinished())void download(new Blob([JSON.stringify(project)],{type:'application/json'}),`${project.report||'Probenplan'}.probenplan`);}
 /** Vor dem Ersetzen des Plans im Projektordner: dauerhafte Kopie der bisherigen Fassung („(Kopie vor dem Ersetzen …)“) –
  *  die automatische Bereinigung entfernt nur „(vorher …)“- und „(Speicherkandidat …)“-Kopien, diese nie. */
@@ -605,7 +617,7 @@ async function importFile(file:File,isProject=false,asSheet=false){if(busy||crop
     if(!await allowReplace())return;await install(next);cropOffer=!isProject&&sheetCount(next)===1;render();toast(sheetCount(next)>1&&!isProject?`${sheetCount(next)} Pläne angelegt. Unten zwischen den Plänen wechseln.`:next.plan.pdf?`PDF-Seite ${next.plan.pdf.page} geladen (${next.plan.width} × ${next.plan.height} px). Bei Bedarf drehen oder zuschneiden.`:'Plan geladen. Bei Bedarf drehen oder zuschneiden.');
   }catch(e){fail(e);}finally{if(pdf)await pdf.close().catch(()=>{});busy=false;$('import-status').hidden=true;render();}}
 /** Der Knopf oben ersetzt den ganzen Plan (mit Markierungen und Flächen). Ein weiteres Geschoss legt „＋ Plan“ unter dem Plan an. */
-function ladeKnopf(hatPlan:boolean){const b=$('load');if(hatPlan)b.innerHTML='<span class="lang">Grundriss ersetzen …</span><span class="kurz">Plan ersetzen …</span>';else b.textContent='＋ Plan';b.title=hatPlan?'Ersetzt den ganzen Probenplan samt Markierungen und Flächen durch einen neuen Grundriss. Für ein weiteres Geschoss nimm unten „＋ Plan“.':'Grundriss laden: PDF, Polycam-ZIP, SVG, PNG oder JPG';}
+function ladeKnopf(hatPlan:boolean){const b=$('load'),t=hatPlan?'Diesen Plan ersetzen …':'Grundriss auswählen …';if(b.textContent!==t)b.textContent=t;b.title=hatPlan?'Ersetzt den ganzen Probenplan samt Markierungen und Flächen durch einen neuen Grundriss. Für ein weiteres Geschoss nimm „＋ Weiteren Plan (Geschoss) …“.':'Grundriss laden: PDF, Polycam-ZIP, SVG, PNG oder JPG';}
 $('load').onclick=$('welcome-load').onclick=()=>input('file').click();
 input('file').onchange=()=>{const f=input('file').files?.[0];if(f)void importFile(f);input('file').value='';};
 $('open-project').onclick=()=>input('project-file').click();input('project-file').onchange=()=>{const f=input('project-file').files?.[0];if(f)void importFile(f,true);input('project-file').value='';};
@@ -666,14 +678,14 @@ window.addEventListener('keydown',e=>{
 $('zoom-in').onclick=()=>zoom(.8);$('zoom-out').onclick=()=>zoom(1.25);$('fit').onclick=fit;
 svg.addEventListener('wheel',e=>{if(!project)return;e.preventDefault();if(cropDrag)return;zoom(Math.exp(e.deltaY*.0015),point(e));},{passive:false});
 const pointers=new Map<number,{clientX:number;clientY:number}>();
-type Drag={id:number;start:{x:number;y:number};screen:{x:number;y:number};camera:typeof camera;marker?:Marker;part?:string;original?:Marker;before?:Project;area?:Area;areaOriginal?:Area;vertex?:number;pan:boolean;threshold:number;moved:boolean};
+type Drag={punkt?:boolean;id:number;start:{x:number;y:number};screen:{x:number;y:number};camera:typeof camera;marker?:Marker;part?:string;original?:Marker;before?:Project;area?:Area;areaOriginal?:Area;vertex?:number;pan:boolean;threshold:number;moved:boolean};
 let drag:Drag|null=null,pinch:{distance:number;camera:typeof camera;anchor:{x:number;y:number}}|null=null;
 svg.addEventListener('pointerdown',e=>{if(!project||cropping||e.button>0)return;svg.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{clientX:e.clientX,clientY:e.clientY});if(pointers.size===2){if(drag?.before&&drag.original&&drag.marker)Object.assign(drag.marker,drag.original);if(drag?.area&&drag.areaOriginal)Object.assign(drag.area,drag.areaOriginal);drag=null;const [a,b]=[...pointers.values()];pinch={distance:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),camera:{...camera},anchor:point({clientX:(a.clientX+b.clientX)/2,clientY:(a.clientY+b.clientY)/2})};renderMarkers();return;}
   const target=e.target as Element,m=project.markers.find(m=>m.id===target.closest('[data-id]')?.getAttribute('data-id'));
-  if(m&&['sample','fire','edit'].includes(mode)){selected=m.id;render();reveal('inspector');}
+  if(m&&['sample','fire','edit','lab-place'].includes(mode)){selected=m.id;render();reveal('inspector');}   // 2.0: auch beim Setzen – ein Tipp auf einen Punkt wählt ihn aus
   const placing=mode==='sample'||mode==='fire'||mode==='lab-place'||mode==='measure';
   // Only free-space gestures in placement tools pan; editor gestures stay unchanged.
-  drag={id:e.pointerId,start:point(e),screen:{x:e.clientX,y:e.clientY},camera:{...camera},pan:mode==='navigate'||(placing&&!m),threshold:placing&&!m?(e.pointerType==='touch'?8:6):4,moved:false};
+  drag={punkt:!!m,id:e.pointerId,start:point(e),screen:{x:e.clientX,y:e.clientY},camera:{...camera},pan:mode==='navigate'||(placing&&!m),threshold:placing&&!m?(e.pointerType==='touch'?8:6):4,moved:false};
   if(mode==='area-edit'){const a=project.areas?.find(a=>a.id===target.closest('[data-area]')?.getAttribute('data-area'));if(a){selected=null;selectedArea=a.id;reveal('area-inspector');drag.area=a;drag.areaOriginal=clone(a);drag.before=clone(project);const vertex=target.closest('[data-vertex]')?.getAttribute('data-vertex');if(vertex!==null&&vertex!==undefined)drag.vertex=Number(vertex);render();}}
   if(m&&mode==='edit'){drag.marker=m;drag.original=clone(m);drag.before=clone(project);drag.part=target.closest('[data-drag]')?.getAttribute('data-drag')||'point';
     // Automatisch versetztes Schild: Ziehen beginnt an der angezeigten Stelle und legt es danach fest (wie von Hand versetzt).
@@ -696,7 +708,7 @@ function endPointer(e:PointerEvent,cancel=false){if(cropping)return;pointers.del
   if(d.pan&&Math.hypot(e.clientX-d.screen.x,e.clientY-d.screen.y)>d.threshold)d.moved=true;
   if(d.area&&d.areaOriginal&&d.before){const error=polygonError(d.area.points,project.plan);if(error){Object.assign(d.area,d.areaOriginal);render();toast(error,true);}else if(d.moved){history.push(d.before);changed();}}
   else if(!d.moved&&mode==='measure'){measureClick(point(e));}
-  else if(!d.moved&&mode==='lab-place'){labUI?.placeAt(point(e));}
+  else if(!d.moved&&mode==='lab-place'){if(!d.punkt)labUI?.placeAt(point(e));}   // 2.0: Tipp auf einen vorhandenen Punkt setzt keine Probe darauf
   else if(!d.moved&&mode==='area-draw'){const pt=point(e);if(pt.x<0||pt.y<0||pt.x>project.plan.width||pt.y>project.plan.height){toast('Bitte innerhalb des Grundrisses zeichnen.');return;}if(draftPoints.length>=MAX_POINTS){toast(`Höchstens ${MAX_POINTS} Eckpunkte pro Fläche.`,true);return;}draftPoints.push(pt);render();}
   else if(d.marker&&d.moved&&d.before){history.push(d.before);changed();}
   else if(!d.moved&&(mode==='sample'||mode==='fire')){const hit=document.elementFromPoint(e.clientX,e.clientY)?.closest('[data-id]');if(hit)return;const pt=point(e);if(pt.x<0||pt.y<0||pt.x>project.plan.width||pt.y>project.plan.height){toast('Bitte innerhalb des Grundrisses markieren.');return;}mutate(p=>{const m=addMarker(p,mode==='sample'?'sample':'fire',pt.x,pt.y),f=$<HTMLSelectElement>('next-shape').value as Shape;if(m.kind==='sample'&&f!=='circle'&&SHAPES.includes(f))m.shape=f;if(p.plan.sketch&&quickSketchOn()){const r=roomAt(p.plan.sketch,pt);if(r){m.raum=r.name;m.raumSkizze=r.id;}}selected=m.id;});}
@@ -743,7 +755,7 @@ async function runPdf(paper:Paper,resultsView:boolean,all:boolean){
   for(const [i,view] of views.entries()){$('export').textContent=views.length>1?`Blatt ${i+1} von ${views.length} wird erstellt …`:'PDF wird erstellt …';pages.push(await sheetPage(view,paper,resultsView?rateMarkers(view):null,i+1,views.length));}
   let name=exportName(project,'pdf',resultsView,all);const blob=buildPdf(pages,{title:name.replace(/\.pdf$/,''),subject:[project.report&&`Gutachten ${project.report}`,String(projectData.objekt||'').trim()].filter(Boolean).join(' · '),author:COMPANY.name});
   if(exportURL)URL.revokeObjectURL(exportURL);exportURL=URL.createObjectURL(blob);const a=$<HTMLAnchorElement>('export-link');a.hidden=false;a.href=exportURL;a.download=name;a.textContent='PDF erneut herunterladen';$('export-result').hidden=false;
-  const uncalibrated=views.filter(v=>!metersPerUnit(v.plan)).length,hint=uncalibrated?` ${uncalibrated===views.length?'Ohne':'Teilweise ohne'} Maßstab – Plan in der Liste kalibrieren („Strecke messen“).`:'';
+  const uncalibrated=views.filter(v=>!metersPerUnit(v.plan)).length,hint=uncalibrated?` ${uncalibrated===views.length?'Ohne':'Teilweise ohne'} Maßstab – Plan in Schritt ① kalibrieren („Strecke messen“).`:'';
   if(folder){name=await writeExportFile(folder.plaene,name,blob,await replaceExports([name]));a.download=name;toast(`PDF gespeichert: ${PLAENE}/${name}.${hint}`,!!uncalibrated);}else{a.click();toast(`PDF erstellt (${pages.length} ${pages.length===1?'Blatt':'Blätter'}). Der Download ist bereit.${hint}`,!!uncalibrated);}
 }
 function annexKey(){return `plankit-anlage-titel:${folder?.name||''}`;}
@@ -766,17 +778,19 @@ async function runExport(){if(!project||busy||!requireFinished())return;
   try{if(!await projectDataForExport()||project!==exporting||folder!==origin)return;
     // Schilder werden anhand des Planbilds platziert: vor Layout und Zeichnen für alle Pläne laden, damit Maße und Bild übereinstimmen.
     for(let i=0;i<sheetCount(project);i++)await ensureInk(sheetProject(project,i).plan);}finally{busy=false;$<HTMLButtonElement>('export').disabled=false;}
-  if(exportFormat()==='anlage'){busy=true;$<HTMLButtonElement>('export').disabled=true;try{await runAnnex();}catch(e){fail(e);}finally{busy=false;$<HTMLButtonElement>('export').disabled=false;dimensions();render();}return;}
+  if(exportFormat()==='anlage'){busy=true;$<HTMLButtonElement>('export').disabled=true;let ok=false;try{await runAnnex();ok=true;}catch(e){fail(e);}finally{busy=false;$<HTMLButtonElement>('export').disabled=false;dimensions();pk?.ausgegeben(ok);render();}return;}
   busy=true;$<HTMLButtonElement>('export').disabled=true;$('smaller').hidden=true;
   const resultsView=!$('view-field').hidden&&input('view').value==='results',all=sheetCount(project)>1&&input('scope').value==='all',chosen=exportFormat(),pdf=chosen.startsWith('pdf'),format=chosen as 'png'|'jpeg',quality=Number(input('quality').value);
   if(resultsView){const views=all?Array.from({length:sheetCount(project)},(_,i)=>sheetProject(project!,i)):[project];const problem=views.map(resultsProblem).find(Boolean);if(problem){busy=false;$<HTMLButtonElement>('export').disabled=false;toast(problem,true);return;}}
   $('export').textContent=pdf?'PDF wird erstellt …':'Bild wird erstellt …';$('export-link').textContent='Bild erneut herunterladen';
+  let ok=false;
   try{
     if(pdf)await runPdf(chosen.slice(4) as Paper,resultsView,all);else
     if(all){const count=sheetCount(project),replace=await replaceExports(Array.from({length:count},(_,i)=>exportName(sheetProject(project!,i),format,resultsView)));for(let i=0;i<count;i++){$('export').textContent=`Bild ${i+1} von ${count} wird erstellt …`;const view=clone(sheetProject(project,i));const image=framed()?await framedImage(view,quality,format,resultsView?rateMarkers(view):null,i+1,count):await exportImage(view,quality,format,resultsView?rateMarkers(view):null,footerExtra()),name=exportName(view,format,resultsView);if(folder)await writeExportFile(folder.plaene,name,image,replace);else await download(image,name);}
       $('export-result').hidden=true;toast(folder?`${count} Bilder in „${PLAENE}“ gespeichert – je Plan ein Bild.`:`${count} Bilder erstellt – je Plan ein Bild. Der Browser fragt eventuell einmal, ob mehrere Downloads erlaubt sind.`);}
     else{const blob=framed()?await framedImage(clone(project),quality,format,resultsView?rateMarkers(project):null):await exportImage(clone(project),quality,format,resultsView?rateMarkers(project):null,footerExtra());if(exportURL)URL.revokeObjectURL(exportURL);exportURL=URL.createObjectURL(blob);const a=$<HTMLAnchorElement>('export-link');a.hidden=false;a.href=exportURL;a.download=exportName(project,format,resultsView);$('export-result').hidden=false;if(folder){a.download=await writeExportFile(folder.plaene,a.download,blob,await replaceExports([a.download]));toast(`Bild gespeichert: ${PLAENE}/${a.download}`);}else{a.click();toast('Bild erstellt. Der Download ist bereit.');}}
-  }catch(e){fail(e);$('export-result').hidden=false;$('export-link').hidden=!exportURL||all||pdf;$('smaller').hidden=pdf||quality<=3500;}finally{busy=false;$<HTMLButtonElement>('export').disabled=false;dimensions();render();}}
+    ok=true;
+  }catch(e){fail(e);$('export-result').hidden=false;$('export-link').hidden=!exportURL||all||pdf;$('smaller').hidden=pdf||quality<=3500;}finally{busy=false;$<HTMLButtonElement>('export').disabled=false;dimensions();pk?.ausgegeben(ok);render();}}
 $('export').onclick=runExport;$('smaller').onclick=()=>{input('quality').value='3500';dimensions();void runExport();};$('help').onclick=()=>$<HTMLDialogElement>('help-dialog').showModal();
 async function offline(){if(!('serviceWorker' in navigator)){ $('offline').textContent='○ Offline nicht verfügbar';return;}const update=()=>{$('offline').textContent=navigator.serviceWorker.controller?'● Offline bereit':'● Offline nach erneutem Öffnen bereit';$('offline').classList.add('ready');};navigator.serviceWorker.addEventListener('controllerchange',update);try{await navigator.serviceWorker.register('./sw.js');await navigator.serviceWorker.ready;update();}catch{if(navigator.serviceWorker.controller)update();else $('offline').textContent='○ Offline nicht eingerichtet';}}
 labUI=new LabUI({project:()=>project,labelkitProject:()=>folder?.name||project?.report||null,resultkit:()=>folder?.name||null,blocked:()=>busy||cropping||!!draftPoints.length,busy:value=>{busy=value;render();},mutate,point,mode:next=>{if(next==='lab-place'){selected=null;selectedArea=null;}setMode(next);render();},error:fail,selected:id=>{selected=id;selectedArea=null;},pick:pickMarker,show:showMarker,hover:hoverMarker,del:delMarker,selectedMarker:()=>selected,activeSheet:()=>project?.active??0,wert:markerWert,storno:liste=>{stornoStand={folder,liste};render();}});
@@ -806,9 +820,9 @@ document.querySelector('#help-dialog h2')!.insertAdjacentHTML('afterend','<h3>Ta
 const PANEL_KEY='plankit:panel';
 function setPanel(open:boolean,remember=true){document.body.classList.toggle('panel-open',open);$('panel-toggle').setAttribute('aria-pressed',String(open));if(remember){try{localStorage.setItem(PANEL_KEY,open?'open':'closed');}catch{/* privates Fenster */}}}
 const tabs=new PanelTabs($('side-panel'),()=>render());
-function reveal(id:string){tabs.zeige(id);const wasOpen=document.body.classList.contains('panel-open');setPanel(true);if(!wasOpen||matchMedia('(min-width:701px)').matches){const target=document.getElementById(id);const box=target?.getBoundingClientRect(),view=panelScroll.getBoundingClientRect();if(target&&box&&(box.top<view.top||box.top>view.bottom-40))target.scrollIntoView({block:'nearest'});}}
+function reveal(id:string){tabs.zeige(id);pk?.abschnitt(id);const wasOpen=document.body.classList.contains('panel-open');setPanel(true);if(!wasOpen||matchMedia('(min-width:701px)').matches){const target=document.getElementById(id);const box=target?.getBoundingClientRect(),view=panelScroll.getBoundingClientRect();if(target&&box&&(box.top<view.top||box.top>view.bottom-40))target.scrollIntoView({block:'nearest'});}}
 let storedPanel:string|null=null;try{storedPanel=localStorage.getItem(PANEL_KEY);}catch{/* privates Fenster */}
-setPanel(storedPanel==='open',false);
+setPanel(storedPanel!=='closed',false);   // 2.0: beim ersten Start offen, danach gemerkt
 $('panel-toggle').onclick=()=>setPanel(!document.body.classList.contains('panel-open'));
 $('panel-close').onclick=()=>setPanel(false);
 $('marker-list').addEventListener('click',()=>reveal('inspector'));
@@ -820,8 +834,10 @@ window.addEventListener('keydown',e=>{
   if(e.defaultPrevented||e.isComposing||e.ctrlKey||e.metaKey||e.altKey)return;
   const editing=(t:EventTarget|null)=>t instanceof Element&&(!!t.closest('input,textarea,select,[role="textbox"]')||(t instanceof HTMLElement&&t.isContentEditable));
   if(editing(e.target)||editing(document.activeElement)||document.querySelector('dialog:modal,[role="dialog"][aria-modal="true"]'))return;
-  if(e.key==='Escape'&&exportCard.open&&!selected&&!selectedArea&&!cropping){exportCard.close();return;}
+  if(e.key==='Escape'&&exportCard.open&&!selected&&!selectedArea&&!cropping&&pk?.aktuell!=='3'){exportCard.close();return;}   // 2.0: in ③ ist die Karte die Spalte – bleibt offen
   const key=e.key.toLowerCase(),click=(b:HTMLElement|null)=>{if(b&&!(b as HTMLButtonElement).disabled){e.preventDefault();b.click();}};
+  // 2.0: Kürzel, deren Knopf in einem anderen Schritt liegt, wechseln erst dorthin (nie still in einem unsichtbaren Schritt); V = Pause
+  if(pk&&(key.length===1)&&!(e.shiftKey&&key!=='r')&&!pk.kuerzel(key,e.shiftKey)){e.preventDefault();return;}
   if(key==='r'&&e.shiftKey)return click($('rotate-left'));
   if(e.shiftKey&&key!=='+')return;
   const tool=document.querySelector<HTMLElement>(`[data-key="${CSS.escape(key)}"]`);
@@ -845,7 +861,7 @@ function renderSheets(){
   const strip=$('sheet-strip'),p=project;strip.hidden=!p;if(!p){sheetSignature='';return;}
   const count=sheetCount(p),active=p.active??0,single=count<2;strip.classList.toggle('single',single);
   const items=(p.sheets||[{id:'',name:'EG'}]).map((sh,i)=>{const view=i===active?p:sheetProject(p,i),samples=view.markers.filter(m=>m.kind==='sample').length,fires=view.markers.length-samples;
-    return {i,name:sh.name,src:single?'':thumb(view.plan),info:[samples?`${samples} Probe${samples===1?'':'n'}`:'',fires?`${fires} Brandherd${fires===1?'':'e'}`:''].filter(Boolean).join(' · ')||'leer'};});
+    return {i,name:sh.name,src:thumb(view.plan),info:[samples?`${samples} Probe${samples===1?'':'n'}`:'',fires?`${fires} Brandherd${fires===1?'':'e'}`:''].filter(Boolean).join(' · ')||'leer'};});
   const signature=JSON.stringify([active,items,busy,cropping,draftPoints.length>0]);if(signature===sheetSignature)return;sheetSignature=signature;
   $('sheet-list').innerHTML=items.map(it=>`<div class="sheet${it.i===active?' active':''}"><button class="sheet-main" role="tab" aria-selected="${it.i===active}" data-sheet="${it.i}" title="${escape(it.name)}${it.i===active?' – Doppelklick zum Umbenennen':' – anzeigen'}"><span class="sheet-thumb">${it.src?`<img src="${it.src}" alt="">`:''}</span><span class="sheet-text"><b>${escape(it.name)}</b><small>${escape(it.info)}</small></span></button>${it.i===active?`<button class="sheet-more" data-sheet-menu="${it.i}" title="Plan umbenennen, verschieben oder löschen" aria-label="Plan ${escape(it.name)} bearbeiten">⋯</button>`:''}</div>`).join('');
   $<HTMLButtonElement>('sheet-add').disabled=$<HTMLButtonElement>('sheet-sketch').disabled=busy||cropping||!!draftPoints.length||count>=MAX_SHEETS;
@@ -1457,7 +1473,7 @@ const startProject=PROJEKT_URL.projekt;
 const startAktion=PROJEKT_URL.aktion;   // vor dem Öffnen merken – die Adresse wird dabei umgeschrieben
 function startAction(){if(startAktion!=='anlage')return;
   if(!project){toast('Anlage Probenahme: In diesem Projekt gibt es noch keinen Plan – zuerst einen Grundriss laden und die Proben setzen.',true);return;}
-  input('format').value='anlage';if(!exportCard.open)exportCard.show();dimensions();}
+  input('format').value='anlage';pk?.anlage();if(!exportCard.open)exportCard.show();dimensions();}
 void (async()=>{if(startProject){await openFromZentrale(startProject);void offline();return;}try{const saved=await restoreLocal();if(saved){const frei=(saved as Partial<FreieKopie>).browserKopie?.frei===true,next=await validateProject(saved);   // validateProject lässt den Vermerk weg
   // Mit Vermerk im Datensatz ist es ein freier Plan (ohne Projektordner) – er kommt zurück, aber nicht stillschweigend als „Projekt“.
   // Ohne Vermerk (geschrieben von einer älteren Version, auch aus einem noch offenen alten Tab) kann es die Kopie eines
@@ -1482,3 +1498,54 @@ document.addEventListener('input',e=>{if(PFLICHT_ANLAGE.includes((e.target as HT
 const handbuchLink=(anker:'app-plankit'|'bohrkern'|'bohrkern-ablauf',text:string,titel:string)=>`<a class="hilfe-link" href="../aidkit/#${anker}" target="aidkit" rel="noopener" title="${titel} – öffnet das Handbuch (AidKit) in einem eigenen Fenster">📘 ${text}</a>`;
 document.querySelector('#help-dialog h2')!.insertAdjacentHTML('afterend',`<p class="hilfe-verweis">Ausführlich mit Übungen: ${handbuchLink('app-plankit','Handbuch – PlanKit Schritt für Schritt','Handbuch: PlanKit Schritt für Schritt')}</p>`);
 document.getElementById('wand-title')!.insertAdjacentHTML('afterend',`<p class="hilfe-verweis">${handbuchLink('bohrkern','Probenbezeichnung Bohrkerne','Handbuch: Probenbezeichnung Bohrkerne mit ID-Baukasten')} ${handbuchLink('bohrkern-ablauf','Bohrkerne Schritt für Schritt','Handbuch: Bohrkerne von der Begehung bis zum Labor')}</p>`);
+
+/* ---- PlanKit 2.0: einfache Oberfläche (Spektron Schritt 3) ----
+   Kopfband (Leiste v3) · drei Schritte auf der Karte · rechte Spalte je Schritt · Hinweiskarte · Fußleiste. Nur Oberfläche: oberflaeche.ts setzt
+   die vorhandenen Bedienelemente (IDs und Handler unverändert) an neue Plätze; die Kurzanleitung nennt die neuen Wege. */
+{
+  const hilfe=$('help-dialog');
+  // Verweise auf die alte Oberfläche („Liste →“, „links in der Leiste“ …) auf Schritte und „Mehr …“ umschreiben
+  const NEU:[string,string][]=[
+    ['„📁 Projekt …“','„Mehr …“ › „Projektordner öffnen …“'],
+    ['(mit „Ergebnisse“ bzw. K wieder aus)','(mit „Ergebnisfarben zeigen“ unter der Probenliste bzw. K wieder aus)'],
+    ['„＋ Plan“ unten fügt einen weiteren Grundriss hinzu','In Schritt ① fügt „＋ Weiteren Plan (Geschoss) …“ einen weiteren Grundriss hinzu'],
+    ['Ein Klick auf das Vorschaubild wechselt den Plan','Ein Klick auf einen Plan oben rechts auf der Karte (oder in der Planliste in Schritt ①) wechselt den Plan'],
+    ['Doppelklick, Rechtsklick oder „⋯“ benennt den Plan um','Doppelklick, Rechtsklick oder „⋯“ in der Planliste benennt den Plan um'],
+    ['„Entzerren“ (W) links in der Leiste','„Entzerren“ (W) in Schritt ① unter „Plan vorbereiten“'],
+    ['Links in der Werkzeugleiste „✎ Skizze“ (ohne Plan: neue Skizze, sonst als weiterer Plan; auf einer Skizze: bearbeiten), Startseite „Kein Plan? Skizze zeichnen“ oder unten „＋ Skizze“ für ein weiteres Geschoss.','Startkarte „Kein Plan? Skizze zeichnen“; in Schritt ① „＋ Skizze als weiteren Plan“ für ein weiteres Geschoss und „Skizze bearbeiten“, wenn der Plan eine Skizze ist.'],
+    ['Liste → „Raumbuch bearbeiten …“','Schritt ③ › „Weitere Anlagen“ › „Raumbuch bearbeiten …“'],
+    ['Liste → „Wandansichten (Bohrkerne) …“','Schritt ③ › „Weitere Anlagen“ › „Wandansichten (Bohrkerne) …“'],
+    ['Liste → „Beschriftung“, je Plan:','Schritt ③ › „Darstellung“, je Plan:'],
+    ['Liste → „Maßstab & Norden“','Schritt ① › „Maßstab & Norden“'],
+    ['Export → „Word · Anlage Probenahme“','Schritt ③ „Plan ausgeben“ › Dateiformat „Word · Anlage Probenahme“'],
+    ['Im Export „PDF · A4“ oder „PDF · A3“ wählen','In Schritt ③ „PDF · A4“ oder „PDF · A3“ wählen'],
+    ['Zum Verschieben der Ansicht können Sie zwischendurch „Ansicht bewegen“ wählen.','Ziehen an einer freien Stelle verschiebt zwischendurch die Ansicht.'],
+    ['Unter „Fläche bearbeiten“ oder über die Flächenliste auswählen.','„Mehr …“ › „Schadensflächen …“, dann „Fläche bearbeiten“ (G) oder in der Flächenliste rechts auswählen.'],
+    ['„Fläche zeichnen“ wählen,','„Mehr …“ › „Schadensflächen …“ (oder F), „Fläche zeichnen“ wählen,'],
+    ['„Ansicht bewegen“ verschiebt den Plan. Auch unter „Probe setzen“ und „Brandherd setzen“ verschiebt','Ziehen an einer freien Stelle verschiebt den Plan – auch beim Setzen von Proben und Brandherden verschiebt'],
+    ['„Projekt speichern“ sichert','„Als Datei speichern“ (unten, ohne Projektordner) sichert'],
+    ['„Projekt öffnen“ lädt','„Mehr …“ › „Projektdatei öffnen …“ lädt'],
+    ['Sobald oben „Offline bereit“ steht','Sobald unter „Mehr …“ › „Version, Offline und Änderungen“ „Offline bereit“ steht'],
+    ['unter „Markierungen“ wählen','in der Karte „Probe …“ wählen (Punkt in Schritt ② antippen)'],
+    ['unter „Markierungen“','in der Karte „Probe …“ (Punkt in Schritt ② antippen)'],
+    ['Unter „Plan vorbereiten“ jeweils','In Schritt ① unter „Plan vorbereiten“ jeweils'],
+    ['dann hier unter „Proben übernehmen …“','dann in Schritt ② unter „Proben übernehmen …“'],
+  ];
+  const tw=document.createTreeWalker(hilfe,NodeFilter.SHOW_TEXT);const knoten:Text[]=[];while(tw.nextNode())knoten.push(tw.currentNode as Text);
+  for(const n of knoten){let t=n.textContent||'';for(const [a,b] of NEU)if(t.includes(a))t=t.split(a).join(b);if(t!==n.textContent)n.textContent=t;}
+  hilfe.querySelector('ol')!.innerHTML='<li><b>① Plan laden:</b> Grundriss als PDF, Polycam-ZIP, SVG, PNG oder JPG auswählen – oder ohne Plan eine Skizze zeichnen. Bei mehrseitigen PDFs eine Seite wählen. Bei Bedarf drehen, zuschneiden, ausrichten oder entzerren; „Maßstab &amp; Norden“ für ein maßstäbliches PDF. Weitere Geschosse mit „＋ Weiteren Plan (Geschoss) …“.</li>'
+    +'<li><b>② Proben setzen:</b> „Proben übernehmen …“ holt die Proben aus LabelKit (im Projekt über ResultKit). Unten links steht, welche Probe als Nächstes dran ist – einfach in den Plan tippen; „Überspringen“ nimmt die nächste, „Pause“ hält an. Eigene Punkte mit „Probe von Hand“, Brandherde mit „Brandherd“, Punkte und Schilder mit „Punkte verschieben“. Ein Tipp auf einen Punkt zeigt rechts die Karte „Probe …“ (Form, Oberflächenart, Raum, Notiz, „Beschriftung versetzen“).</li>'
+    +'<li><b>③ Plan ausgeben:</b> Gutachtennummer und Datum ergänzen, Format wählen (Word · Anlage Probenahme, PDF, Bild) und unten rechts speichern. Der gesamte Plan einschließlich außerhalb liegender Beschriftungen wird ausgegeben. Darstellung (Punktgröße, Beschriftung, Ergebniskarte) und weitere Anlagen (Raumbuch, Wandansichten) stehen ebenfalls hier.</li>';
+  hilfe.querySelector('ol')!.insertAdjacentHTML('afterend','<p>Selten gebraucht steht unter <b>„Mehr …“</b> unten links: Schadensflächen, Projektdatei öffnen, Notfallkopie, Projektordner, Projektdaten neu einlesen, „Nach jeder Probe gleich die nächste wählen“, diese Kurzanleitung, Version und Handbuch.</p>');
+  // Tastenkürzel: neue Namen; ein Kürzel aus einem anderen Schritt wechselt erst dorthin
+  for(const h3 of hilfe.querySelectorAll('h3'))if(h3.textContent==='Tastenkürzel'){const p=h3.nextElementSibling as HTMLElement;p.innerHTML='<b>P</b> Probe von Hand · <b>B</b> Brandherd · <b>E</b> Punkte verschieben · <b>V</b> oder <b>Esc</b> Pause · <b>F</b> Fläche zeichnen · <b>G</b> Fläche bearbeiten · <b>R</b>/<b>Umschalt+R</b> drehen · <b>C</b> zuschneiden · <b>A</b> ausrichten · <b>W</b> entzerren · <b>K</b> Ergebnisfarben · <b>L</b> Spalte rechts ein/aus · <b>+</b>/<b>−</b> Zoom · <b>0</b> Einpassen · <b>&lt;</b>/<b>&gt;</b> Punktgröße · <b>Bild↑</b>/<b>Bild↓</b> Plan wechseln · <b>Strg+Z</b>/<b>Strg+Y</b> rückgängig/wiederholen · <b>Entf</b> löschen. Liegt das Werkzeug in einem anderen Schritt, wechselt PlanKit erst dorthin (z. B. C → ① Plan laden).</p>';}
+  // Version, Offline und Änderungen
+  const neu=document.createElement('h3');neu.id='pk-aenderungen';neu.textContent='Neu in PlanKit 2.0.0 · 05.11.2026';
+  const neuP=document.createElement('p');neuP.textContent='Einfache Oberfläche wie LabelKit und FotoKit: oben das Kopfband mit Projekt und Arbeitsschritten, auf der Karte drei Schritte – ① Plan laden, ② Proben setzen, ③ Plan ausgeben. Rechts steht je Schritt nur, was dazugehört; unten „Mehr …“, der Speicherstand und eine Hauptaktion. In ② ist gleich die nächste offene Probe dran („Als Nächstes setzen …“ – in den Plan tippen); ein Tipp auf einen vorhandenen Punkt wählt ihn aus, statt eine Probe darauf zu setzen. Kennungen von Laborproben kommen aus LabelKit und sind hier nicht mehr änderbar. Planformat, Speicherorte und Exporte sind unverändert.';
+  const versionZeile=document.createElement('p');versionZeile.id='pk-version-zeile';versionZeile.className='tiny';versionZeile.append(`PlanKit ${$('app-version').textContent?.replace(/^v/,'')} · `,$('offline'));
+  for(const h3 of hilfe.querySelectorAll('h3'))if(/^Neu in PlanKit/.test(h3.textContent||'')){h3.before(neu,versionZeile,neuP);break;}
+}
+pk=new Oberflaeche({project:()=>project,mode:()=>mode,setMode:m=>setMode(m),render,fit,blocked:()=>busy||cropping||!!draftPoints.length,cropping:()=>cropping,folder:()=>folder?.name||null,labUI:()=>labUI,
+  showSheet,openSheetMenu,deselect:()=>{selected=null;selectedArea=null;render();},selectedId:()=>selected,exportCard,dimensions,folderSupported,toast});
+document.getElementById('pk-ordner-start')!.hidden=!folderSupported();
+render();

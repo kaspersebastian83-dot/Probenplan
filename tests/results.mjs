@@ -1,4 +1,5 @@
 // Ergebniskarte: Messwerte aus der Labor-XML, Skalen wie in FotoKit, eingefärbte Marker, Legende und Export.
+import * as pk from './pk-ui.mjs';
 import {chromium,webkit,savedProject,downloadedProject,openExport,closeExport} from './runtime.mjs';
 import {labRows,labXML} from './lab-fixtures.mjs';
 import assert from 'node:assert/strict';
@@ -21,7 +22,7 @@ for(const engine of ['chromium','webkit']){
   await check(`${engine}: Labor-XML speichert Messwerte je Probe, Ergebnisse erst danach verfügbar`,async()=>{
    assert.equal(await page.locator('#results-toggle').isDisabled(),true);
    await page.locator('#lab-files').setInputFiles([{name:'bericht.xml',mimeType:'application/xml',buffer:Buffer.from(labXML(rows))}]);await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});
-   for(const [i,[fx,fy]] of [[.2,.3],[.4,.3],[.6,.3],[.8,.3],[.5,.7]].entries()){await page.locator('[data-pending]').first().click();await tap(page,fx,fy);void i;}
+   for(const [i,[fx,fy]] of [[.2,.3],[.4,.3],[.6,.3],[.8,.3],[.5,.7]].entries()){await page.locator('[data-plabel]').first().click();await tap(page,fx,fy);void i;}
    const saved=await savedProject(page);assert.deepEqual(saved.markers.map(m=>m.label),['P1','P2','P3','P4','P5']);
    assert.deepEqual(saved.markers[3].lab.werte[0],{p:SUM,r:'1.300,0',u:UNIT});
    assert.equal(await page.locator('#results-toggle').getAttribute('aria-pressed'),'true','Ergebniskarte schaltet sich mit Messwerten selbst ein');
@@ -29,7 +30,7 @@ for(const engine of ['chromium','webkit']){
   });
   await check(`${engine}: Automatisch färbt nach FotoKit-Skala (grün → rot), ohne Wert grau; K schaltet aus und an`,async()=>{
    await page.keyboard.press('Escape');await page.keyboard.press('k');assert.equal(await page.locator('#results-toggle').getAttribute('aria-pressed'),'false');await page.keyboard.press('k');assert.equal(await page.locator('#results-toggle').getAttribute('aria-pressed'),'true');
-   await page.locator('#results-section').waitFor();assert.equal(await page.locator('#result-param').inputValue(),'*');
+   await pk.ergebniskarte(page);assert.equal(await page.locator('#result-param').inputValue(),'*');
    assert.deepEqual(await fills(page),{P1:'#749bb5',P2:'#4caf50',P3:'#f2c94c',P4:'#e0453a',P5:'#c3ccd5'});
    const saved=await savedProject(page);assert.equal(saved.results.parameter,'*');assert.deepEqual(saved.results.scales[KEY].cats.map(c=>[c.name,c.from,c.color]),[['gering',0,'#4caf50'],['mittel',5,'#f2c94c'],['hoch',50,'#e0453a']]);
    assert.match(await page.locator('#result-legend').textContent(),/gering.*mittel.*hoch.*ohne Bewertung/);
@@ -45,27 +46,27 @@ for(const engine of ['chromium','webkit']){
    await page.keyboard.press('Control+z');
   });
   await check(`${engine}: anderer Parameter ohne Skala bleibt grau, „Skala anlegen“ legt eine an`,async()=>{
-   await page.locator('#result-param').selectOption('Benzo[a]pyren');assert.deepEqual(Object.values(await fills(page)),Array(5).fill('#c3ccd5'));
+   await pk.ergebniskarte(page);await page.locator('#result-param').selectOption('Benzo[a]pyren');assert.deepEqual(Object.values(await fills(page)),Array(5).fill('#c3ccd5'));
    await page.locator('#result-scales [data-scale-new]').click();assert.equal(await page.locator('#result-scales [data-cat]').count(),2);
    assert.deepEqual(await fills(page),{P1:'#4caf50',P2:'#4caf50',P3:'#4caf50',P4:'#4caf50',P5:'#e0453a'});
-   await page.locator('#result-param').selectOption(SUM);assert.equal((await fills(page)).P4,'#e0453a');
+   await pk.ergebniskarte(page);await page.locator('#result-param').selectOption(SUM);assert.equal((await fills(page)).P4,'#e0453a');
   });
   await check(`${engine}: VdS usage, BG, undo/redo, roundtrip and FotoKit isolation`,async()=>{
    const before=await savedProject(page),shared=await page.evaluate(()=>localStorage.getItem('bu-scales'));
-   await page.locator('#result-usage').selectOption('residential');
+   await pk.ergebniskarte(page);await page.locator('#result-usage').selectOption('residential');
    assert.deepEqual(await fills(page),{P1:'#749bb5',P2:'#e0453a',P3:'#e0453a',P4:'#e0453a',P5:'#c3ccd5'});
    assert.match(await page.locator('#result-scales').textContent(),/Wohn-\/Büroräume/);assert.match(await page.locator('#result-scales').textContent(),/0,1/);
    assert.match(await page.locator('#result-legend').textContent(),/Unter BG/);
-   await page.locator('#result-usage').selectOption('industrial');assert.match(await page.locator('#result-scales').textContent(),/Industrie/);
+   await pk.ergebniskarte(page);await page.locator('#result-usage').selectOption('industrial');assert.match(await page.locator('#result-scales').textContent(),/Industrie/);
    await page.locator('#undo').click();assert.equal(await page.locator('#result-usage').inputValue(),'residential');
    await page.locator('#redo').click();assert.equal(await page.locator('#result-usage').inputValue(),'industrial');
    const file=await downloadedProject(page);assert.equal(file.results.usage,'industrial');assert.deepEqual(file.results.scales,before.results.scales);assert.deepEqual(file.markers,before.markers);
    await page.locator('#project-file').setInputFiles({name:'usage.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(file))});await page.locator('#replace-yes').click();await page.locator('#toast:not(.error)').waitFor();
    assert.equal((await savedProject(page)).results.usage,'industrial');
    // Ohne VdS-Referenz für den Parameter gilt die eigene Skala (hier die oben angelegte BaP-Skala)
-   await page.locator('#result-param').selectOption('Benzo[a]pyren');assert.equal(await page.locator('#result-usage').inputValue(),'industrial');
+   await pk.ergebniskarte(page);await page.locator('#result-param').selectOption('Benzo[a]pyren');assert.equal(await page.locator('#result-usage').inputValue(),'industrial');
    assert.deepEqual(await fills(page),{P1:'#4caf50',P2:'#4caf50',P3:'#4caf50',P4:'#4caf50',P5:'#e0453a'});assert.match(await page.locator('#result-scales').textContent(),/Keine VdS-Referenz .* eigene Skala/);
-   await page.locator('#result-param').selectOption(SUM);
+   await pk.ergebniskarte(page);await page.locator('#result-param').selectOption(SUM);
    // VdS-Referenz bleibt bearbeitbar: Änderung ergibt eine angepasste Skala nur im Projekt; eigene Skala und FotoKit bleiben unberührt
    assert.match(await page.locator('#result-scales').textContent(),/Änderungen hier ergeben eine angepasste Skala/);
    await page.locator('#result-scales [data-cat="1"] [data-cat-from]').fill('1000000');await page.locator('#result-scales [data-cat="1"] [data-cat-from]').dispatchEvent('change');
@@ -74,14 +75,14 @@ for(const engine of ['chromium','webkit']){
    {const saved=(await savedProject(page)).results;assert.deepEqual(Object.keys(saved.vds),[`${SUM}|${Object.keys(saved.vds)[0].split('|').pop()}`]);assert.deepEqual(saved.scales,before.results.scales,'eigene Skala bleibt erhalten');}
    assert.equal(await page.evaluate(()=>localStorage.getItem('bu-scales')),shared,'angepasste VdS-Referenz geht nicht an FotoKit');
    await page.locator('#result-scales [data-scale-del]').click();assert.equal((await savedProject(page)).results.vds,undefined,'zurück zur VdS-Referenz');
-   assert.match(await page.locator('#result-scales').textContent(),/Änderungen hier ergeben eine angepasste Skala/);await page.locator('#result-usage').selectOption('');assert.deepEqual((await savedProject(page)).results,before.results);
+   assert.match(await page.locator('#result-scales').textContent(),/Änderungen hier ergeben eine angepasste Skala/);await pk.ergebniskarte(page);await page.locator('#result-usage').selectOption('');assert.deepEqual((await savedProject(page)).results,before.results);
    assert.equal(await page.evaluate(()=>localStorage.getItem('bu-scales')),shared);
    const bad=structuredClone(file);bad.results.usage='unknown';await page.locator('#project-file').setInputFiles({name:'bad-usage.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(bad))});await page.locator('#toast.error').waitFor();assert.match(await page.locator('#toast').textContent(),/Nutzungskategorie/);
   });
   await check(`${engine}: Export als Ergebniskarte und als neutraler Probenplan`,async()=>{
    await openExport(page);await page.locator('#view-field').waitFor();await page.locator('#view').selectOption('results');
-   let d=page.waitForEvent('download');await page.locator('#export').click();assert.match((await d).suggestedFilename().replace(/_/g,' '),/^Probenplan - Ergebniskarte\.png$/);
-   await page.locator('#view').selectOption('plan');d=page.waitForEvent('download');await page.locator('#export').click();const head=await (await import('node:fs/promises')).readFile(await (await d).path());if(process.env.SHOTS)await (await import('node:fs/promises')).writeFile(process.env.SHOTS+'/probenplan-bild.png',head);
+   let d=page.waitForEvent('download');await pk.ausgeben(page);assert.match((await d).suggestedFilename().replace(/_/g,' '),/^Probenplan - Ergebniskarte\.png$/);
+   await page.locator('#view').selectOption('plan');d=page.waitForEvent('download');await pk.ausgeben(page);const head=await (await import('node:fs/promises')).readFile(await (await d).path());if(process.env.SHOTS)await (await import('node:fs/promises')).writeFile(process.env.SHOTS+'/probenplan-bild.png',head);
    assert.equal((await d).suggestedFilename(),'Probenplan.png');
    // Bild mit Schriftfeld (Standard): Seitenverhältnis A4 wie das PDF
    const w=head.readUInt32BE(16),h=head.readUInt32BE(20),ratio=Math.max(w,h)/Math.min(w,h);assert.ok(Math.abs(ratio-297/210)<.01,`A4-Verhältnis, ist ${w}×${h}`);
@@ -95,7 +96,7 @@ for(const engine of ['chromium','webkit']){
    await page.locator('#project-file').setInputFiles({name:'ohne.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(ohne))});await page.locator('#replace-yes').click();await page.locator('#toast:not(.error)').waitFor();
    await openExport(page);await page.locator('#view').selectOption('results');
    assert.match(await page.locator('#view-note').textContent(),/keine Bewertungsskala/);
-   await page.locator('#export').click();await page.locator('#toast.error').waitFor();assert.match(await page.locator('#toast').textContent(),/alle Proben blieben grau|Ergebniskarte wäre grau/);
+   await pk.ausgeben(page);await page.locator('#toast.error').waitFor();assert.match(await page.locator('#toast').textContent(),/alle Proben blieben grau|Ergebniskarte wäre grau/);
    await closeExport(page);await page.evaluate(v=>localStorage.setItem('bu-scales',v),shared);
    await page.locator('#project-file').setInputFiles({name:'orig.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(orig))});await page.locator('#replace-yes').click();await page.locator('#toast:not(.error)').waitFor();
   });
@@ -117,14 +118,14 @@ for(const engine of ['chromium','webkit']){
    const legend=await page.locator('#result-legend').textContent();assert.match(legend,/Unter BG/);assert.match(legend,/Nicht nachgewiesen/);assert.match(legend,/Nicht bestimmt \/ Bedeutung prüfen/);assert.match(legend,/ohne Bewertung/);
    const text=await page.locator('#result-scales').textContent();assert.match(text,/Unter BG.*P1, P2/);assert.match(text,/Nicht nachgewiesen.*P3/);assert.match(text,/Nicht bestimmt.*P4/);assert.match(text,/Ohne Bewertung.*P5/);
    assert.deepEqual((await downloadedProject(page)).markers.map(m=>m.lab.werte),file.markers.map(m=>m.lab.werte));
-   await openExport(page);await page.locator('#view').selectOption('results');const download=page.waitForEvent('download');await page.locator('#export').click();assert.match((await download).suggestedFilename(),/Ergebniskarte/);await closeExport(page);
+   await openExport(page);await page.locator('#view').selectOption('results');const download=page.waitForEvent('download');await pk.ausgeben(page);assert.match((await download).suggestedFilename(),/Ergebniskarte/);await closeExport(page);
    file.markers[0].lab.werte[0].r='0';await load(file);assert.equal((await fills(page)).P1,'#4caf50');assert.equal((await fills(page)).P2,'#749bb5');
    assert.equal((await savedProject(page)).results.usage,'residential');
   });
   await check(`${engine}: Ergebniskarte als maßstäbliches PDF mit Ergebnislegende`,async()=>{
    await openExport(page);await page.locator('#view').selectOption('results');await page.locator('#format').selectOption('pdf-a3');
    assert.match(await page.locator('#dimensions').textContent(),/A3 (quer|hoch)/);
-   const download=page.waitForEvent('download');await page.locator('#export').click();const pdf=await download;assert.match(pdf.suggestedFilename(),/Ergebniskarte\.pdf$/);
+   const download=page.waitForEvent('download');await pk.ausgeben(page);const pdf=await download;assert.match(pdf.suggestedFilename(),/Ergebniskarte\.pdf$/);
    const {readFile}=await import('node:fs/promises'),bytes=await readFile(await pdf.path());assert.match(bytes.subarray(0,8).toString('latin1'),/^%PDF-1\.4/);assert.match(bytes.toString('latin1'),/\/Count 1 /);
    await page.locator('#format').selectOption('png');await closeExport(page);
   });

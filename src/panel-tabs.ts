@@ -2,7 +2,8 @@
 // welcher Reiter sie zeigt, entscheidet allein das CSS (`#side-panel[data-liste=neu][data-tab=…]`). Schalter „Neue Liste (Test)“ im Kopf.
 export const LISTE_KEY='plankit-neue-liste';
 /** Standard: an. Abschaltbar (gilt je Browser) – dann die Seitenleiste wie bisher (eine lange Spalte). */
-export function listeOn(){try{return localStorage.getItem(LISTE_KEY)!=='0';}catch{return true;}}
+/** Ab 2.0 immer an: die Probenliste ist die einzige Liste (Schalter „Neue Liste (Test)“ und die alte lange Spalte entfallen). */
+export function listeOn(){return true;}
 export function setListe(on:boolean){try{localStorage.setItem(LISTE_KEY,on?'1':'0');}catch{/* ohne Speicher */}}
 
 export type Tab='proben'|'plan'|'raumbuch';
@@ -28,7 +29,7 @@ export class PanelTabs{
     const head=panel.querySelector('.panel-head');head?.after(this.strip);
     const label=document.createElement('label');label.className='liste-switch';label.title='Seitenleiste mit Reitern und einer Probenliste (Test). Aus = Seitenleiste wie bisher.';
     this.sw.type='checkbox';this.sw.id='liste-switch';this.sw.checked=listeOn();this.sw.onchange=()=>{setListe(this.sw.checked);this.apply();this.changed();};label.append(this.sw,document.createTextNode(' Neue Liste (Test)'));
-    head?.querySelector('.eyebrow')?.after(label);
+    void label;   // 2.0: kein Schalter mehr
     this.apply();
   }
   get current(){return this.tab;}
@@ -36,7 +37,8 @@ export class PanelTabs{
   /** Reiter zeigen, zu dem der Abschnitt `id` gehört (nur mit neuer Liste). */
   zeige(id:string){const t=TAB_VON[id];if(t&&listeOn())this.set(t);}
   apply(){
-    const on=listeOn();this.sw.checked=on;this.panel.dataset.liste=on?'neu':'alt';this.panel.dataset.tab=this.tab;this.strip.hidden=!on;
+    // 2.0: Die Reiter sind unsichtbar (die Schritte zeigen die Abschnitte); TAB_VON/zeige() bleiben als stiller Zustand.
+    this.panel.dataset.liste='neu';this.strip.hidden=true;
     for(const [tab,b] of this.buttons){const sel=tab===this.tab;b.setAttribute('aria-selected',String(sel));b.tabIndex=sel?0:-1;b.classList.toggle('active',sel);}
   }
 }

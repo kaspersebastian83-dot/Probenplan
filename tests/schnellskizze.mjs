@@ -1,5 +1,6 @@
 // Schnellskizze (ab 1.41, abschaltbar): Räume aus Liste im Raster, „nicht maßstäblich“ (kein Maßstab, keine m², Stempel),
 // Brandraum je Raum, Raum an der Probe beim Setzen, Umbenennen zieht die Proben mit, Projektdatei mit Validierung.
+import * as pk from './pk-ui.mjs';
 import {chromium,webkit,savedProject,downloadedProject} from './runtime.mjs';
 import assert from 'node:assert/strict';
 const base=process.env.TEST_URL||'http://localhost:4173';
@@ -50,7 +51,7 @@ for(const engine of engines){
    await page.locator('#raum').fill('Küche');await page.locator('#raum').press('Tab');   // Tab: change-Ereignis in allen Browsern (WebKit: Enter im Feld mit Vorschlagsliste nicht)
    s=await savedProject(page);assert.equal(s.markers[1].raum,'Küche');assert.equal(s.markers[1].raumSkizze,undefined);
    assert.equal(await page.locator('#measure-start').isDisabled(),true,'nicht maßstäblich: kein Messen');
-   await page.locator('#sketch-edit').click();await page.locator('#sketch-actions').waitFor();
+   await pk.schritt(page,1);await page.locator('#sketch-edit').click();await page.locator('#sketch-actions').waitFor();
    assert.equal(await page.locator('#sketch-list-panel').isVisible(),false,'mit Räumen keine Liste aufklappen');
    await tapPlan(page,700,150);await page.locator('#sketch-name').fill('Kochen');await page.locator('#sketch-name').press('Enter');
    s=await savedProject(page);assert.equal(s.markers[0].raum,'Kochen');assert.equal(s.markers[1].raum,'Küche','Handeingabe bleibt');

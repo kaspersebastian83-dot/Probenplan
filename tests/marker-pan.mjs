@@ -1,3 +1,4 @@
+import * as pk from './pk-ui.mjs';
 import {chromium,webkit,devices,savedProject} from './runtime.mjs';
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -12,10 +13,10 @@ async function untouched(page,before,buttons,tool){assert.deepEqual(await savedP
 async function mouseDrag(page,pt,dx,dy,back=false){await page.mouse.move(pt.x,pt.y);await page.mouse.down();await page.mouse.move(pt.x+dx,pt.y+dy,{steps:6});if(back)await page.mouse.move(pt.x,pt.y,{steps:6});await page.mouse.up();}
 for(const engine of ['chromium','webkit']){
  const browser=await ({chromium,webkit}[engine]).launch();
- try{const context=await browser.newContext({viewport:{width:1500,height:1050},acceptDownloads:true}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(base);await page.locator('#project-file').setInputFiles({name:'pan.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(fixture))});await page.locator('.area-row').waitFor();await savedProject(page);
+ try{const context=await browser.newContext({viewport:{width:1500,height:1050},acceptDownloads:true}),page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto(base);await page.locator('#project-file').setInputFiles({name:'pan.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(fixture))});await page.locator('.area-row').waitFor({state:'attached'});await savedProject(page);
  for(const tool of ['sample','fire']){
   await check(`${engine}/${tool}: Klick und kleine Mausbewegung setzen genau einen Punkt`,async()=>{
-   await page.locator(`[data-mode="${tool}"]`).click();await page.locator('#fit').click();let before=await savedProject(page),pt=await position(page);await page.mouse.click(pt.x,pt.y);let after=await savedProject(page);assert.equal(after.markers.length,before.markers.length+1);assert.equal(after.markers.at(-1).kind,tool);await page.locator('#undo').click();
+   await pk.modus(page,tool);await page.locator('#fit').click();let before=await savedProject(page),pt=await position(page);await page.mouse.click(pt.x,pt.y);let after=await savedProject(page);assert.equal(after.markers.length,before.markers.length+1);assert.equal(after.markers.at(-1).kind,tool);await page.locator('#undo').click();
    before=await savedProject(page);const camera=await view(page);pt=await position(page);await mouseDrag(page,pt,3,2);after=await savedProject(page);assert.equal(after.markers.length,before.markers.length+1);assert.equal(await view(page),camera);await page.locator('#undo').click();
   });
   await check(`${engine}/${tool}: Ziehen, Rückkehr zum Start, Undo/Redo und keine Speicherung`,async()=>{
@@ -34,10 +35,10 @@ for(const engine of ['chromium','webkit']){
   });
  }assert.deepEqual(errors,[]);await context.close();}finally{await browser.close();}
 }
-const browser=await chromium.launch();try{const context=await browser.newContext({...devices['iPhone 13'],acceptDownloads:true}),page=await context.newPage();await page.goto(base);await page.locator('#project-file').setInputFiles({name:'touch-pan.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(fixture))});await page.locator('.area-row').waitFor();const cdp=await context.newCDPSession(page);
+const browser=await chromium.launch();try{const context=await browser.newContext({...devices['iPhone 13'],acceptDownloads:true}),page=await context.newPage();await page.goto(base);await page.locator('#project-file').setInputFiles({name:'touch-pan.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(fixture))});await page.locator('.area-row').waitFor({state:'attached'});const cdp=await context.newCDPSession(page);
 const touch=async(type,points)=>cdp.send('Input.dispatchTouchEvent',{type,touchPoints:points});
 for(const tool of ['sample','fire']){
- await page.locator(`[data-mode="${tool}"]`).click();await page.locator('#fit').click();
+ await pk.modus(page,tool);await page.locator('#fit').click();
  await check(`Touch/${tool}: Tippen, Toleranz bei Fingerbewegung und Einfinger-Pan`,async()=>{
   let before=await savedProject(page),pt=await position(page);await page.touchscreen.tap(pt.x,pt.y);assert.equal((await savedProject(page)).markers.length,before.markers.length+1);await page.locator('#undo').click();
   before=await savedProject(page);pt=await position(page);let camera=await view(page);await touch('touchStart',[{...pt,id:1}]);await touch('touchMove',[{x:pt.x+5,y:pt.y+2,id:1}]);await touch('touchEnd',[]);assert.equal((await savedProject(page)).markers.length,before.markers.length+1);assert.equal(await view(page),camera);await page.locator('#undo').click();

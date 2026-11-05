@@ -1,5 +1,6 @@
 // Wandansichten der Bohrkerne: Projektordner mit LabelKit-Datei (Wandblatt-Bohrkerne) und Prüfbericht (MKW), Dialog,
 // Vorschau, Word-Anlage und CSV in „Mitteilungen“. Synthetische Daten. Nur Chromium (Ordnerzugriff).
+import * as pk from './pk-ui.mjs';
 import {chromium} from './runtime.mjs';
 import {labXML,labErgebnisse} from './lab-fixtures.mjs';
 import assert from 'node:assert/strict';
@@ -35,13 +36,13 @@ try{
  },[NAME,svg,daten,labXML(rows,{vorlaeufig:true}),labErgebnisse(rows,{vorlaeufig:true})]);
  // Skala für MKW (synthetisch) wie aus FotoKit
  await page.evaluate(([k])=>localStorage.setItem('bu-scales',JSON.stringify({[k]:{name:'Testskala MKW (synthetisch)',cats:[{name:'gering',from:0},{name:'erhöht',from:1000},{name:'stark',from:5000}]}})),[`${C40}|${U}`]);
- await page.locator('#open-folder').click();
+ await pk.mehr(page,'pk-m-ordner');
  await page.locator('#folder-plans button',{hasText:'Grundriss EG.svg'}).click();await page.locator('#welcome').waitFor({state:'hidden'});
- await page.locator('#lab-import').click();await page.locator('#lab-folder-dialog [data-ergebnis]',{hasText:'AR-999.xml'}).click();await page.locator('#lab-review').waitFor();
+ await pk.proben(page);await page.locator('#lab-folder-dialog [data-ergebnis]',{hasText:'AR-999.xml'}).click();await page.locator('#lab-review').waitFor();
  assert.match(await page.locator('#lab-review').textContent(),/Vorläufiger Prüfbericht AR-999-2099-000001-01/,'Hinweis beim Import');
  await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});
  // Im Projekt: Messwerte nur aus ResultKit – Dialog zeigt den übernommenen Stand, eine Laborbericht-Datei wird abgewiesen
- await page.locator('#lab-import').click();const dlg=page.locator('#lab-folder-dialog');await dlg.locator('[data-ergebnis]').waitFor();
+ await pk.proben(page);const dlg=page.locator('#lab-folder-dialog');await dlg.locator('[data-ergebnis]').waitFor();
  assert.match(await dlg.locator('[data-ergebnis]').textContent(),/AR-999-2099-000001-01 · vorläufig.*bereits im Plan/s);
  assert.match(await dlg.locator('.lab-resultkit').textContent(),/Seit der Übernahme in ResultKit hat sich der Ordner geändert/);
  assert.equal(new URL(await dlg.locator('a.hilfe-link').getAttribute('href'),page.url()).hash,`#projekt=${encodeURIComponent(NAME)}`);
@@ -50,11 +51,11 @@ try{
  await page.locator('#toast.error',{hasText:'in ResultKit importiert'}).waitFor();assert.equal(await page.locator('#lab-review').isVisible(),false);
  // Ergebnisdatei eines anderen Projekts wird nicht angeboten
  await page.evaluate(async([name,erg])=>{const d=await (await (await (await navigator.storage.getDirectory()).getDirectoryHandle('Mosaik Archivordner')).getDirectoryHandle(name)).getDirectoryHandle('Laborergebnisse');const w=await (await d.getFileHandle('_Ergebnisse.json')).createWritable();await w.write(erg);await w.close();},[NAME,labErgebnisse(rows,{projekt:'26.9999'})]);
- await page.locator('#lab-import').click();await dlg.locator('.lab-resultkit.warn',{hasText:'gehört zu Projekt 26.9999'}).waitFor();assert.equal(await dlg.locator('[data-ergebnis]').count(),0);await dlg.locator('button.close').click();
- (await page.locator('#results-toggle').getAttribute('aria-pressed')==='true'||await page.locator('#results-toggle').click());await page.locator('#result-vorlaeufig:not([hidden])').waitFor();assert.match(await page.locator('#result-vorlaeufig').textContent(),/vorläufigem Prüfbericht AR-999/);await page.locator('#results-toggle').click();
+ await pk.proben(page);await dlg.locator('.lab-resultkit.warn',{hasText:'gehört zu Projekt 26.9999'}).waitFor();assert.equal(await dlg.locator('[data-ergebnis]').count(),0);await dlg.locator('button.close').click();
+ (await page.locator('#results-toggle').getAttribute('aria-pressed')==='true'||await pk.ergebnisse(page));await page.locator('#result-vorlaeufig:not([hidden])').waitFor({state:'attached'});assert.match(await page.locator('#result-vorlaeufig').textContent(),/vorläufigem Prüfbericht AR-999/);await pk.ergebnisse(page);
 
  await check('Dialog: Kerne aus LabelKit, MKW C10–C40 vorgeschlagen, Vorschau je Fläche, Hinweise',async()=>{
-  await page.locator('#wand-open').click();await page.locator('#wand-dialog[open]').waitFor();
+  await pk.schritt(page,3);await page.locator('#wand-open').click();await page.locator('#wand-dialog[open]').waitFor();
   assert.match(await page.locator('#wand-quelle').textContent(),/2 Flächen mit 3 Bohrkernen aus Laboraufträge\/26\.0142_24\.10\.2026_Daten\.json/);
   assert.equal(await page.locator('#wand-p1').inputValue(),C40);assert.equal(await page.locator('#wand-p2').inputValue(),C22);
   assert.equal(await page.locator('#wand-vorschau img').count(),2);

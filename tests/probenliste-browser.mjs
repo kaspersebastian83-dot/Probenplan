@@ -1,6 +1,7 @@
-// Probenliste und Reiter im Browser (ab 1.48): Reiter Proben / Plan & Ausgabe / Raumbuch, eine Liste für offene und platzierte
+// Probenliste im Browser (ab 1.48, in 2.0 die rechte Spalte von ② Proben setzen): eine Liste für offene und platzierte
 // Laborproben nach Geschoss → Raum, Fortschritt, Filter, Suche, fertige Räume zugeklappt ans Ende, ⋯-Menüs, Hervorheben,
-// Brandherde, Schalter aus = Seitenleiste wie bisher. Synthetische Daten.
+// Brandherde. Reiter und Schalter „Neue Liste (Test)“ gibt es ab 2.0 nicht mehr. Synthetische Daten.
+import * as pk from './pk-ui.mjs';
 import {chromium,webkit,savedProject} from './runtime.mjs';
 import assert from 'node:assert/strict';
 const base=process.env.TEST_URL||'http://localhost:4173';
@@ -14,7 +15,7 @@ const lk={version:'4.34.0',projekt:{nr:''},proben:RAEUME.map((raum,i)=>({id:i+1,
 async function start(page,url){
  await page.goto(url);
  await page.locator('#file').setInputFiles({name:'eg.svg',mimeType:'image/svg+xml',buffer:Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><rect width="1200" height="800" fill="white"/></svg>')});await page.locator('#welcome').waitFor({state:'hidden'});
- if(await page.locator('#panel-toggle').getAttribute('aria-pressed')!=='true')await page.locator('#panel-toggle').click();
+ await pk.spalte(page);
  page.once('dialog',d=>d.accept());
  await page.locator('#lab-files').setInputFiles([{name:'x_Daten.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(lk))}]);await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});
 }
@@ -31,15 +32,12 @@ for(const engine of engines){
   const context=await browser.newContext({viewport:{width:1440,height:900},acceptDownloads:true}),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await start(page,`${base}/?weiter-default&liste-default`);
 
-  await check(`${engine}: Reiter – Proben ist Standard; Plan & Ausgabe und Raumbuch zeigen ihre Abschnitte, nicht die Liste`,async()=>{
-   assert.equal(await page.locator('#side-panel').getAttribute('data-liste'),'neu');assert.equal(await page.locator('#panel-tabs').isVisible(),true);
-   assert.deepEqual(await texts(page,'.panel-tab'),['Proben6','Plan & Ausgabe','Raumbuch'],'Zähler der offenen Proben am Reiter');
-   assert.equal(await page.locator('#tab-proben').getAttribute('aria-selected'),'true');assert.equal(await page.locator('#proben-section').isVisible(),true);
-   assert.equal(await page.locator('#lab-panel').isVisible(),false,'alte Laborliste ist weg');assert.equal(await page.locator('#raumbuch-section').isVisible(),false);
-   await page.locator('#tab-plan').click();assert.equal(await page.locator('#proben-section').isVisible(),false);assert.equal(await page.locator('.areas-section').isVisible(),true);assert.equal(await page.locator('#raumbuch-section').isVisible(),false);
-   await page.locator('#tab-raumbuch').click();assert.equal(await page.locator('#raumbuch-section').isVisible(),true);assert.equal(await page.locator('.areas-section').isVisible(),false);assert.equal(await page.locator('#proben-section').isVisible(),false);
-   await page.locator('#tab-proben').focus();await page.keyboard.press('ArrowRight');assert.equal(await page.locator('#tab-plan').getAttribute('aria-selected'),'true','Pfeiltasten wechseln den Reiter');
-   await page.locator('#tab-proben').click();assert.equal(await page.locator('#proben-section').isVisible(),true);
+  await check(`${engine}: ② zeigt die Probenliste – keine Reiter, kein Schalter, alte Listen weg; Spaltenkopf mit Zählern`,async()=>{
+   assert.equal(await pk.aktuell(page),'2');assert.equal(await page.locator('#side-panel').getAttribute('data-liste'),'neu');assert.equal(await page.locator('#panel-tabs').isVisible(),false);
+   assert.equal(await page.locator('#liste-switch').isVisible(),false);assert.equal(await page.locator('#proben-section').isVisible(),true);
+   assert.equal(await page.locator('#lab-panel').isVisible(),false,'alte Laborliste ist weg');assert.equal(await page.locator('.markers-section #marker-list').isVisible(),false,'alte Markierungsliste ist weg');
+   assert.equal((await page.locator('#pk-kopf-zahl').textContent()).trim(),'0 gesetzt · 6 offen');assert.equal((await page.locator('#lab-import').textContent()).trim(),'Andere Proben übernehmen …');
+   await page.keyboard.press('Escape');   // die erste Probe ist gleich dran (E5) – hier erst einmal anhalten
   });
   await check(`${engine}: Fortschritt, Filter-Zähler, Gruppen nach Geschoss → Raum`,async()=>{
    assert.equal((await page.locator('#proben-progress').textContent()).trim(),'0 von 6 platziert');
@@ -55,13 +53,13 @@ for(const engine of engines){
    assert.equal(await page.locator('[data-pending]:visible').count(),0,'keine zweite Liste mehr in der Seitenleiste');
   });
   await check(`${engine}: Zeile wählen → Platzieren mit Weiter-Platzieren; Liste, Fortschritt und Gruppenzähler folgen`,async()=>{
-   await row(page,'P1').click();await page.locator('#weiter-chip').waitFor();assert.match(await chipText(page),/^JETZT P1 · EG Flur/);
+   await row(page,'P1').click();await page.locator('#weiter-chip').waitFor();assert.match(await chipText(page),/^Als Nächstes setzen: P1 · EG Flur/);
    assert.equal(await row(page,'P1').getAttribute('aria-pressed'),'true');
    await tap(page,200,200);await until(page,p=>p.markers.length===1);
-   assert.match(await chipText(page),/^JETZT P4 · EG Flur/);assert.equal(await row(page,'P4').getAttribute('aria-pressed'),'true');
+   assert.match(await chipText(page),/^Als Nächstes setzen: P4 · EG Flur/);assert.equal(await row(page,'P4').getAttribute('aria-pressed'),'true');
    assert.equal(await row(page,'P1').count(),0,'Filter „Offen“ blendet platzierte aus');
    assert.equal((await page.locator('#proben-progress').textContent()).trim(),'1 von 6 platziert');assert.deepEqual(await texts(page,'.pl-gcount'),['1/2','0/2','0/1','0/1']);
-   assert.deepEqual(await texts(page,'.panel-tab'),['Proben5','Plan & Ausgabe','Raumbuch']);
+   assert.equal((await page.locator('#pk-kopf-zahl').textContent()).trim(),'1 gesetzt · 5 offen');
   });
   await check(`${engine}: Filter Platziert und Alle; platzierte Zeile mit durchgezogenem Rand`,async()=>{
    await page.locator('#filter-platziert').click();assert.deepEqual(await texts(page,'.pl-row .pl-badge'),['P1']);assert.equal(await row(page,'P1').locator('.pl-badge.open').count(),0);assert.equal(await row(page,'P1').getAttribute('data-art'),'platziert');
@@ -74,7 +72,7 @@ for(const engine of engines){
    assert.equal(await page.locator('.pl-group').last().getAttribute('aria-expanded'),'false');assert.equal(await row(page,'P1').count(),0,'zugeklappt: keine Zeilen');
    await page.locator('.pl-group').last().click();assert.equal(await page.locator('.pl-group').last().getAttribute('aria-expanded'),'true');assert.deepEqual(await texts(page,'.pl-row .pl-badge'),['P2','P5','P3','P6','P1','P4']);
    await page.locator('.pl-group').last().click();assert.equal(await row(page,'P1').count(),0);
-   assert.match(await chipText(page),/^Raum „EG Flur“ fertig · JETZT P2 · EG Küche/);
+   assert.match(await chipText(page),/^Raum „EG Flur“ fertig · Als Nächstes setzen: P2 · EG Küche/);
   });
   await check(`${engine}: Suche nach Raum oder Kennung klappt Treffer auf; leere Suche stellt zurück`,async()=>{
    await page.locator('#proben-suche').fill('flur');assert.deepEqual(await gruppen(page),['Flur']);assert.deepEqual(await texts(page,'.pl-row .pl-badge'),['P1','P4'],'auch fertige Räume werden aufgeklappt gezeigt');
@@ -102,7 +100,7 @@ for(const engine of engines){
   await check(`${engine}: Neu platzieren setzt die Probe an eine andere Stelle`,async()=>{
    const before=(await savedProject(page)).markers.find(m=>m.label==='P1');
    await more(page,'P1').click();await page.getByRole('menuitem',{name:'Neu platzieren'}).click();
-   await page.locator('#weiter-chip').waitFor();assert.match(await chipText(page),/^JETZT P1 · EG Flur/);
+   await page.locator('#weiter-chip').waitFor();assert.match(await chipText(page),/^Als Nächstes setzen: P1 · EG Flur/);
    await tap(page,500,500);const p=await until(page,p=>p.markers.find(m=>m.label==='P1')&&Math.abs(p.markers.find(m=>m.label==='P1').x-500)<2);
    assert.ok(Math.abs(before.x-500)>50);assert.equal(p.markers.length,2);assert.equal(p.markers.find(m=>m.label==='P1').lab.ref,'Probe 1');
    await page.keyboard.press('Escape');
@@ -132,15 +130,12 @@ for(const engine of engines){
    await page.mouse.move(box.x+20,box.y+10);await page.mouse.down();await page.mouse.move(t.x,t.y,{steps:10});await page.mouse.up();
    const p=await until(page,p=>p.markers.some(m=>m.label==='P2'));assert.equal(p.markers.length,4);assert.equal(await page.locator('#weiter-chip').isHidden(),true);
   });
-  await check(`${engine}: Schalter „Weiter-Platzieren (Test)“ liegt in der Probenliste`,async()=>{
-   assert.equal(await page.locator('#weiter-switch').isVisible(),true);assert.equal(await page.locator('#proben-section #weiter-switch').count(),1);
+  await check(`${engine}: „gleich die nächste wählen“ steht unter „Mehr …“, nicht mehr in der Liste`,async()=>{
+   assert.equal(await page.locator('#weiter-switch').isVisible(),false);await page.locator('#pk-mehr').click();assert.match((await page.locator('#pk-m-weiter').textContent()).trim(),/^✓ Nach jeder Probe gleich die nächste wählen$/);await page.keyboard.press('Escape');
   });
-  await check(`${engine}: „Neue Liste (Test)“ aus – Seitenleiste wie bisher ohne Reiter; wieder an – Reiter zurück`,async()=>{
-   await page.locator('#liste-switch').uncheck();
-   assert.equal(await page.locator('#panel-tabs').isVisible(),false);assert.equal(await page.locator('#proben-section').isVisible(),false);assert.equal(await page.locator('#lab-panel').isVisible(),true);
-   assert.equal(await page.locator('[data-pending]').count(),3,'alte Liste mit den noch offenen Proben');assert.equal(await page.locator('.markers-section #marker-list').isVisible(),true);assert.equal(await page.locator('#weiter-switch').isVisible(),true);
-   assert.equal(await page.evaluate(()=>localStorage.getItem('plankit-neue-liste')),'0');
-   await page.locator('#liste-switch').check();assert.equal(await page.locator('#panel-tabs').isVisible(),true);assert.equal(await page.locator('#proben-section').isVisible(),true);assert.equal(await page.locator('#lab-panel').isVisible(),false);
+  await check(`${engine}: alter Schalterwert „Neue Liste (Test)“ = aus wirkt nicht mehr – nur die Probenliste`,async()=>{
+   await page.evaluate(()=>localStorage.setItem('plankit-neue-liste','0'));await page.reload();await page.locator('#welcome').waitFor({state:'hidden'});
+   assert.equal(await pk.aktuell(page),'2');assert.equal(await page.locator('#proben-section').isVisible(),true);assert.equal(await page.locator('#lab-panel').isVisible(),false);
   });
   assert.deepEqual(errors,[]);await context.close();
  }finally{await browser.close();}

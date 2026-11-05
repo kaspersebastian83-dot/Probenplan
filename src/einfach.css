@@ -1,0 +1,250 @@
+/* PlanKit 2.0 – einfache Oberfläche (Spektron Schritt 3). Kommt nach style/theme/layout und dem SPEKTRON-LOOK v1.
+   Kopfband (56 px, Leiste v3) · Karte randlos · drei Schritte schwebend oben links · Plan-Chips oben rechts · Hinweiskarte unten links ·
+   Rückgängig/Zoom unten rechts · rechte Spalte je Schritt · Fußleiste (Mehr … · Stand · Hauptaktion). Exporte bleiben unverändert (Arial). */
+:root{
+  --kit-bg:var(--sp-bg); --kit-panel:var(--sp-panel); --kit-panel2:var(--sp-panel2); --kit-line:var(--sp-line); --kit-line2:var(--sp-line2);
+  --kit-text:var(--sp-text); --kit-muted:var(--sp-muted); --kit-accent:var(--sp-app-dunkel); --kit-accent-2:var(--sp-app-dunkel); --kit-accent-l:var(--sp-app);
+  --kit-head:var(--sp-app); --kit-focus:#e8f0f8; --kit-sans:var(--sp-font);
+  --pk-fuss:64px; --pk-schwarz:#17222c;
+  font-family:var(--sp-font);
+}
+body.pk2{font-family:var(--sp-font);background:var(--sp-bg);color:var(--sp-text);font-size:14px}
+#pk-alt,#pk-alt[hidden]{display:none!important}
+.pk-aus{display:none!important}
+
+/* ---- Rahmen: Kopfband · Warnleisten · Karte | Spalte · Fußleiste ---- */
+body.pk2 #mosaikLeiste{flex:0 0 auto}
+body.pk2 #app{flex:1 1 auto;min-height:0}
+body.pk2 .project-data-warning{flex:0 0 auto}
+body.pk2 .kit-workspace{flex:1 1 auto;min-height:0}
+body.pk2 .kit-canvas{background:var(--sp-bg)}
+body.pk2 #stage{border:0;border-radius:0;box-shadow:none;background-color:#eaf0f5;background-image:radial-gradient(#cbd7e1 .8px,transparent .8px)}
+
+/* ---- schwebend oben links: Schritte und (in ②) Werkzeuge ---- */
+#pk-oben{position:absolute;top:10px;left:10px;z-index:4;display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px;max-width:calc(100% - 96px);pointer-events:none}
+#pk-oben>*{pointer-events:auto}
+#pk-schritte{display:flex;align-items:center;gap:6px;height:44px;box-sizing:border-box;padding:0 10px 0 6px;background:var(--sp-panel);border-radius:12px;box-shadow:0 2px 10px rgba(23,34,44,.14)}
+.pk-schritt{display:inline-flex;align-items:center;gap:7px;height:36px;min-height:0;padding:0 6px 0 4px;border:0;border-radius:10px;background:none;font:inherit;font-size:14px;font-weight:600;color:var(--sp-muted);cursor:pointer;white-space:nowrap}
+.pk-schritt:hover:not(:disabled):not([aria-current]){background:var(--sp-panel2);color:var(--sp-text)}
+.pk-schritt:disabled{opacity:.5;cursor:not-allowed}
+.pk-kreis{width:28px;height:28px;flex:none;border-radius:50%;border:2px solid var(--sp-line2);display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--sp-muted);background:var(--sp-panel);box-sizing:border-box}
+.pk-schritt[aria-current="step"]{color:var(--sp-text);font-weight:700;cursor:default}
+.pk-schritt[aria-current="step"] .pk-kreis{background:var(--sp-app);border-color:var(--sp-app);color:#fff}
+.pk-schritt.fertig .pk-kreis{border-color:var(--sp-ok);color:var(--sp-ok)}
+.pk-schritt:focus-visible,.pk-wz:focus-visible,.pk-chip:focus-visible{outline:3px solid var(--sp-text);outline-offset:2px}
+.pk-strich{width:12px;height:2px;background:var(--sp-line2);flex:none}
+.pk-flaechen-titel{display:none;margin-left:8px;padding-left:12px;border-left:1px solid var(--sp-line);font-weight:700;white-space:nowrap}
+body[data-pk-schritt="f"] .pk-flaechen-titel{display:inline}
+#pk-werkzeuge{display:none;gap:4px;padding:4px;background:var(--sp-panel);border-radius:12px;box-shadow:0 2px 10px rgba(23,34,44,.14);flex-wrap:wrap}
+body[data-pk-schritt="2"] #pk-werkzeuge,body[data-pk-schritt="f"] #pk-werkzeuge{display:flex}
+.pk-wz{height:36px;min-height:0;padding:0 12px;border:1.5px solid transparent;border-radius:9px;background:none;font:inherit;font-size:14px;font-weight:600;color:var(--sp-text);cursor:pointer;white-space:nowrap}
+.pk-wz:hover:not(:disabled){background:var(--sp-panel2);border-color:var(--sp-line2);color:var(--sp-text)}
+.pk-wz.aktiv,.pk-wz.aktiv:hover{background:var(--sp-app-dunkel);border-color:var(--sp-app-dunkel);color:#fff}
+.pk-wz:disabled{opacity:.45;cursor:not-allowed}
+#pk-w-setzen,#pk-w-brand,#pk-w-schieben{display:none}
+body[data-pk-schritt="2"] :is(#pk-w-setzen,#pk-w-brand,#pk-w-schieben){display:inline-block}
+#pk-w-fzeichnen,#pk-w-fbearbeiten,#pk-w-ffertig{display:none}
+body[data-pk-schritt="f"] :is(#pk-w-fzeichnen,#pk-w-fbearbeiten,#pk-w-ffertig){display:inline-block}
+#pk-w-ffertig{border-color:var(--sp-line2)}
+/* Plan-Chips oben rechts */
+#pk-plaene{position:absolute;top:10px;right:10px;z-index:4;display:flex;gap:4px;padding:4px;background:var(--sp-panel);border-radius:12px;box-shadow:0 2px 10px rgba(23,34,44,.14);max-width:40%;flex-wrap:wrap;justify-content:flex-end}
+#pk-plaene[hidden]{display:none}
+.pk-chip{height:36px;min-height:0;padding:0 14px;border:1.5px solid var(--sp-line2);border-radius:9px;background:var(--sp-panel);font:inherit;font-size:14px;font-weight:600;color:var(--sp-text);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center}
+.pk-chip:hover{border-color:var(--sp-app);color:var(--sp-text)}
+.pk-chip[aria-pressed="true"]{background:var(--sp-app-dunkel);border-color:var(--sp-app-dunkel);color:#fff;cursor:default}
+.pk-chip.einzel{border-color:transparent;cursor:default}
+#pk-plan-wahl{height:36px;min-height:0;font:inherit;font-size:14px;font-weight:600;padding:0 10px;margin:0;border-radius:9px}
+/* Während Zuschnitt/Ausrichten/Entzerren/Skizze gehören die Leisten oben der Vollbild-Leiste */
+body.pk-vollbild #pk-oben,body.pk-vollbild #pk-plaene,body.pk-vollbild .pk-lasche{display:none!important}
+body.pk-ohne-plan #pk-werkzeuge,body.pk-ohne-plan #pk-plaene{display:none!important}
+
+/* ---- Hinweiskarte unten links (schwarz wie im Entwurf) ---- */
+#pk-hinweis{position:absolute;left:10px;bottom:10px;z-index:4;display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;max-width:min(640px,max(300px,calc(100% - 510px)));min-height:48px;box-sizing:border-box;padding:8px 10px 8px 16px;background:var(--pk-schwarz);color:#fff;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.22);font-size:14px;line-height:1.35}
+#pk-hinweis[hidden]{display:none}
+#pk-hinweis-text{font-weight:600}
+#pk-hinweis .weiter-chip{position:static;transform:none;display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:0;margin:0;border:0;background:none;box-shadow:none;color:#fff}
+#pk-hinweis .weiter-chip span{font-size:14px;font-weight:600;color:#fff}
+#pk-hinweis .weiter-chip[hidden]{display:none!important}
+#pk-hinweis #mode-hint{position:static;transform:none;display:block;visibility:visible;border:0;background:none;padding:0;font-size:14px;font-weight:600;color:#fff;white-space:normal;pointer-events:auto}
+#pk-hinweis #mode-hint[hidden]{display:block!important}
+#pk-hinweis #mode-hint:empty{display:none!important}
+#pk-hinweis #weiter-chip:not([hidden])~#mode-hint,#pk-hinweis #weiter-chip:not([hidden])~.pk-hinweis-knoepfe #pk-pause{display:none!important}
+#pk-hinweis label.inline-field{display:inline-flex!important;align-items:center;gap:8px;margin:0!important;border:0;padding:0;font-size:14px!important;font-weight:600;color:#fff}
+#pk-hinweis label.inline-field.pk-aus{display:none!important}
+#pk-hinweis #next{width:84px;height:34px;min-height:0;margin:0;padding:2px 8px;font:600 15px var(--sp-font);color:var(--sp-text);background:#fff;border:0;border-radius:8px}
+#pk-hinweis #next-shape{height:34px;min-height:0;margin:0;padding:2px 8px;font:inherit;font-size:14px;color:var(--sp-text);background:#fff;border:0;border-radius:8px}
+.pk-hinweis-knoepfe{display:inline-flex;gap:6px}
+#pk-hinweis button{height:36px;min-height:0;width:auto;margin:0;padding:0 14px;border-radius:9px;border:1.5px solid rgba(255,255,255,.45);background:transparent;color:#fff;font:inherit;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
+#pk-hinweis button:hover{background:rgba(255,255,255,.14);border-color:#fff;color:#fff}
+#pk-weiter-setzen{background:#fff!important;color:var(--pk-schwarz)!important;border-color:#fff!important}
+
+/* ---- unten rechts: Rückgängig · Zoom · Einpassen; darüber die Ergebnislegende ---- */
+body.pk2 .zoom-controls{right:10px;bottom:10px;left:auto;transform:none;z-index:4;border:0;border-radius:12px;box-shadow:0 2px 10px rgba(23,34,44,.14);padding:4px;gap:2px;background:var(--sp-panel)}
+body.pk2 .zoom-controls button{min-height:0;height:36px;padding:0 12px;font:inherit;font-size:14px;font-weight:600;border-radius:9px;color:var(--sp-text);background:none}
+body.pk2 .zoom-controls button:hover:not(:disabled){background:var(--sp-panel2);color:var(--sp-text)}
+body.pk2 .zoom-controls button:disabled{opacity:.4}
+body.pk2 .zoom-controls #zoom-out,body.pk2 .zoom-controls #zoom-in{font-size:20px;width:38px;padding:0}
+body.pk2 .zoom-controls #fit{font-size:14px}
+body.pk2 .zoom-controls #zoom-value{font:600 13px var(--sp-font);color:var(--sp-muted);min-width:46px}
+.pk-verlauf{display:inline-flex;gap:2px;font-family:var(--sp-font);min-width:0}
+body.pk2 .zoom-controls .pk-verlauf,body.pk2 .zoom-controls .pk-wort{font:inherit;font-size:inherit;color:inherit;min-width:0;text-align:left}
+body.pk2 .zoom-controls #undo,body.pk2 .zoom-controls #redo{font-family:var(--sp-font)}
+body.pk-ohne-plan .zoom-controls{display:none}
+body.pk2 .canvas-footer.pk-legende{left:auto;right:10px;bottom:62px;font-size:12px;border:0;border-radius:10px;box-shadow:0 2px 10px rgba(23,34,44,.12);background:#fffffff0}
+body.pk2 .canvas-footer.pk-legende:not(:has(#result-legend:not([hidden]))){display:none}
+body.pk2 #result-legend{margin:0;padding:0;border:0}
+/* Lasche am rechten Rand, wenn die Spalte zu ist */
+.pk-lasche{position:absolute;right:0;top:50%;transform:translateY(-50%);z-index:4;height:auto;min-height:0;padding:14px 8px;border:0;border-radius:10px 0 0 10px;background:var(--sp-panel);box-shadow:0 2px 10px rgba(23,34,44,.18);font:inherit;font-size:14px;font-weight:700;color:var(--sp-app-dunkel);writing-mode:vertical-rl;cursor:pointer}
+.pk-lasche:hover{background:var(--sp-panel2);color:var(--sp-text)}
+body.panel-open .pk-lasche,body.pk-ohne-plan .pk-lasche{display:none}
+/* Vollbild-Leisten (unverändert) und Zuschnitt-Angebot */
+body.pk2 #crop-actions,body.pk2 #import-status{top:12px}
+body.pk2 #crop-offer{top:auto;bottom:70px;left:10px;transform:none;z-index:5}
+
+/* ---- Startkarte (① ohne Plan) ---- */
+body.pk2 #welcome{background:radial-gradient(ellipse at center,#f8fafcee,transparent)}
+body.pk2 #welcome h2{font-size:30px;color:var(--sp-text);font-weight:700;letter-spacing:-.5px}
+body.pk2 #welcome p{font-size:14px;color:var(--sp-muted)}
+body.pk2 #welcome .eyebrow{color:var(--sp-app-dunkel);font-weight:700}
+body.pk2 #welcome .primary{font:inherit;font-size:17px;font-weight:700;height:var(--sp-h-haupt);padding:0 26px;border-radius:12px;border:0;background:var(--sp-app-dunkel);color:#fff}
+body.pk2 #welcome .primary:hover{background:var(--sp-app)}
+body.pk2 #welcome .welcome-sketch{font:inherit;font-size:16px;font-weight:600;height:var(--sp-h);padding:0 18px;margin-top:12px;border-radius:var(--sp-radius-k);border:1.5px solid var(--sp-line2);background:var(--sp-panel);color:var(--sp-text)}
+body.pk2 #welcome .welcome-sketch:hover{border-color:var(--sp-app)}
+body.pk2 #welcome .tiny{font-size:12.5px;color:var(--sp-muted)}
+#pk-ordner-start[hidden]{display:none}
+
+/* ---- rechte Spalte ---- */
+body.pk2 .kit-panel{width:300px;background:var(--sp-panel);border-left:1px solid var(--sp-line)}
+body.pk2 .panel-head{height:52px;box-sizing:border-box;padding:0 8px 0 18px;border-bottom:1px solid var(--sp-line);gap:8px}
+.pk-kopf{display:flex;align-items:baseline;gap:10px;min-width:0;overflow:hidden}
+.pk-kopf strong{font-size:17px;font-weight:700;white-space:nowrap}
+#pk-kopf-zahl{font-size:13px;color:var(--sp-muted);white-space:nowrap}
+body.pk2 #panel-close{width:36px;height:36px;min-height:0;font-size:18px;border-radius:9px;background:none;border:1.5px solid var(--sp-line2);color:var(--sp-text)}
+.pk-sicht{display:none}
+body[data-pk-schritt="1"] #pk-s1,body[data-pk-schritt="2"] #pk-s2,body[data-pk-schritt="3"] #pk-s3,body[data-pk-schritt="f"] #pk-sf{display:block}
+body.pk2 .panel-scroll>.pk-sicht>section,body.pk2 .pk-karte{padding:14px 18px;border-bottom:1px solid var(--sp-line)}
+body.pk2 .panel-scroll h2,.pk-karte>h2{font-size:15px;font-weight:700;margin:0 0 8px;letter-spacing:0}
+body.pk2 .panel-scroll .eyebrow{display:none}
+body.pk2 .panel-scroll button:not(.pl-row):not(.pl-group):not(.pl-chip):not(.pl-more):not(.pl-more-top):not(.pk-klein){font-family:var(--sp-font)}
+.pk-klein{height:32px;min-height:0;padding:0 12px;font:inherit;font-size:13px;font-weight:600;border-radius:9px;border:1.5px solid var(--sp-line2);background:var(--sp-panel);color:var(--sp-text);cursor:pointer;width:auto}
+/* ① Planliste (die frühere Planleiste, senkrecht) */
+.pk-planinfo{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin:0 0 10px;font-size:12.5px;color:var(--sp-muted)}
+.pk-planinfo #canvas-name{font:600 13px var(--sp-font);color:var(--sp-text);max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-planinfo .tag{font-size:10px;background:var(--sp-panel2);color:var(--sp-muted);border:1px solid var(--sp-line)}
+.pk-planinfo #source-info{flex-basis:100%;margin:0;padding:0;border:0}
+#pk-plankarte .sheet-strip{height:auto!important;display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:0;border:0;background:none;overflow:visible}
+#pk-plankarte .sheet-strip[hidden]{display:none}
+#pk-plankarte #sheet-list{flex-direction:column;align-items:stretch;gap:6px;max-height:min(46vh,420px);overflow-y:auto}
+#pk-plankarte .sheet{border-radius:10px;border-color:var(--sp-line2)}
+#pk-plankarte .sheet.active{border-color:var(--sp-app);background:#eef4fa;box-shadow:inset 0 0 0 1px var(--sp-app)}
+#pk-plankarte .sheet-main{flex:1;min-width:0;height:56px}
+#pk-plankarte .single .sheet-main{height:56px;padding:4px 10px 4px 4px}
+#pk-plankarte .single .sheet-thumb,#pk-plankarte .single .sheet-text small{display:grid}
+#pk-plankarte .single .sheet-text small{display:block}
+#pk-plankarte .sheet-text{max-width:none;font-size:14px}
+#pk-plankarte .sheet-text small{font-size:12px}
+#pk-plankarte .sheet-more{width:36px;height:36px;font-size:18px}
+#pk-plankarte .sheet-add{height:40px;font:inherit;font-size:14px;font-weight:600;border-radius:var(--sp-radius-k);border:1.5px dashed var(--sp-line2);background:var(--sp-panel);color:var(--sp-text);text-align:left;padding:0 14px}
+#pk-plankarte .sheet-add:hover:not(:disabled){border-style:solid;border-color:var(--sp-app)}
+body.pk2 #pk-vorbereiten #preparation{display:block;border:0;margin:0;padding:0}
+body.pk2 #pk-vorbereiten #preparation[hidden]{display:none}
+body.pk2 #pk-vorbereiten .preparation-buttons{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0}
+body.pk2 #pk-vorbereiten .preparation-buttons button{min-height:0;height:40px;font:inherit;font-size:14px;font-weight:600;padding:0 10px;border-radius:var(--sp-radius-k);border:1.5px solid var(--sp-line2);background:var(--sp-panel);color:var(--sp-text);flex-direction:row}
+body.pk2 #pk-vorbereiten .preparation-buttons button:hover:not(:disabled){border-color:var(--sp-app)}
+body.pk2 #pk-vorbereiten .preparation-buttons button:disabled{opacity:.45}
+body.pk2 #pk-vorbereiten .preparation-buttons button[hidden]{display:none}
+#pk-s1 #scale-section{margin:0}
+.pk-ersetzen{padding:14px 18px}
+body.pk2 .pk-ersetzen #load{height:36px;min-height:0;padding:0 12px;font:inherit;font-size:13px;font-weight:600;border-radius:9px;border:1.5px solid var(--sp-line2);background:var(--sp-panel);color:var(--sp-muted)}
+body.pk2 .pk-ersetzen #load:hover:not(:disabled){color:var(--sp-text);border-color:var(--sp-app)}
+body.pk-ohne-plan #pk-vorbereiten,body.pk-ohne-plan #pk-s1 #scale-section{display:none}
+/* ② Probenliste */
+body.pk2 #proben-section{padding:14px 18px 10px}
+body.pk2 #proben-section .section-heading h2{font-size:15px}
+.pk-proben-zahl{margin:-4px 0 8px;font-size:13px;color:var(--sp-muted)}
+.pk-proben-zahl[hidden]{display:none}
+body.pk2 #proben-section .pk-listenkopf{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 8px}
+body.pk2 #proben-section .pk-listenkopf:has(.pk-import[hidden]){justify-content:flex-end}
+body.pk2 .pk-import,body.pk2 #lab-import.pk-import{height:36px;min-height:0;margin:0;padding:0 14px;font:inherit;font-size:14px;font-weight:600;width:auto;background:var(--sp-panel);color:var(--sp-text);border:1.5px solid var(--sp-line2);border-radius:var(--sp-radius-k)}
+body.pk2 #lab-import.pk-import:hover:not(:disabled){background:var(--sp-panel);border-color:var(--sp-app);color:var(--sp-text)}
+body.pk2 .weiter-switch{display:none!important}
+#pk-kein-plan[hidden],.pk-planinfo[hidden],.pk-ersetzen[hidden]{display:none}
+body.pk2 #pk-fuss #save-project[hidden]{display:none}
+body.pk2 .pk-import[hidden]{display:none}
+.pk-leer{padding:6px 0 4px}
+.pk-leer[hidden]{display:none}
+.pk-leer .sp-knopf{width:100%;height:var(--sp-h-haupt);font-size:16px}
+.pk-leer .tiny{margin:8px 0 0;font-size:13px}
+body.pk2 #proben-section .pl-row[aria-pressed="true"]{outline:2px solid var(--sp-app);outline-offset:-2px;border-radius:8px}
+.pk-ergebnisfarben{padding:10px 18px 16px;border-bottom:1px solid var(--sp-line)}
+.pk-schalter{height:36px;min-height:0;padding:0 14px;font:inherit;font-size:14px;font-weight:600;border-radius:var(--sp-radius-k);border:1.5px solid var(--sp-line2);background:var(--sp-panel);color:var(--sp-text);cursor:pointer}
+.pk-schalter[aria-pressed="true"]{border-color:var(--sp-app-dunkel);box-shadow:inset 0 0 0 1px var(--sp-app-dunkel)}
+.pk-schalter:disabled{opacity:.45;cursor:not-allowed}
+.pk-schalter[hidden]{display:none}
+body.pk2 #results-toggle::before{box-shadow:0 0 0 1px var(--sp-line2)}
+body.pk2 #results-toggle[aria-pressed=true]{background:var(--sp-panel);color:var(--sp-text)}
+/* gewählter Punkt: Karte „Probe P3“ oben */
+body.pk2 #pk-s2 .markers-section{background:#f4f8fb;border-bottom:1px solid var(--sp-line);padding:12px 18px 14px}
+.pk-probe-kopf{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+.pk-probe-kopf strong{font-size:16px}
+#pk-kennung-fest{margin:-4px 0 6px;font-size:12.5px;color:var(--sp-muted)}
+#pk-kennung-fest[hidden]{display:none}
+body.pk2 #label[readonly]{background:var(--sp-panel2);color:var(--sp-muted);cursor:default}
+/* ③ Ausgabe: die Exportkarte als offene Spalte (nicht modal) */
+body.pk2 #pk-s3 dialog.export-card{position:static;inset:auto;display:block;width:auto;max-width:none;max-height:none;margin:0;padding:14px 18px 16px;border:0;border-bottom:1px solid var(--sp-line);border-radius:0;box-shadow:none;overflow:visible;z-index:auto;background:var(--sp-panel);color:var(--sp-text)}
+body.pk2 #pk-s3 dialog.export-card:not([open]){display:none}
+body.pk2 #pk-s3 dialog.export-card>form,body.pk2 #pk-s3 #export{display:none}
+body.pk2 #pk-s3 dialog.export-card h2{font-size:15px;margin:0 0 4px}
+body.pk2 #pk-s3 dialog.export-card .muted{font-size:12.5px}
+body.pk2 #pk-s3 dialog.export-card .export-row{grid-template-columns:1fr}
+.pk-warnung{margin:8px 0 0;padding:8px 10px;border-radius:var(--sp-radius-k);background:#fff9e0;border:1px solid var(--sp-pille);color:#6b5400;font-size:13px;font-weight:600}
+.pk-warnung[hidden]{display:none}
+.pk-erledigt{margin:10px 0 0;font-size:14px;font-weight:600;color:var(--sp-ok)}
+.pk-erledigt[hidden]{display:none}
+#pk-darstellung>section{padding:0;border:0;margin:0 0 12px}
+#pk-darstellung details{margin-top:4px}
+#pk-darstellung summary{cursor:pointer;font-weight:700;font-size:14px;padding:6px 0}
+#pk-darstellung #results-section{padding:0;border:0}
+#pk-anlagen #raumbuch-section{padding:0;border:0;margin:0}
+#pk-anlagen button{font:inherit;font-size:14px;font-weight:600;height:40px;min-height:0;border-radius:var(--sp-radius-k);margin:6px 0 0;width:100%}
+/* Flächen-Ansicht */
+body.pk2 #pk-sf .areas-section #area-draft{margin:8px 0 10px;padding:10px 12px;border:1px solid var(--sp-line);border-radius:var(--sp-radius-k);background:var(--sp-panel2)}
+body.pk2 #pk-sf #area-draft[hidden]{display:none}
+
+/* ---- Fußleiste ---- */
+#pk-fuss{flex:0 0 auto;z-index:20;box-sizing:border-box;min-height:64px;display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;padding:6px 16px;background:var(--sp-panel);border-top:1px solid var(--sp-line);box-shadow:0 -2px 10px rgba(0,0,0,.05)}
+#pk-mehr{height:46px;padding:0 16px;font-size:15px;display:inline-flex;align-items:center;gap:8px;font-weight:600}
+.pk-stand{flex:1 1 220px;display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px 12px;min-width:0}
+.pk-stand-text{font-size:14px;color:var(--sp-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.pk-stand-text.ok{color:var(--sp-ok)}
+.pk-stand-text.gelb{color:#8a6d00;font-weight:600}
+.pk-stand-text.fehler{color:var(--sp-err);font-weight:600}
+body.pk2 #pk-fuss #saved{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+body.pk2 #pk-fuss #save-project{height:36px;font-size:14px;font-weight:600;padding:0 14px}
+body.pk2 #pk-fuss #save-project:disabled{opacity:.45}
+#pk-neben{height:46px;font-size:15px;font-weight:600}
+#pk-neben[hidden]{display:none}
+#pk-haupt{height:var(--sp-h-haupt);padding:0 24px;white-space:nowrap}
+#pk-haupt:disabled{opacity:.45;cursor:not-allowed}
+/* Meldungen über der Fußleiste */
+body.pk2 #toast{top:122px;bottom:auto;z-index:2147483200;font-family:var(--sp-font);font-size:14px;background:var(--pk-schwarz)}
+/* Dialoge über dem Kopfband */
+body.pk2 dialog:modal{font-family:var(--sp-font)}
+#mosaikMehrPop button[id^="pk-m-"]{white-space:normal}
+
+/* ---- schmale Fenster ---- */
+@media(max-width:1000px){body.pk2 .kit-panel{width:280px}.pk-sname{display:none}.pk-schritt[aria-current="step"] .pk-sname{display:inline}}
+@media(max-width:700px){
+  body.pk2{height:auto;overflow:auto}
+  body.pk2 .kit-panel{width:100%}
+  #pk-hinweis{max-width:calc(100% - 20px);bottom:62px}
+  #pk-plaene{top:auto;bottom:62px;right:10px;max-width:calc(100% - 20px)}
+  #pk-hinweis:not([hidden])~#pk-plaene{display:none}
+  #pk-fuss{padding:8px 10px;position:sticky;bottom:0}
+  #pk-haupt{flex:1 1 100%;font-size:16px}
+  .pk-wz{padding:0 10px;font-size:13px}
+  .pk-lasche{display:none}
+  .pk-wort{display:none}
+  body.pk2 .zoom-controls button{padding:0 9px}
+}
+@media print{#pk-fuss,#pk-oben,#pk-plaene,#pk-hinweis{display:none!important}}

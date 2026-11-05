@@ -1,7 +1,8 @@
 // Beschriftung (ab 1.19): Schilder automatisch platzieren und Messwerte am Plan – beides je Plan schaltbar.
 // Probenstelle bleibt exakt, nur das Schild weicht aus; berechnete Positionen werden nie gespeichert; von Hand gezogene
 // Schilder bleiben; „Schilder neu anordnen“; Wertkästchen in der Ergebniskarte; Einstellungen im Projekt und Validierung.
-import {chromium,webkit,savedProject,downloadedProject} from './runtime.mjs';
+import * as pk from './pk-ui.mjs';
+import {chromium,webkit,savedProject,downloadedProject,openExport} from './runtime.mjs';
 import {labRows,labXML} from './lab-fixtures.mjs';
 import assert from 'node:assert/strict';
 const base=process.env.TEST_URL||'http://localhost:4173';
@@ -27,12 +28,12 @@ for(const engine of engines){
   const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(base);
   await page.locator('#file').setInputFiles({name:'eg.svg',mimeType:'image/svg+xml',buffer:Buffer.from(svg)});await page.locator('#welcome').waitFor({state:'hidden'});
-  if(await page.locator('#panel-toggle').getAttribute('aria-pressed')!=='true')await page.locator('#panel-toggle').click();
+  await pk.spalte(page);
   // Vier Proben eng beieinander auf dem Raumnamen, eine allein in freier Fläche
   // Beim Setzen ohne Automatik, damit kein bereits versetztes Schild an der nächsten Tippstelle liegt
-  await page.locator('#auto-labels').uncheck();await page.evaluate(()=>document.activeElement?.blur());
+  await pk.schritt(page,3);await page.locator('#auto-labels').uncheck();await page.evaluate(()=>document.activeElement?.blur());
   await page.keyboard.press('p');for(const [fx,fy] of [[.455,.5],[.5,.5],[.545,.5],[.5,.56],[.15,.2]])await tap(page,fx,fy);await page.keyboard.press('v');
-  await page.locator('#auto-labels').check();
+  await pk.schritt(page,3);await page.locator('#auto-labels').check();
   await page.waitForTimeout(600);   // Tinte des Plans wird geladen, danach neu platziert
 
   await check(`${engine}: Standard an – Schilder überlappen nicht, freie Probe bleibt am Punkt, Gedränge mit Hinweislinien`,async()=>{
@@ -46,7 +47,7 @@ for(const engine of engines){
    for(const m of s.markers){assert.equal(m.lx,m.x);assert.equal(m.ly,m.y);}
   });
   await check(`${engine}: ausschalten – Schilder wieder am Punkt, im Plan gespeichert, rückgängig machbar`,async()=>{
-   await page.locator('#auto-labels').uncheck();const b=await badges(page);assert.equal(b.filter(x=>x.leader).length,0);
+   await pk.schritt(page,3);await page.locator('#auto-labels').uncheck();const b=await badges(page);assert.equal(b.filter(x=>x.leader).length,0);
    assert.equal((await savedProject(page)).plan.autoLabels,false);
    await page.evaluate(()=>document.activeElement?.blur());await page.keyboard.press('Control+z');assert.equal(await page.locator('#auto-labels').isChecked(),true);
    assert.equal((await savedProject(page)).plan.autoLabels,undefined);
@@ -59,7 +60,7 @@ for(const engine of engines){
    assert.ok(Math.abs((after.cx-before.cx)*k-30)<4,`Schild sprang: ${before.cx} → ${after.cx}`);
    const s=await savedProject(page),m=s.markers.find(x=>x.label===label);assert.ok(Math.hypot(m.lx-m.x,m.ly-m.y)>1,'von Hand versetzt = gespeichert');
    assert.match(await page.locator('#labels-reset').textContent(),/1 von Hand/);
-   await page.locator('#labels-reset').click();
+   await pk.schritt(page,3);await page.locator('#labels-reset').click();
    const s2=await savedProject(page);for(const m of s2.markers){assert.equal(m.lx,m.x);assert.equal(m.ly,m.y);}
    assert.equal(await page.locator('#labels-reset').isDisabled(),true);
   });
@@ -69,25 +70,25 @@ for(const engine of engines){
    await page.locator('#file').setInputFiles({name:'og.svg',mimeType:'image/svg+xml',buffer:Buffer.from(svg)});await page.locator('#replace-yes').click().catch(()=>{});await page.locator('#welcome').waitFor({state:'hidden'});
    await page.locator('#lab-files').setInputFiles([{name:'bericht.xml',mimeType:'application/xml',buffer:Buffer.from(labXML(rows))}]);await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});
    await page.evaluate(()=>document.activeElement?.blur());
-   for(const [fx,fy] of [[.7,.3],[.75,.3],[.3,.7],[.85,.75]]){await page.locator('[data-pending]').first().click();await tap(page,fx,fy);}
+   for(const [fx,fy] of [[.7,.3],[.75,.3],[.3,.7],[.85,.75]]){await page.locator('[data-plabel]').first().click();await tap(page,fx,fy);}
    await page.keyboard.press('Escape');await page.keyboard.press('v');
-   await page.locator('#value-labels').check();assert.equal((await savedProject(page)).plan.valueLabels,true);
-   assert.equal(await page.locator('#results-toggle').getAttribute('aria-pressed'),'true','Ergebniskarte schaltet sich mit Messwerten selbst ein');await page.locator('#results-toggle').click();
+   await pk.schritt(page,3);await page.locator('#value-labels').check();assert.equal((await savedProject(page)).plan.valueLabels,true);
+   assert.equal(await page.locator('#results-toggle').getAttribute('aria-pressed'),'true','Ergebniskarte schaltet sich mit Messwerten selbst ein');await pk.ergebnisse(page);
    assert.equal(await page.locator('#marks text',{hasText:'1.300,0'}).count(),0,'ohne Ergebniskarte keine Wertkästchen');
-   await page.locator('#results-toggle').click();
+   await pk.ergebnisse(page);
    await page.locator('#marks text',{hasText:'1.300,0'}).first().waitFor();
    const text=await page.locator('#marks').textContent();for(const t of ['< 0,50','3,2','45','1.300,0','µg/100 cm²','hoch','mittel','gering'])assert.ok(text.includes(t),t);
    const b=await badges(page);assert.deepEqual(overlaps(b),[]);
    // Exportkarte: gleicher Schalter
-   await page.locator('#export-open').click();await page.locator('#export').waitFor();await page.locator('#view').selectOption('results');
+   await openExport(page);await page.locator('#view').selectOption('results');
    assert.equal(await page.locator('#values-field').isVisible(),true);assert.equal(await page.locator('#values-export').isChecked(),true);
-   const dl=page.waitForEvent('download');await page.locator('#export').click();const d=await dl;assert.match(d.suggestedFilename(),/Ergebniskarte/);
+   const dl=page.waitForEvent('download');await pk.ausgeben(page);const d=await dl;assert.match(d.suggestedFilename(),/Ergebniskarte/);
    await page.locator('#values-export').uncheck();assert.equal(await page.locator('#value-labels').isChecked(),false);assert.equal(await page.locator('#marks text',{hasText:'1.300,0'}).count(),0);
-   await page.locator('#export-dialog .close').click();
-   await page.locator('#value-labels').check();
+   await pk.schritt(page,2);
+   await pk.schritt(page,3);await page.locator('#value-labels').check();
   });
   await check(`${engine}: Einstellungen in der Projektdatei, unbekannte Werte werden abgewiesen`,async()=>{
-   await page.locator('#auto-labels').uncheck();const file=await downloadedProject(page);assert.equal(file.plan.autoLabels,false);assert.equal(file.plan.valueLabels,true);
+   await pk.schritt(page,3);await page.locator('#auto-labels').uncheck();const file=await downloadedProject(page);assert.equal(file.plan.autoLabels,false);assert.equal(file.plan.valueLabels,true);
    await page.locator('#project-file').setInputFiles({name:'x.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(file))});await page.locator('#replace-yes').click();
    await page.locator('#welcome').waitFor({state:'hidden'});assert.equal(await page.locator('#auto-labels').isChecked(),false);assert.equal(await page.locator('#value-labels').isChecked(),true);
    const bad=structuredClone(file);bad.plan.valueLabels='ja';

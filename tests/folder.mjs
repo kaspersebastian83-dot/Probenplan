@@ -1,6 +1,7 @@
 // Projektordner: Öffnen aus der Projektzentrale (?projekt=), automatisches Speichern in „Pläne“, Bilder dorthin,
 // Grundrisse und Laborberichte aus dem Projekt, Konflikt bei fremder Änderung, Sicherungskopie beim Ersetzen.
 // Der Archivordner wird im privaten Dateisystem des Browsers (OPFS) nachgebildet; nur Chromium kennt die Ordner-API.
+import * as pk from './pk-ui.mjs';
 import {chromium,openExport,closeExport} from './runtime.mjs';
 import {labXML,labErgebnisse} from './lab-fixtures.mjs';
 import assert from 'node:assert/strict';
@@ -32,13 +33,13 @@ try{
  await check('Fragmentprojekt mit Sonderzeichen hat Vorrang; andere URL-Bestandteile bleiben erhalten',async()=>{
   const special='26.0987 Köln & Süd + 50% #Hof';await fs(page,'setup',special,svg,labXML());
   await page.goto(`${base}/?projekt=falsch&ansicht=liste#plan&projekt=${encodeURIComponent(special)}`);
-  await page.locator('#project-badge:not([hidden])').waitFor();
+  await page.locator('#project-badge:not([hidden])').waitFor({state:'attached'});
   assert.equal((await page.locator('#project-badge').textContent()).trim(),special);
   const url=new URL(page.url());assert.equal(url.searchParams.has('projekt'),false);assert.equal(url.searchParams.get('ansicht'),'liste');assert.ok(url.hash.startsWith('#plan&'));
   assert.equal(new URLSearchParams(url.hash.slice(1)).get('projekt'),special);
  });
  await check('?projekt= öffnet das Projekt, zeigt Nummer/Ort und bietet Grundrisse aus „Pläne“ an',async()=>{
-  await page.goto(`${base}/?projekt=${encodeURIComponent(NAME)}`);await page.locator('#project-badge:not([hidden])').waitFor();
+  await page.goto(`${base}/?projekt=${encodeURIComponent(NAME)}`);await page.locator('#project-badge:not([hidden])').waitFor({state:'attached'});
   assert.equal((await page.locator('#project-badge').textContent()).trim(),'26.0123 Köln');
   assert.equal(new URL(page.url()).searchParams.has('projekt'),false);assert.equal(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('projekt'),NAME);
   await page.locator('#folder-plans button',{hasText:'Grundriss EG.svg'}).click();await page.locator('#welcome').waitFor({state:'hidden'});
@@ -50,16 +51,16 @@ try{
   let downloaded=false;page.once('download',()=>{downloaded=true;});await page.locator('#save-project').click();await page.locator('#toast',{hasText:'Gespeichert'}).waitFor();assert.equal(downloaded,false);
  });
  await check('Export schreibt das Bild in „Pläne“ mit Projektnamen',async()=>{
-  await page.locator('#export-open').click();await page.locator('#export').click();await page.locator('#toast',{hasText:'Bild gespeichert'}).waitFor({timeout:60000});
-  assert.ok((await fs(page,'list',[NAME,'Pläne'])).includes(`Probenplan ${NAME}.png`));await page.locator('#export-dialog .close').click();
+  await openExport(page);await pk.ausgeben(page);await page.locator('#toast',{hasText:'Bild gespeichert'}).waitFor({timeout:60000});
+  assert.ok((await fs(page,'list',[NAME,'Pläne'])).includes(`Probenplan ${NAME}.png`));await pk.schritt(page,2);
  });
  await check('Probenerfassung aus LabelKit wird vorab zu offenen Proben',async()=>{
-  await page.locator('#lab-import').click();await page.locator('#lab-folder-dialog [data-labelkit]').click();await page.locator('#lab-review').waitFor();await page.locator('#lab-update-all:visible').click();
+  await pk.proben(page);await page.locator('#lab-folder-dialog [data-labelkit]').click();await page.locator('#lab-review').waitFor();await page.locator('#lab-update-all:visible').click();
   await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});await page.waitForTimeout(900);
   const file=await saved(page);assert.equal(file.markers[0].lab.desc,'Küche, Fensterbank, 400 cm²');assert.deepEqual(file.pending.map(r=>[r.label,r.ref,r.desc,r.art,r.datum]),[['P2','Probe 2','Flur, Wand, 100 cm²','Chlorid · Wischprobe','2026-10-15']]);
  });
  await check('Laborbericht aus „Laborergebnisse“ ergänzt die LabelKit-Proben per „Alle Konflikte: Aktualisieren“',async()=>{
-  await page.locator('#lab-import').click();await page.locator('#lab-folder-dialog [data-ergebnis]',{hasText:'AR-999.xml'}).click();await page.locator('#lab-review').waitFor();await page.locator('#lab-update-all:visible').click();
+  await pk.proben(page);await page.locator('#lab-folder-dialog [data-ergebnis]',{hasText:'AR-999.xml'}).click();await page.locator('#lab-review').waitFor();await page.locator('#lab-update-all:visible').click();
   await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});
   await page.waitForTimeout(900);const file=await saved(page);assert.equal(file.pending.length,8);const p2=file.pending.find(r=>r.label==='P2');assert.ok(p2.labNr&&p2.werte?.length,'P2 mit Labordaten');assert.ok(file.markers[0].lab.werte?.length,'P1 mit Messwerten');
  });
@@ -79,7 +80,7 @@ try{
  await check('Fremde Änderung wird nicht überschrieben – andere Fassung laden',async()=>{
   const other=JSON.parse(await fs(page,'read',[NAME,'Pläne'],FILE));other.markers[0].label='P77';await page.waitForTimeout(1600);await fs(page,'write',[NAME,'Pläne'],FILE,JSON.stringify(other));
   await page.keyboard.press('p');await tap(page,.6,.6);await page.locator('#ask-dialog').waitFor();assert.match(await page.locator('#ask-text').textContent(),/an anderer Stelle gespeichert/);
-  await page.locator('#ask-actions button',{hasText:'Andere Fassung laden'}).click();await page.locator('#marker-list',{hasText:'P77'}).waitFor();
+  await page.locator('#ask-actions button',{hasText:'Andere Fassung laden'}).click();await page.locator('#marker-list',{hasText:'P77'}).waitFor({state:'attached'});
   const file=JSON.parse(await fs(page,'read',[NAME,'Pläne'],FILE));assert.deepEqual(file.markers.map(m=>m.label),['P77']);
  });
  await check('Neuer Grundriss ersetzt den Plan nur mit Sicherungskopie',async()=>{
@@ -95,18 +96,18 @@ try{
   await page.evaluate(file=>{const original=FileSystemFileHandle.prototype.createWritable;window.failMainClose=true;
    FileSystemFileHandle.prototype.createWritable=async function(...args){const stream=await original.apply(this,args);if(this.name!==file)return stream;return new Proxy(stream,{get(target,key){if(key==='close')return async()=>{if(window.failMainClose)throw Error('Synthetic interrupted close');return target.close();};return typeof target[key]==='function'?target[key].bind(target):target[key];}});};
   },FILE);
-  await page.locator('[data-mode=sample]').click();await tap(page,.4,.4);await page.locator('#saved',{hasText:/^⚠ Nicht im Projektordner gespeichert$/}).waitFor();
+  await pk.modus(page,'sample');await tap(page,.4,.4);await page.locator('#saved',{hasText:/^⚠ Nicht im Projektordner gespeichert$/}).waitFor();
   assert.equal(await fs(page,'read',[NAME,'Pläne'],FILE),before);
   const recoveries=await recoveryProjects(page);assert.ok(recoveries.some(r=>r.project?.plan.name==='Neu.svg'&&r.project.markers.length===1),JSON.stringify({recoveries,toast:await page.locator('#toast').textContent()}));
   const local=await page.evaluate(name=>new Promise((res,rej)=>{const r=indexedDB.open('probenplan',1);r.onsuccess=()=>{const q=r.result.transaction('projects').objectStore('projects').get(`projekt:${name}`);q.onsuccess=()=>{r.result.close();res(q.result);};q.onerror=()=>rej(q.error);};}),NAME);assert.equal(local.dirty,true);assert.equal(local.project.markers.length,1);
-  const d=page.waitForEvent('download');await page.locator('#emergency-copy').click();assert.match((await d).suggestedFilename(),/Notfallkopie/);
+  const d=page.waitForEvent('download');await pk.mehr(page,'pk-m-notfall');assert.match((await d).suggestedFilename(),/Notfallkopie/);
   page.once('dialog',dialog=>dialog.accept());await page.reload();await page.locator('#ask-title',{hasText:'Ungespeicherte Browser-Fassung'}).waitFor();await page.locator('#ask-actions button',{hasText:'Browser-Fassung verwenden'}).click();
   await page.locator('#saved',{hasText:'Wiederhergestellt'}).waitFor();assert.equal(await fs(page,'read',[NAME,'Pläne'],FILE),before);assert.equal(await page.locator('#count').textContent(),'1');
   await page.locator('#save-project').click();await page.locator('#toast',{hasText:'Gespeichert'}).waitFor();assert.equal((await saved(page)).markers.length,1);
  });
  await check('Repeated edits during a conflict prompt ask again and backup the accepted external file',async()=>{
   const other=JSON.parse(await fs(page,'read',[NAME,'Pläne'],FILE));other.report='External A';await fs(page,'write',[NAME,'Pläne'],FILE,JSON.stringify(other));
-  await page.locator('[data-mode=sample]').click();await tap(page,.6,.6);await page.locator('#ask-dialog').waitFor();
+  await pk.modus(page,'sample');await tap(page,.6,.6);await page.locator('#ask-dialog').waitFor();
   other.report='External B';await fs(page,'write',[NAME,'Pläne'],FILE,JSON.stringify(other));await page.locator('#ask-actions button',{hasText:'Meine Fassung übernehmen'}).click();
   await page.locator('#ask-dialog').waitFor({state:'visible'});assert.equal(JSON.parse(await fs(page,'read',[NAME,'Pläne'],FILE)).report,'External B');
   await page.locator('#ask-actions button',{hasText:'Meine Fassung übernehmen'}).click();await page.locator('#saved',{hasText:/^✓ In „Pläne“ gespeichert$/}).waitFor();assert.equal((await saved(page)).markers.length,2);
@@ -133,7 +134,7 @@ try{
   await page.evaluate(()=>{window.failRecovery=true;document.querySelector('#toast').hidden=true;});await page.locator('#ask-actions button',{hasText:'Andere Fassung laden'}).click();await page.locator('#toast.error',{hasText:'Synthetic recovery creation failure'}).waitFor();
   assert.equal(await page.locator('#report').inputValue(),'Unsaved protect');assert.deepEqual(await browserDraft(page),draft);
   await page.evaluate(async()=>{const root=await navigator.storage.getDirectory(),archive=await root.getDirectoryHandle('Mosaik Archivordner'),other=await archive.getDirectoryHandle('26.0456 Other',{create:true});await other.getDirectoryHandle('Pläne',{create:true});window.showDirectoryPicker=async()=>other;});
-  await page.locator('#open-folder').click();await page.locator('#ask-title',{hasText:'Ungespeicherte Änderungen'}).waitFor();await page.evaluate(()=>document.querySelector('#toast').hidden=true);await page.locator('#ask-actions button',{hasText:'Sichern und wechseln'}).click();await page.locator('#toast.error',{hasText:'Synthetic recovery creation failure'}).waitFor();
+  await pk.mehr(page,'pk-m-ordner');await page.locator('#ask-title',{hasText:'Ungespeicherte Änderungen'}).waitFor();await page.evaluate(()=>document.querySelector('#toast').hidden=true);await page.locator('#ask-actions button',{hasText:'Sichern und wechseln'}).click();await page.locator('#toast.error',{hasText:'Synthetic recovery creation failure'}).waitFor();
   assert.equal(await page.locator('#project-badge').textContent(),NAME);assert.equal(await page.locator('#report').inputValue(),'Unsaved protect');assert.deepEqual(await browserDraft(page),draft);
   await page.evaluate(()=>window.failRecovery=false);await page.locator('#save-project').click();await page.locator('#ask-dialog').waitFor();await page.locator('#ask-actions button',{hasText:'Andere Fassung laden'}).click();await page.waitForFunction(()=>document.querySelector('#report').value==='External discard');
   await page.waitForFunction(name=>new Promise(resolve=>{const r=indexedDB.open('probenplan',1);r.onsuccess=()=>{const q=r.result.transaction('projects').objectStore('projects').get(`projekt:${name}`);q.onsuccess=()=>{r.result.close();resolve(q.result?.project.report==='External discard');};};}),NAME);

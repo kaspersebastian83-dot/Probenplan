@@ -1,4 +1,5 @@
 // Verbindlicher F1-Fall und Altdateien am echten Importdialog, nur synthetisches OPFS.
+import * as pk from './pk-ui.mjs';
 import {chromium,webkit,savedProject,openExport,closeExport} from './runtime.mjs';
 import assert from 'node:assert/strict';
 const base=process.env.TEST_URL||'http://localhost:4173',NAME='26.0101 Muster';
@@ -35,7 +36,7 @@ try{
  },NAME);
  await page.goto(`${base}/#projekt=${encodeURIComponent(NAME)}`);await page.reload();await page.locator('#folder-plans button',{hasText:'Muster.svg'}).click();await page.locator('#welcome').waitFor({state:'hidden'});
  async function write(nr){await page.evaluate(async({name,nr})=>{const p=await(await(await navigator.storage.getDirectory()).getDirectoryHandle('F1-Testarchiv')).getDirectoryHandle(name),lab=await p.getDirectoryHandle('Laboraufträge');const w=await(await lab.getFileHandle('26.0999_Daten.json',{create:true})).createWritable();await w.write(JSON.stringify({projekt:{nr},proben:[{id:1,_nr:1,z2:'FREMDES PROJEKT',matrix:'Wischprobe'}]}));await w.close();},{name:NAME,nr});}
- async function select(){await page.locator('#lab-import').click();await page.locator('#lab-folder-dialog [data-labelkit]').click();}
+ async function select(){await pk.proben(page);await page.locator('#lab-folder-dialog [data-labelkit]').click();}
  async function disk(){return page.evaluate(async name=>{const p=await(await(await navigator.storage.getDirectory()).getDirectoryHandle('F1-Testarchiv')).getDirectoryHandle(name),d=await p.getDirectoryHandle('Pläne');return(await(await d.getFileHandle(`Probenplan ${name}.probenplan`)).getFile()).text();},NAME);}
 
  // Auch die manuelle Dateiauswahl muss die echte Ordnernummer benutzen, selbst bei leerem Gutachtenfeld.

@@ -3,6 +3,9 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),http=require('node:http');
 const root=path.resolve(__dirname,'..'),plan=fs.existsSync(path.join(root,'src/main.ts')),engine=process.argv[2]||'chromium';
 const pw=plan?require('@playwright/test'):require('playwright');
+// PlanKit 2.0: Kopfband – Objekt steht in .ml-z2; „📁 Projekt“ und „Projektdaten neu einlesen“ liegen unsichtbar im alten Kopf und werden aus „Mehr …“
+// ausgelöst, die Ausgabe ist Schritt ③ – hier direkt klicken (die Oberfläche selbst prüft tests/oberflaeche-browser.mjs).
+const klick=(page,sel)=>/^#(projekt-ordner|pj-refresh|open-folder|project-badge|export)$/.test(sel)?page.evaluate(s=>document.querySelector(s).click(),sel):page.locator(sel).click();
 const names={A:'26.0101 Muster A',B:'26.0999 Muster B',C:'26.0707 Neues Projekt'};
 const pj=(objekt)=>JSON.stringify({format:'mosaik-projekt',version:1,objekt,auftraggeber:'AG '+objekt,ortstermin:'2026-10-21'});
 const svg='<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><rect x="1" y="1" width="298" height="198" fill="white" stroke="black"/></svg>';
@@ -76,16 +79,16 @@ let browser,server;
    page.on('dialog',d=>{if(d.type()==='confirm'&&d.message().includes('möglicherweise veraltet')){confirmations.push(d.message());void(allow?d.accept():d.dismiss());}else void d.accept();});
    await page.goto(url);if(!plan)await page.evaluate(()=>{document.querySelectorAll('.modal-overlay.open').forEach(e=>e.classList.remove('open'));});
    const button=plan?'#project-badge':'#pj-refresh',warning=plan?'#project-data-warning':'#pj-warning';
-   const open=async key=>{await page.evaluate(key=>window.__f7next=key,key);await page.locator(plan?'#open-folder':'#projekt-ordner').click();await page.waitForFunction(({button,name})=>document.querySelector(button)?.dataset.status==='ok'&&window.SpektronProjectData(name)?.data.objekt!==undefined,{button,name:names[key]});};
+   const open=async key=>{await page.evaluate(key=>window.__f7next=key,key);await klick(page,plan?'#open-folder':'#projekt-ordner');await page.waitForFunction(({button,name})=>document.querySelector(button)?.dataset.status==='ok'&&window.SpektronProjectData(name)?.data.objekt!==undefined,{button,name:names[key]});};
    const status=async()=>page.evaluate(name=>{const s=window.SpektronProjectData(name);return s?{status:s.status,stale:s.stale,checking:s.checking,data:s.data}:null;},names[await page.evaluate(()=>window.__f7next)]);
-   const refresh=async()=>{await page.locator(button).click();await page.waitForFunction(button=>!document.querySelector(button).disabled,button);};
+   const refresh=async()=>{await klick(page,button);await page.waitForFunction(button=>!document.querySelector(button).disabled,button);};
    const put=(key,data)=>files.set(names[key]+'/_Projekt.json',bytes(data));
    const exported=()=>[...files.keys()].filter(p=>/\.(png|pdf|docx)$/.test(p));
    const exportStart=async(format='png')=>{
     if(!plan){if(!await page.evaluate(()=>proben.length))await page.evaluate(()=>{proben.push({id:1,datum:'2026-10-21',z1:PROJEKTORDNER.state.proj.nr,z2:'Raum',z3:'Test',z4:'Glas',matrix:'Wischprobe',cm2:'100',notiz:''});});return page.evaluate(()=>exportAuftragsscheinRTF());}
-    if(!await page.locator('#export-dialog').evaluate(d=>d.open))await page.locator('#export-open').click();
+    if(await page.evaluate(()=>document.body.dataset.pkSchritt)!=='3')await page.locator('[data-pk-step="3"]').click();
     await page.locator('#format').selectOption(format);if(format==='png')await page.locator('#framed').uncheck();
-    await page.locator('#export').click();
+    await klick(page,'#export');
    };
    const acceptPlan=async accept=>{await page.locator('#ask-dialog[open]').waitFor();await page.getByRole('button',{name:accept?'Für diesen Export ausdrücklich verwenden':'Abbrechen',exact:true}).click();};
    const deferred=()=>{let arrived,release;const reached=new Promise(r=>{arrived=r;}),wait=new Promise(r=>{release=r;});hold={project:names.A,started:false,arrived,wait};return{reached,release};};
@@ -98,8 +101,8 @@ let browser,server;
   await t.open('A');t.put('A',pj('NEU'));t.faults[names.A]={name:'NetworkError'};await t.refresh();
   assert.equal((await t.status()).data.objekt,'ALT');assert.equal((await t.status()).stale,true);assert.equal((await t.status()).status,'network');assert.match(await t.page.locator(t.warning).textContent(),/möglicherweise veraltet/);
   // The suite bar refreshes asynchronously after the reader button is enabled.
-  await t.page.waitForFunction(()=>/ALT.*möglicherweise veraltet/.test(document.querySelector('#mosaikLeiste .ml-obj')?.textContent||''),undefined,{timeout:5000});
-  assert.match(await t.page.locator('#mosaikLeiste .ml-obj').textContent(),/ALT.*möglicherweise veraltet/);
+  await t.page.waitForFunction(()=>/ALT.*möglicherweise veraltet/.test(document.querySelector('#mosaikLeiste .ml-z2')?.textContent||''),undefined,{timeout:5000});
+  assert.match(await t.page.locator('#mosaikLeiste .ml-z2').textContent(),/ALT.*möglicherweise veraltet/);
   if(!plan){await t.page.evaluate(()=>fbVorbelegen(true));assert.doesNotMatch(await t.page.locator('#flash').textContent().catch(()=>''),/übernommen ✓/);}
  });
  await scenario('B: erneute Prüfung, Exportabbruch und ausdrückliche Zustimmung',async t=>{
@@ -111,13 +114,13 @@ let browser,server;
   assert.equal(await t.page.locator(t.warning).isVisible(),true,'Zustimmung löscht keine Warnung');
  });
  await scenario('C: Wiederholung übernimmt NEU und entfernt Warnung, Export nutzt NEU',async t=>{
-  await t.open('A');t.put('A',JSON.stringify({daten:{objekt:'Altbestand'}}));await t.refresh();assert.equal((await t.status()).data.daten.objekt,'Altbestand');await t.page.waitForFunction(()=>document.querySelector('#mosaikLeiste .ml-obj')?.textContent.includes('Altbestand'),undefined,{timeout:5000});assert.match(await t.page.locator('#mosaikLeiste .ml-obj').textContent(),/Altbestand/);t.put('A',pj('ALT'));await t.refresh();t.faults[names.A]={name:'NetworkError'};await t.refresh();t.put('A',pj('NEU'));delete t.faults[names.A];await t.refresh();
+  await t.open('A');t.put('A',JSON.stringify({daten:{objekt:'Altbestand'}}));await t.refresh();assert.equal((await t.status()).data.daten.objekt,'Altbestand');await t.page.waitForFunction(()=>document.querySelector('#mosaikLeiste .ml-z2')?.textContent.includes('Altbestand'),undefined,{timeout:5000});assert.match(await t.page.locator('#mosaikLeiste .ml-z2').textContent(),/Altbestand/);t.put('A',pj('ALT'));await t.refresh();t.faults[names.A]={name:'NetworkError'};await t.refresh();t.put('A',pj('NEU'));delete t.faults[names.A];await t.refresh();
   assert.equal((await t.status()).data.objekt,'NEU');assert.equal((await t.status()).stale,false);assert.equal(await t.page.locator(t.warning).isVisible(),false);
   if(plan){await t.exportStart('pdf-a4');await t.page.waitForFunction(()=>!document.querySelector('#export').disabled);const pdf=t.exported().find(p=>p.endsWith('.pdf'));assert.ok(pdf,await t.page.locator('#toast').textContent());const subjectHex=/\/Subject <FEFF([A-F0-9]+)>/.exec(Buffer.from(t.files.get(pdf)).toString('latin1'))[1];const subject=Buffer.from(subjectHex,'hex').swap16().toString('utf16le');assert.match(subject,/NEU/);assert.doesNotMatch(subject,/ALT/);}
   else{const dl=t.page.waitForEvent('download');await t.exportStart();const text=fs.readFileSync(await(await dl).path(),'latin1');assert.match(text,/Objekt: \\b NEU/);assert.doesNotMatch(text,/Objekt: \\b ALT/);assert.equal(t.confirmations.length,0);}
  });
  await scenario('D: verspätetes A-Ergebnis bleibt nach Projektwechsel ohne Wirkung',async t=>{
-  await t.open('A');t.put('A',pj('A verspätet'));const delay=t.deferred();await t.page.locator(t.button).click();await delay.reached;
+  await t.open('A');t.put('A',pj('A verspätet'));const delay=t.deferred();await klick(t.page,t.button);await delay.reached;
   await t.open('B');delay.release();await t.page.waitForTimeout(100);assert.equal((await t.status()).data.objekt,'B aktuell');assert.equal((await t.status()).stale,false);
   assert.doesNotMatch(await t.page.locator('#mosaikLeiste').textContent(),/A verspätet/);
  });
@@ -130,11 +133,11 @@ let browser,server;
  });
  await scenario('Fehlende Datei: neues Projekt ohne Warnung, nach geladenem Stand mit Warnung',async t=>{
   await t.open('A');t.files.delete(names.A+'/_Projekt.json');await t.refresh();assert.equal((await t.status()).status,'missing');assert.equal((await t.status()).stale,true);
-  await t.page.evaluate(()=>window.__f7next='C');await t.page.locator(plan?'#open-folder':'#projekt-ordner').click();await t.page.waitForFunction(({button,name})=>document.querySelector(button)?.dataset.status==='missing'&&window.SpektronProjectData(name),{button:t.button,name:names.C});
+  await t.page.evaluate(()=>window.__f7next='C');await klick(t.page,plan?'#open-folder':'#projekt-ordner');await t.page.waitForFunction(({button,name})=>document.querySelector(button)?.dataset.status==='missing'&&window.SpektronProjectData(name),{button:t.button,name:names.C});
   assert.equal((await t.status()).stale,false);assert.deepEqual((await t.status()).data,{});assert.equal(await t.page.locator(t.warning).isVisible(),false);
  });
  await scenario('Später Erfolg darf neueren Lesefehler nicht als Erfolg überdecken',async t=>{
-  await t.open('A');const delay=t.deferred();await t.page.locator(t.button).click();await delay.reached;t.faults[names.A]={name:'NetworkError'};
+  await t.open('A');const delay=t.deferred();await klick(t.page,t.button);await delay.reached;t.faults[names.A]={name:'NetworkError'};
   await t.page.evaluate(()=>window.dispatchEvent(new Event('focus')));await t.page.waitForFunction(button=>document.querySelector(button).dataset.stale==='true',t.button);delay.release();await t.page.waitForTimeout(100);
   assert.equal((await t.status()).status,'network');assert.equal((await t.status()).stale,true);
  });
