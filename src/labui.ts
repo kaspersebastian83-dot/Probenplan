@@ -48,7 +48,7 @@ export class LabUI {
  /** Plan → Liste: Zeile des Punkts hervorheben. */
  listeHover(id:string|null){if(listeOn())this.liste.markHover(id);}
  render(p:Project|null){this.panel.hidden=!p;this.open.disabled=this.loading||this.hooks.blocked();this.sw.checked=weiterOn();const stage=document.getElementById('stage');if(stage)stage.dataset.weiter=weiterOn()?'on':'off';if(!p){this.chip.hidden=true;this.liste.root.hidden=true;return;}this.liste.root.hidden=false;{const ziel=listeOn()?this.liste.slot:this.panel;if(this.swLabel.parentElement!==ziel){if(ziel===this.panel)this.panel.querySelector('h2')?.after(this.swLabel);else ziel.append(this.swLabel);}}
-  const pending=p.pending||[];if(this.selected!==null&&!pending.some(r=>r.label===this.selected))this.selected=null;const jetzt=this.selected===null?undefined:pending.find(r=>r.label===this.selected);this.chip.hidden=!(weiterOn()&&jetzt);if(jetzt)this.chipText.textContent=`${this.note}JETZT ${jetztText(jetzt)} – In den Plan tippen`;if(listeOn())this.liste.render(p);
+  const pending=p.pending||[];if(this.selected!==null&&!pending.some(r=>r.label===this.selected))this.selected=null;const jetzt=this.selected===null?undefined:pending.find(r=>r.label===this.selected);this.chip.hidden=!(weiterOn()&&jetzt);if(jetzt)this.chipText.textContent=`${this.note}Als Nächstes setzen: ${jetztText(jetzt)} · einfach in den Plan tippen`;if(listeOn())this.liste.render(p);
   const placed=allMarkers(p).filter(m=>m.lab).length;const floors=p.sheets&&p.sheets.length>1?p.sheets.map((s,i)=>({name:s.name,n:(i===(p.active??0)?p.markers:s.markers||[]).filter(m=>m.lab).length})).filter(f=>f.n):[];this.counter.textContent=`${placed} von ${placed+pending.length} platziert${floors.length?` (${floors.map(f=>`${f.name}: ${f.n}`).join(' · ')})`:''}${!pending.length&&placed?' · Alle Laborproben platziert.':''}`;this.list.replaceChildren();
   pending.forEach((r,index)=>{const item=el('div');item.className='pending-item';const b=el('button');b.className=`pending-row ${pendingShape(r)}`;b.dataset.pending=String(index);b.setAttribute('aria-pressed',String(this.selected===r.label));b.append(el('span',r.label),el('span',`${r.label} – ${r.desc||r.ref}`));b.onclick=()=>this.choose(r.label);const x=button('✕',()=>this.removePending(r.label));x.className='row-del';x.dataset.pendingDel=r.label;x.title=`${r.label} aus der Liste entfernen`;x.setAttribute('aria-label',`${r.label} aus der Liste entfernen`);x.addEventListener('pointerdown',e=>e.stopPropagation());item.append(b,x);this.list.append(item);});this.clear.hidden=pending.length<2;if(!pending.length)this.list.append(el('p',placed?'Platzierung vollständig.':'Noch kein Laborbericht übernommen.'));
  }
@@ -97,7 +97,7 @@ export class LabUI {
  /** Aktuelle Probe auslassen und die nächste in der Reihenfolge wählen (Raum zuerst). */
  private skip(){const p=this.hooks.project(),label=this.selected;if(!p||label===null)return;const next=naechste(p.pending||[],label);if(next===null)return;this.note='';this.selected=next;this.render(p);this.scrollSel();}
  /** „Fertig“ / Esc: Platzieren beenden, zurück zur Ansicht. */
- fertig(){this.note='';this.selected=null;this.hooks.mode('navigate');this.render(this.hooks.project());}
+ fertig(){this.letzteWahl=this.selected??this.letzteWahl;this.note='';this.selected=null;this.hooks.mode('navigate');this.render(this.hooks.project());}
  /** Noch nicht platzierte Probe(n) aus der Liste entfernen – rückgängig über den Verlauf. */
  private removePending(label:string){if(this.hooks.blocked())return;const p=this.hooks.project();if(!p?.pending?.some(r=>r.label===label))return;this.hooks.mutate(q=>{q.pending=(q.pending||[]).filter(r=>r.label!==label);});if(this.selected===label){this.selected=null;this.hooks.mode('navigate');}this.render(this.hooks.project());}
  private clearPending(){if(this.hooks.blocked())return;const n=this.hooks.project()?.pending?.length||0;if(!n||!confirm(`Alle ${n} noch nicht platzierten Proben aus der Liste entfernen?\nBereits platzierte Probenpunkte bleiben. Rückgängig mit Strg+Z.`))return;this.hooks.mutate(q=>{q.pending=[];});this.selected=null;this.hooks.mode('navigate');this.render(this.hooks.project());}
@@ -108,7 +108,12 @@ export class LabUI {
   const label=m.label;this.hooks.mutate(q=>{zurueckZuOffen(q,id);});
   if(neu)this.choose(label);else this.render(this.hooks.project());
  }
- reset(){this.selected=null;this.note='';this.cancelDrag();}
+ reset(){this.selected=null;this.letzteWahl=null;this.note='';this.cancelDrag();}
+ /** Gewählte offene Probe (für die Hinweiskarte „Pause – nächste wäre …“). */
+ gewaehlt(){return this.selected;}
+ /** Zuletzt gewählte offene Probe vor „Pause“ (Hinweiskarte „Pause – nächste wäre …“). */
+ private letzteWahl:string|null=null;
+ letzte(){return this.selected??this.letzteWahl;}
  private summary(report?:LabReport){
   const p=this.hooks.project();if(!p)return;
   const dialog=el('dialog');dialog.id='lab-summary';dialog.append(el('h2','Probenliste speichern'),el('p','Ziel im Dateidialog: Projektordner → Laborergebnisse. Gespeicherte Herkunftsangaben werden automatisch übernommen. Bei älteren Proben ohne Herkunft bitte fehlende Angaben ergänzen.'));

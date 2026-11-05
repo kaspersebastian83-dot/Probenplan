@@ -1,6 +1,7 @@
 // Anlage Probenahme (Word): Projekt aus dem Ordner, drei Proben im Plan, Laborbericht, Fotos aus FotoKit (eins verändert,
 // eins mit unbekannter Probe-Nr., eins aussortiert). Prüft Inhalt, Bilder, Prüfprotokoll, Ablage in „Mitteilungen“ und
 // dass nichts überschrieben wird. Nur Chromium (Ordnerzugriff). ANLAGE_DUMP=<Ordner> legt die .docx zur Sichtprüfung ab.
+import * as pk from './pk-ui.mjs';
 import {chromium,openExport} from './runtime.mjs';
 import {labXML,labRows,labErgebnisse} from './lab-fixtures.mjs';
 import assert from 'node:assert/strict';
@@ -49,10 +50,10 @@ try{
  await page.goto(base);await fs(page,'setup',NAME,svg,labXML(rows),labErgebnisse(rows));
  // Skala wie aus FotoKit (gemeinsamer Browser-Speicher)
  await page.evaluate(([k])=>localStorage.setItem('bu-scales',JSON.stringify({[k]:{name:'PAK Wischproben',cats:[{name:'gering',from:0},{name:'mittel',from:5},{name:'hoch',from:50}]}})),[`${PARAM}|${UNIT}`]);
- await page.goto(`${base}/?projekt=${encodeURIComponent(NAME)}`);await page.locator('#project-badge:not([hidden])').waitFor();
+ await page.goto(`${base}/?projekt=${encodeURIComponent(NAME)}`);await page.locator('#project-badge:not([hidden])').waitFor({state:'attached'});
  await page.locator('#folder-plans button',{hasText:'Grundriss EG.svg'}).click();await page.locator('#welcome').waitFor({state:'hidden'});
  await page.keyboard.press('p');await tap(page,.2,.3);await tap(page,.25,.7);await tap(page,.7,.5);await page.keyboard.press('v');
- await page.locator('#lab-import').click();await page.locator('#lab-folder-dialog [data-ergebnis]',{hasText:'AR-999.xml'}).click();await page.locator('#lab-review').waitFor();await page.locator('#lab-update-all:visible').click();
+ await pk.proben(page);await page.locator('#lab-folder-dialog [data-ergebnis]',{hasText:'AR-999.xml'}).click();await page.locator('#lab-review').waitFor();await page.locator('#lab-update-all:visible').click();
  await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});
  await page.locator('#saved',{hasText:/gespeichert/}).waitFor();
 
@@ -63,7 +64,7 @@ try{
   assert.match(await page.locator('#dimensions-note').textContent(),/4 Proben · 1 Planseite · gespeichert in „Mitteilungen“/);
   assert.equal(await page.locator('#export').textContent(),'↓ Anlage erstellen');
   await page.locator('#annex-title').fill('Anlage 3');
-  await page.locator('#export').click();await page.locator('#toast',{hasText:'Anlage gespeichert'}).waitFor({timeout:90000});
+  await pk.ausgeben(page);await page.locator('#toast',{hasText:'Anlage gespeichert'}).waitFor({timeout:90000});
   const list=await fs(page,'list',[NAME,'Mitteilungen']);docName=list.find(n=>n.endsWith('.docx'));
   assert.match(docName,/^26-0142_Anlage-3_Probenahme_\d{4}-\d{2}-\d{2}\.docx$/);assert.ok(list.includes('_Anlagen-Protokoll.txt'));
   assert.match(await page.locator('#toast').textContent(),/Hinweise? im Prüfprotokoll/);
@@ -106,17 +107,17 @@ try{
   assert.ok(log.includes(`| ${docName} | ${docSha} | Pläne/Probenplan ${NAME}.probenplan | ${planSha} | PlanKit ${VERSION}`),'Protokollzeile');
  });
  await check('Zweites Erstellen überschreibt nichts',async()=>{
-  await page.locator('#export').click();await page.locator('#toast',{hasText:'_2.docx'}).waitFor({timeout:90000});
+  await pk.ausgeben(page);await page.locator('#toast',{hasText:'_2.docx'}).waitFor({timeout:90000});
   const list=await fs(page,'list',[NAME,'Mitteilungen']);assert.equal(list.filter(n=>n.endsWith('.docx')).length,2);
   assert.equal((await fs(page,'text',[NAME,'Mitteilungen'],'_Anlagen-Protokoll.txt')).trim().split(/\r?\n/).length,3);
   assert.equal(await page.locator('#annex-title').inputValue(),'Anlage 3');
  });
  await check('Zwei Geschosse: je Geschoss eine Planseite, Spalte „Geschoss“, Probe im OG mit Lage',async()=>{
-  await page.locator('#export-dialog .close').click();
-  await page.locator('#sheet-add').click();await page.locator('#sheet-file').setInputFiles({name:'OG.svg',mimeType:'image/svg+xml',buffer:Buffer.from(svg.replace('Küche','Bad'))});
+  await pk.schritt(page,2);
+  await pk.schritt(page,1);await page.locator('#sheet-add').click();await page.locator('#sheet-file').setInputFiles({name:'OG.svg',mimeType:'image/svg+xml',buffer:Buffer.from(svg.replace('Küche','Bad'))});
   await page.locator('#sheet-strip:not(.single)').waitFor();await page.keyboard.press('p');await tap(page,.4,.4);await page.keyboard.press('v');
   await openExport(page);await page.locator('#format').selectOption('anlage');assert.match(await page.locator('#dimensions-note').textContent(),/5 Proben · 2 Planseiten/);
-  await page.locator('#export').click();await page.locator('#toast',{hasText:'_3.docx'}).waitFor({timeout:90000});
+  await pk.ausgeben(page);await page.locator('#toast',{hasText:'_3.docx'}).waitFor({timeout:90000});
   const name=(await fs(page,'list',[NAME,'Mitteilungen'])).find(n=>n.endsWith('_3.docx'));
   const files=unzip(Buffer.from(await fs(page,'bytes',[NAME,'Mitteilungen'],name),'base64')),t=text(files['word/document.xml'].toString('utf8'));
   assert.equal(Object.keys(files).filter(n=>/media\/.*\.png$/.test(n)).length,2,'zwei Planseiten');
@@ -128,7 +129,7 @@ try{
   const pj=JSON.parse(await fs(page,'text',[NAME],'_Projekt.json'));
   await fs(page,'put',[NAME],'_Projekt.json',JSON.stringify({...pj,objekt:'EFH, Neuweg 9'}));
   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.waitForTimeout(500);
-  await page.locator('#export').click();await page.locator('#toast',{hasText:'_4.docx'}).waitFor({timeout:90000});
+  await pk.ausgeben(page);await page.locator('#toast',{hasText:'_4.docx'}).waitFor({timeout:90000});
   const name=(await fs(page,'list',[NAME,'Mitteilungen'])).find(n=>n.endsWith('_4.docx'));
   const t=text(unzip(Buffer.from(await fs(page,'bytes',[NAME,'Mitteilungen'],name),'base64'))['word/document.xml'].toString('utf8'));
   assert.match(t,/Objekt\nEFH, Neuweg 9/);assert.doesNotMatch(t,/Musterweg 7/);

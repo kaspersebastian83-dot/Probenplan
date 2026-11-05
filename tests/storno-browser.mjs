@@ -1,6 +1,7 @@
 // Stornierte Proben aus LabelKit im Browser (ab 1.51): nicht angeboten, nicht als offen gezählt; ein schon gesetzter Punkt
 // zeigt „P7 ist storniert – Punkt entfernen?“ mit Entfernen (nach Rückfrage, rückgängig) und Behalten; Storno aufgehoben →
 // wieder angeboten. Freier Plan in Chromium und WebKit, Projektordner (privates Browser-Dateisystem) in Chromium. Synthetische Daten.
+import * as pk from './pk-ui.mjs';
 import {chromium,webkit,savedProject} from './runtime.mjs';
 import assert from 'node:assert/strict';
 const base=process.env.TEST_URL||'http://localhost:4173',NAME='26.0101 Muster';
@@ -16,7 +17,7 @@ const daten=(st=[])=>({nrSchutz:1,projekt:{nr:'26.0101'},proben:[1,2,3,4].map(n=
 const file=st=>({name:'26.0101_Daten.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(daten(st)))});
 const offen=page=>page.locator('#pending-list [data-pending-del]').evaluateAll(b=>b.map(x=>x.dataset.pendingDel));
 const zeilen=page=>page.locator('#storno-hinweis .storno-zeile').evaluateAll(r=>r.map(x=>x.querySelector('span').textContent));
-async function platzieren(page,label,x,y){await page.locator('.pending-item',{has:page.locator(`[data-pending-del="${label}"]`)}).locator('.pending-row').click();await tap(page,x,y);await page.locator('#stage[data-mode=navigate]').waitFor();}
+async function platzieren(page,label,x,y){await pk.schritt(page,2);await page.locator(`.pl-row[data-plabel="${label}"]`).click();await tap(page,x,y);await page.locator('#stage[data-mode=navigate]').waitFor();}
 async function uebernehmen(page,files,{konflikte=false}={}){
  await page.locator('#lab-files').setInputFiles(files);await page.locator('#lab-review').waitFor();
  if(konflikte)await page.locator('#lab-update-all').click();
@@ -110,7 +111,7 @@ if(engines.includes('chromium')){
   await schreiben([2]);
   await page.goto(`${base}/#projekt=${encodeURIComponent(NAME)}`);await page.reload();await page.locator('#folder-plans button',{hasText:'Muster.svg'}).click();await page.locator('#welcome').waitFor({state:'hidden'});
   await check('chromium Projektordner: „Proben übernehmen …“ aus LabelKit ohne die stornierte P2',async()=>{
-   await page.locator('#lab-import').click();await page.locator('#lab-folder-dialog [data-labelkit]').click();await page.locator('#lab-review').waitFor();
+   await pk.proben(page);await page.locator('#lab-folder-dialog [data-labelkit]').click();await page.locator('#lab-review').waitFor();
    assert.deepEqual(await page.locator('#lab-review [data-field=label]').evaluateAll(i=>i.map(x=>x.value)),['P1','P3','P4']);
    await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});
    assert.deepEqual(await offen(page),['P1','P3','P4']);assert.equal(await page.locator('#pending-count').textContent(),'0 von 3 platziert');

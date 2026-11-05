@@ -336,7 +336,6 @@ dialog.export-card label.export-check input{width:auto;margin:0}
 .pflicht-tag{display:none;margin-left:6px;vertical-align:1px;padding:0 6px;border-radius:8px;font-size:10.5px;font-weight:600;line-height:16px;color:#8a6500;background:rgba(217,164,0,.16);border:1px solid rgba(217,164,0,.45)}
 label.pflicht-offen .pflicht-tag{display:inline-block}
 label.pflicht-offen>input,label.pflicht-offen>select{border-color:#d9a400!important;background:#fff8e1;box-shadow:inset 3px 0 0 #d9a400}
-@media (prefers-color-scheme:dark){.pflicht-tag{color:#f0c850}label.pflicht-offen>input,label.pflicht-offen>select{background:rgba(217,164,0,.12)}}
 /* Schnellskizze (ab 1.41) */
 #sketch-actions #sketch-quick-row label input[type=checkbox],#sketch-actions #sketch-fire-row input{width:18px;height:18px;min-height:0;margin:0}
 #sketch-actions .sketch-switch{margin-left:auto;color:var(--kit-muted);font-weight:500}
@@ -375,9 +374,6 @@ label.pflicht-offen>input,label.pflicht-offen>select{border-color:#d9a400!import
 #side-panel:not([data-liste=neu]) #proben-section{display:none}
 #side-panel[data-liste=neu] #lab-panel,#side-panel[data-liste=neu] .markers-section .section-heading,#side-panel[data-liste=neu] #marker-list{display:none}
 #side-panel[data-liste=neu] .markers-section:has(#inspector[hidden]){display:none}
-#side-panel[data-liste=neu][data-tab=proben] :is(#size-section,#scale-section,#label-section,#results-section,#raumbuch-section,.areas-section){display:none!important}
-#side-panel[data-liste=neu][data-tab=plan] :is(#proben-section,.markers-section,#raumbuch-section){display:none!important}
-#side-panel[data-liste=neu][data-tab=raumbuch] :is(#proben-section,.markers-section,#size-section,#scale-section,#label-section,#results-section,.areas-section){display:none!important}
 .proben-section .section-heading{display:flex;align-items:center;justify-content:space-between}
 .pl-progress{margin:2px 0 6px;font-size:12px}
 .pl-bar{height:6px;margin-bottom:8px;border-radius:3px;background:var(--kit-line);overflow:hidden}

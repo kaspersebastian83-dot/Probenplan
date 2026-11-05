@@ -1,4 +1,5 @@
 // Maßstäbliches PDF (A4/A3): Kalibrierung per Strecke, Nordpfeil, Schriftfeld, exakter Maßstab auf dem Blatt, mehrere Pläne.
+import * as pk from './pk-ui.mjs';
 import {chromium,webkit,savedProject,downloadedProject,openExport,closeExport} from './runtime.mjs';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
@@ -33,7 +34,7 @@ let dumped=0;
 async function pdfExport(page){
  // Diagnose: Klickziel, angekommene Klicks und Starttext der Schaltfläche mitschreiben.
  await page.evaluate(()=>{const b=document.getElementById('export');window.__diag={clicks:0,texts:[],hit:''};b.addEventListener('click',()=>window.__diag.clicks++);new MutationObserver(()=>window.__diag.texts.push(b.textContent)).observe(b,{childList:true,characterData:true,subtree:true});const r=b.getBoundingClientRect(),el=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);window.__diag.hit=el?(el.id||el.tagName+'.'+el.className):'none';window.__diag.rect=[Math.round(r.left),Math.round(r.top),Math.round(r.width),Math.round(r.height),innerWidth,innerHeight];});
- const started=Date.now(),pending=page.waitForEvent('download',{timeout:60000}).catch(e=>e);await page.locator('#export').click();let dl=await pending;
+ const started=Date.now(),pending=page.waitForEvent('download',{timeout:60000}).catch(e=>e);await pk.ausgeben(page);let dl=await pending;
  if(dl instanceof Error){const first=await page.evaluate(()=>window.__diag);const retry=page.waitForEvent('download',{timeout:60000}).catch(e=>e);await page.locator('#export').evaluate(b=>b.click());const second=await retry;
   throw Error(`Kein PDF-Download nach Klick (${Math.round((Date.now()-started)/1000)} s). Diagnose: ${JSON.stringify(first)} · programmatischer Klick ${second instanceof Error?'ebenfalls ohne Download':'lädt herunter'} · danach ${JSON.stringify(await page.evaluate(()=>({diag:window.__diag,toast:document.getElementById('toast')?.textContent})))}`);}
  if(dl instanceof Error){const state=await page.evaluate(()=>({toast:document.getElementById('toast')?.textContent,toastError:document.getElementById('toast')?.className,button:document.getElementById('export')?.textContent,disabled:document.getElementById('export')?.disabled,ua:navigator.userAgent.slice(-40),result:!document.getElementById('export-result')?.hidden})).catch(e=>({evaluate:String(e)}));throw Error(`Kein PDF-Download nach ${Math.round((Date.now()-started)/1000)} s: ${JSON.stringify(state)} · Konsole: ${JSON.stringify(page.__log||[])}`);}
@@ -46,7 +47,7 @@ for(const engine of ['chromium','webkit']){
   await page.goto(base);
   await page.locator('#file').setInputFiles(plan(4000,3000,'EG'));await page.locator('#welcome').waitFor({state:'hidden'});
   await page.keyboard.press('p');await tap(page,.3,.4);await page.keyboard.press('v');
-  if(await page.locator('#panel-toggle').getAttribute('aria-pressed')!=='true')await page.locator('#panel-toggle').click();
+  await pk.spalte(page);
   await check(`${engine}: ohne Kalibrierung zeigt die Liste den Hinweis, PDF bleibt möglich`,async()=>{
    assert.match(await page.locator('#scale-status').textContent(),/Nicht kalibriert/);assert.equal(await page.locator('#scale-clear').isHidden(),true);
    await openExport(page);await page.locator('#report').fill('26.0142');await page.locator('#format').selectOption('pdf-a4');
@@ -55,25 +56,25 @@ for(const engine of ['chromium','webkit']){
    assert.match(await page.locator('#toast').textContent(),/Ohne Maßstab/);await closeExport(page);
   });
   await check(`${engine}: Messen – Esc bricht ab, ungültige Länge wird abgewiesen, gültige setzt den Maßstab`,async()=>{
-   await page.locator('#measure-start').click();assert.match(await page.locator('#mode-hint').textContent(),/ersten Punkt/);await tap(page,.25,.5);await page.keyboard.press('Escape');assert.match(await page.locator('#mode-hint').textContent(),/Ansicht bewegen/);
+   await pk.schritt(page,1);await page.locator('#measure-start').click();assert.match(await page.locator('#mode-hint').textContent(),/ersten Punkt/);await tap(page,.25,.5);await page.keyboard.press('Escape');assert.match(await page.locator('#mode-hint').textContent(),/Ansicht bewegen/);
    assert.equal(await page.locator('#measure-layer circle').count(),0);
-   await page.locator('#measure-start').click();await tap(page,.25,.5);assert.match(await page.locator('#mode-hint').textContent(),/zweiten Punkt/);await tap(page,.75,.5);
+   await pk.schritt(page,1);await page.locator('#measure-start').click();await tap(page,.25,.5);assert.match(await page.locator('#mode-hint').textContent(),/zweiten Punkt/);await tap(page,.75,.5);
    await page.locator('#measure-dialog').waitFor();await page.locator('#measure-length').fill('zehn');await page.locator('#measure-ok').click();
    assert.equal(await page.locator('#measure-error').isVisible(),true);assert.equal(await page.locator('#measure-dialog').evaluate(d=>d.open),true);
    await page.locator('#measure-length').fill('10,0');await page.locator('#measure-ok').click();await page.locator('#measure-dialog').waitFor({state:'hidden'});
-   await page.locator('#scale-status',{hasText:'Gemessen: 10 m'}).waitFor();assert.match(await page.locator('#scale-status').textContent(),/(19,9|20(,1)?) × 15(,1)? m/);
+   await page.locator('#scale-status',{hasText:'Gemessen: 10 m'}).waitFor({state:'attached'});assert.match(await page.locator('#scale-status').textContent(),/(19,9|20(,1)?) × 15(,1)? m/);
    const saved=await savedProject(page);assert.equal(saved.plan.calibration.meters,10);assert.ok(Math.abs(saved.plan.calibration.units-2000)<10,`gemessen ${saved.plan.calibration.units} Einheiten`);
   });
   await check(`${engine}: erneutes Messen zeigt die Länge nach bisherigem Maßstab; Abbrechen ändert nichts`,async()=>{
-   await page.locator('#measure-start').click();await tap(page,.25,.3);await tap(page,.5,.3);await page.locator('#measure-dialog').waitFor();
+   await pk.schritt(page,1);await page.locator('#measure-start').click();await tap(page,.25,.3);await tap(page,.5,.3);await page.locator('#measure-dialog').waitFor();
    const shown=Number((await page.locator('#measure-length').inputValue()).replace(',','.'));assert.ok(Math.abs(shown-5)<.05,`Kontrollmessung ${shown} m`);await page.locator('#measure-cancel').click();await page.keyboard.press('Escape');
    assert.equal((await savedProject(page)).plan.calibration.meters,10);
   });
   await check(`${engine}: Nordpfeil je Plan, Drehen dreht den Pfeil mit, Rückgängig`,async()=>{
-   await page.locator('#north-on').check();assert.equal(await page.locator('#north-controls').isVisible(),true);await page.locator('#north-right').click();await page.locator('#north-right').click();
-   assert.equal((await savedProject(page)).plan.north,30);await page.locator('#north-angle').fill('400');await page.locator('#north-angle').press('Enter');assert.equal((await savedProject(page)).plan.north,40);
-   await page.locator('#north-angle').fill('30');await page.locator('#north-angle').press('Enter');
-   await page.locator('#rotate-right').click();assert.equal((await savedProject(page)).plan.north,120);await page.keyboard.press('Control+z');assert.equal((await savedProject(page)).plan.north,30);
+   await pk.schritt(page,1);await page.locator('#north-on').check();assert.equal(await page.locator('#north-controls').isVisible(),true);await pk.schritt(page,1);await page.locator('#north-right').click();await pk.schritt(page,1);await page.locator('#north-right').click();
+   assert.equal((await savedProject(page)).plan.north,30);await pk.schritt(page,1);await page.locator('#north-angle').fill('400');await pk.schritt(page,1);await page.locator('#north-angle').press('Enter');assert.equal((await savedProject(page)).plan.north,40);
+   await pk.schritt(page,1);await page.locator('#north-angle').fill('30');await pk.schritt(page,1);await page.locator('#north-angle').press('Enter');
+   await pk.schritt(page,1);await page.locator('#rotate-right').click();assert.equal((await savedProject(page)).plan.north,120);await page.keyboard.press('Control+z');assert.equal((await savedProject(page)).plan.north,30);
   });
   await check(`${engine}: A4 wählt 1:200, A3 1:100 – Strecken auf dem Blatt stimmen auf 0,2 mm`,async()=>{
    await openExport(page);await page.locator('#format').selectOption('pdf-a4');assert.match(await page.locator('#dimensions').textContent(),/A4 quer · M 1:200/);assert.match(await page.locator('#dimensions-note').textContent(),/Nordpfeil/);
@@ -91,13 +92,13 @@ for(const engine of ['chromium','webkit']){
     await page.locator('#project-file').setInputFiles({name:'bad.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(bad))});await page.locator('#toast.error').waitFor();assert.match(await page.locator('#toast').textContent(),/Maßstab|Nordrichtung/,`${field}=${JSON.stringify(value)}`);await page.locator('#toast').evaluate(t=>{t.hidden=true;t.className='';});
    }
    const old=structuredClone(file);delete old.plan.calibration;delete old.plan.north;
-   await page.locator('#project-file').setInputFiles({name:'old.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(old))});await page.locator('#replace-yes').click().catch(()=>{});await page.locator('#scale-status',{hasText:'Nicht kalibriert'}).waitFor();
-   await page.locator('#project-file').setInputFiles({name:'ok.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(file))});await page.locator('#replace-yes').click().catch(()=>{});await page.locator('#scale-status',{hasText:'Gemessen: 10 m'}).waitFor();
+   await page.locator('#project-file').setInputFiles({name:'old.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(old))});await page.locator('#replace-yes').click().catch(()=>{});await page.locator('#scale-status',{hasText:'Nicht kalibriert'}).waitFor({state:'attached'});
+   await page.locator('#project-file').setInputFiles({name:'ok.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(file))});await page.locator('#replace-yes').click().catch(()=>{});await page.locator('#scale-status',{hasText:'Gemessen: 10 m'}).waitFor({state:'attached'});
    assert.equal(await page.locator('#north-on').isChecked(),true);
   });
   await check(`${engine}: hoher Plan → Hochformat; Flächenlegende; „Alle Pläne“ = ein PDF mit einem Blatt je Plan`,async()=>{
-   await page.locator('#sheet-add').click();await page.locator('#sheet-file').setInputFiles(plan(4000,9000,'OG'));await page.locator('#sheet-ok').click().catch(()=>{});await page.waitForTimeout(500);
-   await page.locator('#measure-start').click();await tap(page,.25,.5);await tap(page,.75,.5);await page.locator('#measure-length').fill('10');await page.locator('#measure-ok').click();await page.locator('#scale-status',{hasText:'Gemessen'}).waitFor();
+   await pk.schritt(page,1);await page.locator('#sheet-add').click();await page.locator('#sheet-file').setInputFiles(plan(4000,9000,'OG'));await page.locator('#sheet-ok').click().catch(()=>{});await page.waitForTimeout(500);
+   await pk.schritt(page,1);await page.locator('#measure-start').click();await tap(page,.25,.5);await tap(page,.75,.5);await page.locator('#measure-length').fill('10');await page.locator('#measure-ok').click();await page.locator('#scale-status',{hasText:'Gemessen'}).waitFor({state:'attached'});
    // Fläche über eine Projektdatei ergänzen (Zeichnen ist in areas.mjs getestet).
    const file=await downloadedProject(page),og=file.plan;assert.equal(og.calibration.meters,10);
    file.version=5;file.areas=[{id:'area-1',label:'F1',name:'Rußbelag auf Wandflächen',color:'#d34c42',opacity:.3,points:[{x:500,y:500},{x:2000,y:500},{x:2000,y:2500},{x:500,y:2500}]}];file.nextArea=2;

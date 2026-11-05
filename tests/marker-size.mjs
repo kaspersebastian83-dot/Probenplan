@@ -1,4 +1,5 @@
 // Punktgröße je Plan: Regler, Tasten < und >, Rückgängig, Speichern/Laden je Geschoss, Modellwerte und Validierung.
+import * as pk from './pk-ui.mjs';
 import {chromium,webkit,savedProject,downloadedProject} from './runtime.mjs';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
@@ -26,12 +27,12 @@ await check('Modell: Tastenschritte bewegen sich immer und bleiben in den Grenze
 for(const engine of ['chromium','webkit']){
  const browser=await ({chromium,webkit}[engine]).launch();
  try{
-  const context=await browser.newContext({viewport:{width:1366,height:768},acceptDownloads:true}),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const context=await browser.newContext({viewport:{width:1366,height:1000},acceptDownloads:true}),page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(base);
   // großer Plan: Grundgröße liegt über der Mindestgröße auf dem Bildschirm
   await page.locator('#file').setInputFiles(plan(4000,3000,'EG'));await page.locator('#welcome').waitFor({state:'hidden'});
   await page.keyboard.press('p');await tap(page,.3,.4);await tap(page,.6,.6);await page.keyboard.press('v');
-  if(await page.locator('#panel-toggle').getAttribute('aria-pressed')!=='true')await page.locator('#panel-toggle').click();
+  await pk.spalte(page);
   let base0=0;
   await check(`${engine}: Standard 100 %, nichts im Projekt gespeichert`,async()=>{
    base0=await ry(page);assert.ok(Math.abs(base0-4000/65)<.5,`ry ${base0}`);assert.equal(await pct(page),'100');assert.equal((await savedProject(page)).plan.markerScale,undefined);
@@ -50,20 +51,20 @@ for(const engine of ['chromium','webkit']){
    await page.evaluate(()=>window.dispatchEvent(new KeyboardEvent('keydown',{key:'>',ctrlKey:true,bubbles:true})));assert.equal(await pct(page),before);
   });
   await check(`${engine}: Regler wirkt sofort proportional (50 % = halbe Größe, 200 % = doppelte)`,async()=>{
-   await page.locator('#marker-size').fill('50');assert.ok(Math.abs(await ry(page)-base0*.5)<.6,`50% → ${await ry(page)}`);
-   await page.locator('#marker-size').fill('200');assert.ok(Math.abs(await ry(page)-base0*2)<1);assert.match(await page.locator('#size-value').textContent(),/200/);
-   await page.locator('#size-reset').click();assert.equal(await pct(page),'100');assert.ok(Math.abs(await ry(page)-base0)<.5);
+   await pk.schritt(page,3);await page.locator('#marker-size').fill('50');assert.ok(Math.abs(await ry(page)-base0*.5)<.6,`50% → ${await ry(page)}`);
+   await pk.schritt(page,3);await page.locator('#marker-size').fill('200');assert.ok(Math.abs(await ry(page)-base0*2)<1);assert.match(await page.locator('#size-value').textContent(),/200/);
+   await pk.schritt(page,3);await page.locator('#size-reset').click();assert.equal(await pct(page),'100');assert.ok(Math.abs(await ry(page)-base0)<.5);
   });
   await check(`${engine}: aufeinanderfolgende Änderungen sind ein Rückgängig-Schritt, auch im gespeicherten Projekt`,async()=>{
-   await page.waitForTimeout(1300);await page.locator('#marker-size').fill('60');await page.locator('#marker-size').fill('70');await page.locator('#marker-size').fill('80');await page.waitForTimeout(500);
+   await page.waitForTimeout(1300);await pk.schritt(page,3);await page.locator('#marker-size').fill('60');await pk.schritt(page,3);await page.locator('#marker-size').fill('70');await pk.schritt(page,3);await page.locator('#marker-size').fill('80');await page.waitForTimeout(500);
    assert.equal((await savedProject(page)).plan.markerScale,.8);await page.locator('#marker-size').evaluate(e=>e.dispatchEvent(new PointerEvent('pointerup',{bubbles:true})));assert.equal(await page.evaluate(()=>document.activeElement?.id==='marker-size'),false);
    await page.keyboard.press('Control+z');assert.equal(await pct(page),'100');assert.equal((await savedProject(page)).plan.markerScale,undefined);
    await page.keyboard.press('Control+y').catch(()=>{});await page.keyboard.press('Control+Shift+z');assert.equal(await pct(page),'80');
   });
   await check(`${engine}: je Plan – Obergeschoss bleibt 100 %, EG behält 80 %, Speichern und Öffnen erhalten beides`,async()=>{
-   await page.locator('#sheet-add').click();await page.locator('#sheet-file').setInputFiles(plan(2000,1500,'OG'));await page.locator('#sheet-ok').click().catch(()=>{});
+   await pk.schritt(page,1);await page.locator('#sheet-add').click();await page.locator('#sheet-file').setInputFiles(plan(2000,1500,'OG'));await page.locator('#sheet-ok').click().catch(()=>{});
    await page.waitForTimeout(600);assert.equal(await pct(page),'100');
-   await page.locator('#marker-size').fill('150');await page.waitForTimeout(500);
+   await pk.schritt(page,3);await page.locator('#marker-size').fill('150');await page.waitForTimeout(500);
    const saved=await savedProject(page);const scales=[saved.plan,...saved.sheets.filter((_,i)=>i!==saved.active).map(s=>s.plan)].map(p=>p.markerScale).sort();assert.deepEqual(scales,[.8,1.5]);
    const file=await downloadedProject(page);
    await page.locator('#project-file').setInputFiles({name:'x.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(file))});await page.locator('#replace-yes').click().catch(()=>{});await page.waitForTimeout(800);

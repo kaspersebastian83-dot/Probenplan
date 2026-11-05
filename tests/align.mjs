@@ -3,6 +3,7 @@
 //  • Markierungen, Beschriftungen, Flächen und Nordrichtung bleiben auf derselben Stelle des Originals; hin und zurück ergibt den Ausgangszustand.
 //  • Ausschnitt: umschließendes Rechteck des gedrehten Ausschnitts, Ecken weiß; Format 6, ältere Formate mit Winkel werden abgelehnt.
 //  • Browser: Raster, An-Kante-Ausrichten an einer schiefen Wand, Ziehen, Tasten, Regler/Zahl, Abbrechen, Rückgängig, Export ohne schwarze Ecken, Speichern/Öffnen.
+import * as pk from './pk-ui.mjs';
 import {chromium,webkit,savedProject,downloadedProject,openExport,closeExport} from './runtime.mjs';
 import assert from 'node:assert/strict';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
@@ -80,14 +81,14 @@ for(const engine of ['chromium','webkit']){
     const context=await browser.newContext({viewport:{width:1480,height:1020},acceptDownloads:true}),page=await context.newPage(),errors=[];
     page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
     await page.goto(`${base}/`);await photo(page);
-    await page.locator('[data-mode="sample"]').click();const k=await screen(page,rot(-300,-150).x,rot(-300,-150).y);await page.mouse.click(k.x,k.y);
+    await pk.modus(page,'sample');const k=await screen(page,rot(-300,-150).x,rot(-300,-150).y);await page.mouse.click(k.x,k.y);
     const p0=await savedProject(page),m0=p0.markers[0];assert.equal(p0.markers.length,1);
 
     await check(`${engine}: Ausrichten öffnet Raster und Bedienkarte, Werkzeuge sind gesperrt`,async()=>{
-      await page.locator('#align-start').click();
+      await pk.schritt(page,1);await page.locator('#align-start').click();
       assert.ok(await page.locator('#align-grid').isVisible());assert.ok(await page.locator('#align-actions').isVisible());assert.equal(await angleField(page),0);
       for(const id of ['undo','export-open','crop-start','rotate-right'])assert.equal(await page.locator(`#${id}`).isDisabled(),true,id);
-      assert.equal(await page.locator('[data-mode="sample"]').isDisabled(),true);
+      assert.equal(await page.locator('button[data-mode="sample"]').isDisabled(),true);
     });
     await check(`${engine}: An Kante ausrichten legt eine schiefe Wand waagerecht`,async()=>{
       await page.locator('#align-edge').click();
@@ -111,7 +112,7 @@ for(const engine of ['chromium','webkit']){
     });
     await check(`${engine}: Tasten, Regler, Zahl, Ziehen und Abbrechen ändern nichts am Projekt`,async()=>{
       const before=await savedProject(page),start=before.plan.preparation.angle;
-      await page.locator('#align-start').click();await page.locator('#drawing').hover();
+      await pk.schritt(page,1);await page.locator('#align-start').click();await page.locator('#drawing').hover();
       await page.keyboard.press('ArrowRight');near(await angleField(page),start+.1,1e-9);await page.keyboard.press('Shift+ArrowLeft');near(await angleField(page),start-.9,1e-9);
       await page.locator('#align-angle').fill('2.5');await page.locator('#align-angle').press('Tab');near(await angleField(page),2.5,1e-9);
       await page.locator('#align-reset').click();assert.equal(await angleField(page),0);
@@ -127,7 +128,7 @@ for(const engine of ['chromium','webkit']){
     });
     await check(`${engine}: Export ohne schwarze Ecken`,async()=>{
       await openExport(page);await page.locator('#format').selectOption('jpeg');
-      const d=page.waitForEvent('download');await page.locator('#export').click();const path=resolve(out,`${engine}.jpg`);await (await d).saveAs(path);await closeExport(page);
+      const d=page.waitForEvent('download');await pk.ausgeben(page);const path=resolve(out,`${engine}.jpg`);await (await d).saveAs(path);await closeExport(page);
       // Schwarze (statt weiße) Ecken außerhalb des Fotos wären rund 13 % der Planfläche; Wände allein sind unter 3 %.
       const share=await page.evaluate(async bytes=>{const bmp=await createImageBitmap(new Blob([Uint8Array.from(atob(bytes),c=>c.charCodeAt(0))],{type:'image/jpeg'}));const c=document.createElement('canvas');c.width=bmp.width;c.height=bmp.height;const g=c.getContext('2d');g.drawImage(bmp,0,0);
         const d=g.getImageData(0,0,bmp.width,bmp.height).data;let n=0;for(let i=0;i<d.length;i+=4)if(d[i]+d[i+1]+d[i+2]<150)n++;return n/(bmp.width*bmp.height);},(await readFile(path)).toString('base64'));

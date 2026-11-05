@@ -1,8 +1,13 @@
 // Mosaik-Leiste (Projekt, Arbeitsschritte, „Weiter“, zuletzt geöffnet): gleicher Test wie in LabelKit, FotoKit und BelegKit.
+// PlanKit 2.0 startet die Leiste als Kopfband (v3, kompakt 56 px): Kacheln Proben/Fotos/Labor/Plan/Bericht/Abrechnung, App-Name im title;
+// „💬 Rückmeldung“ steht im Menü „Mehr …“ (Fußleiste) und im Projektmenü.
 // Nur Chromium (Ordnerzugriff über das nachgebildete Origin Private File System).
 import {chromium} from './runtime.mjs';
 import assert from 'node:assert/strict';
 const APP='plan',base=process.env.TEST_URL||'http://localhost:4173';
+const APPNAME={label:'LabelKit',fotos:'FotoKit',ergebnis:'ResultKit',plan:'PlanKit',bericht:'BerichtKit',beleg:'BelegKit'};
+const KACHEL={label:'Proben',fotos:'Fotos',ergebnis:'Labor',plan:'Plan',bericht:'Bericht',beleg:'Abrechnung'};
+const anzeige=n=>n.replace(/^(\d{2}\.\d{2,6})\s+/,'$1 · ');   // Kopfband: „26.0142 · Teststadt“
 const A='26.0142 Teststadt',B='26.0150 Köln & Süd + 50% #Hof';
 await (async () => {
   const name='chromium',url=base+'/';
@@ -21,7 +26,7 @@ await (async () => {
   const leiste = page.locator('#mosaikLeiste');
   await leiste.waitFor({timeout: 8000});
   if (!kann) {
-    assert.match(await leiste.textContent(), /Projektzentrale/);
+    assert.match(await leiste.locator('.ml-home').getAttribute('title'), /Projektzentrale/);
     assert.deepEqual(errors, []);
     await browser.close();
     console.log(`OK (${name}, ohne Ordnerzugriff: nur Leiste geprüft)`);
@@ -51,35 +56,45 @@ await (async () => {
   await weiterOhne.waitFor();
   assert.match(await weiterOhne.textContent(), /Weiter mit 26\.0142 Teststadt/);
   assert.equal(await weiterOhne.getAttribute('href'), '#projekt=' + encodeURIComponent(A));
-  assert.equal(new URL(await page.locator('#mosaikLeiste a.ml-rm').getAttribute('href'), 'http://x/app/').searchParams.has('projekt'), false, 'ohne Projekt keine Projektnummer');
+  await page.locator('#pk-mehr').click();
+  assert.equal(new URL(await page.locator('#mosaikMehrPop a[target=rueckmeldung]').getAttribute('href'), 'http://x/app/').searchParams.has('projekt'), false, 'ohne Projekt keine Projektnummer');
+  await page.keyboard.press('Escape');
 
   // 2) mit Projekt: Name, Objekt, fünf Schritte mit Haken, nächster Schritt
   await page.goto(url + '?projekt=' + encodeURIComponent(A));
-  await page.waitForSelector('#mosaikLeiste .ml-obj', {timeout: 8000});
+  await page.waitForSelector('#mosaikLeiste .ml-z2', {timeout: 8000});
+  await leiste.locator('.ml-z2', {hasText: 'Anna Beispiel'}).waitFor({timeout: 8000});   // zuständige Person (Mitarbeiterliste + _Projekt.json)
   const txt = (await leiste.textContent()).replace(/\s+/g, ' ');
-  assert.match(txt, /26\.0142 Teststadt/); assert.match(txt, /EFH, Musterweg 7, 52525 Heinsberg/);
-  await leiste.locator('.ml-wer', {hasText: 'Anna Beispiel'}).waitFor({timeout: 8000});   // zuständige Person (Mitarbeiterliste + _Projekt.json)
-  for (const n of ['LabelKit', 'FotoKit', 'ResultKit', 'PlanKit', 'BerichtKit', 'BelegKit']) assert.match(txt, new RegExp(n));
-  const schritt = id => leiste.locator('.ml-step', {hasText: {label: 'LabelKit', fotos: 'FotoKit', ergebnis: 'ResultKit', plan: 'PlanKit', beleg: 'BelegKit'}[id]});
+  assert.ok(await leiste.evaluate(e => e.classList.contains('ml-band') && e.classList.contains('ml-kompakt')), 'Kopfband kompakt');
+  assert.equal(Math.round((await leiste.boundingBox()).height), 56);
+  assert.equal(await leiste.locator('.ml-proj strong').textContent(), anzeige(A));
+  assert.match(txt, /EFH, Musterweg 7, 52525 Heinsberg/);
+  for (const n of Object.values(KACHEL)) assert.match(txt, new RegExp(n));
+  const schritt = id => leiste.locator(`.ml-step[title*="${APPNAME[id]}"]`);
+  for (const id of Object.keys(APPNAME)) assert.equal((await schritt(id).locator('strong').textContent()).replace(/ ✓$/, ''), KACHEL[id]);
   assert.ok(await schritt('label').evaluate(e => e.classList.contains('done')), 'LabelKit erledigt');
   assert.ok(await schritt('fotos').evaluate(e => e.classList.contains('done')), 'FotoKit erledigt');
   assert.ok(await schritt('ergebnis').evaluate(e => e.classList.contains('done')), 'ResultKit erledigt (_Ergebnisse.json)');
   assert.ok(!(await schritt('plan').evaluate(e => e.classList.contains('done'))), 'PlanKit offen');
   assert.ok(await schritt(APP).evaluate(e => e.classList.contains('hier')), 'diese App ist markiert');
   assert.equal(await leiste.locator('.ml-step.hier').getAttribute('aria-current'), 'page');
-  const naechster = APP === 'plan' ? /Weiter: BerichtKit/ : /Weiter: PlanKit/;
-  assert.match(await leiste.locator('.ml-weiter').textContent(), naechster);
+  const naechster = APP === 'plan' ? /Weiter: Bericht/ : /Weiter: Plan/;
+  assert.match(await leiste.locator('.ml-weiter strong').textContent(), naechster);
   assert.match(await leiste.locator('.ml-weiter').getAttribute('href'), /#projekt=26\.0142%20Teststadt$/);
   assert.equal(await leiste.locator('.ml-weiter').getAttribute('target'), APP === 'plan' ? 'berichtkit' : 'plankit');
   // Schritte der anderen Apps sind Links mit demselben Projekt, die eigene App ist keiner
   assert.equal(await leiste.locator('a.ml-step').count(), 5);
-  // „💬 Rückmeldung“: Programm, Version, nur die Projektnummer (kein Ort), eigenes Fenster
-  const rm = leiste.locator('a.ml-rm'), rmUrl = new URL(await rm.getAttribute('href'), 'http://x/app/');
+  // „💬 Rückmeldung“ (im Menü „Mehr …“): Programm, Version, nur die Projektnummer (kein Ort), eigenes Fenster
+  assert.equal(await leiste.locator('a.ml-rm, a[target=rueckmeldung]').count(), 0, 'Rückmeldung nicht mehr in der Leiste');
+  await page.locator('#pk-mehr').click();
+  const rm = page.locator('#mosaikMehrPop a[target=rueckmeldung]'), rmUrl = new URL(await rm.getAttribute('href'), 'http://x/app/');
   assert.equal(rmUrl.pathname, '/rueckmeldung/');
   assert.equal(rmUrl.searchParams.get('app'), {label: 'labelkit', fotos: 'fotokit', plan: 'plankit', beleg: 'belegkit'}[APP]);
   assert.match(rmUrl.searchParams.get('version') || '', /^\d+\.\d+\.\d+$/);
   assert.equal(rmUrl.searchParams.get('projekt'), '26.0142');
   assert.equal(await rm.getAttribute('target'), 'rueckmeldung');
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#mosaikMehrPop').count(), 0);
   for (const a of await leiste.locator('a.ml-step, a.ml-weiter').all()){
     const link = new URL(await a.getAttribute('href'), page.url());
     assert.equal(link.searchParams.has('projekt'), false, 'Kein Projekt im HTTP-Query');
@@ -123,17 +138,16 @@ await (async () => {
   await leiste.locator('.ml-proj').click();
   await Promise.all([page.waitForEvent('dialog', {timeout:10000}), pop.locator('a', {hasText: B}).click()]);
   assert.equal(page.url(), vorher, 'Abbruch erhält alte Adresse');
-  assert.ok((await leiste.locator('.ml-proj b').textContent()).includes(A));
+  assert.equal(await leiste.locator('.ml-proj strong').textContent(), anzeige(A));
   await page.evaluate(() => window.removeEventListener('beforeunload', window.__wechselSperre));
   page.removeAllListeners('dialog'); page.on('dialog', d => d.accept());
   await page.keyboard.press('Escape');
   const projektAnfragen = [];
   page.on('request', req => { if (req.isNavigationRequest()) projektAnfragen.push(req.url()); });
   await Promise.all([page.waitForEvent('load', {timeout:10000}), page.waitForURL(/projekt=26\.0150/), (async () => { await leiste.locator('.ml-proj').click(); await pop.locator('a', {hasText: B}).click(); })()]);
-  await page.waitForSelector('#mosaikLeiste .ml-proj b').catch(async e => { await page.screenshot({path: '/tmp/pk-fail.png'}); console.log(errors, page.url(), await page.evaluate(() => document.readyState)); throw e; });
-  assert.match(await leiste.locator('.ml-proj b').textContent(), /26\.0150 Köln/);
+  await page.waitForFunction(t => { const s = document.querySelector('#mosaikLeiste .ml-proj strong'); return s && s.textContent === t; }, anzeige(B), {timeout: 10000});
   await page.waitForFunction(() => document.querySelectorAll('#mosaikLeiste .ml-step.done').length === 0);   // Projekt B ist leer: keine Haken
-  assert.equal(await leiste.locator('.ml-obj').count(), 0);
+  assert.equal(await leiste.locator('.ml-z2').count(), 0, 'Projekt B: kein Objekt, keine Person');
   assert.equal(new URL(page.url()).searchParams.has('projekt'), false);
   assert.equal(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('projekt'), B, 'Sonderzeichen nach echtem App-Neustart erhalten');
 

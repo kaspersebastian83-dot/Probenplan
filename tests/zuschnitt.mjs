@@ -1,5 +1,6 @@
 // Zuschneiden (ab 1.43): Angebot nach dem Laden, Ausschnitt aufziehen, an Anfassern anpassen, innen verschieben,
 // außerhalb ziehen bewegt die Ansicht, Mausrad zoomt, Enter übernimmt; Größe und Hinweise (klein, Markierungen außerhalb).
+import * as pk from './pk-ui.mjs';
 import {chromium,webkit,savedProject} from './runtime.mjs';
 import assert from 'node:assert/strict';
 import {syntheticPDF} from './fixtures.mjs';
@@ -49,7 +50,7 @@ for(const engine of engines){
   await check(`${engine}: Hinweise – Markierung außerhalb, kleiner Ausschnitt; „Neu aufziehen“; Esc bricht ab`,async()=>{
    const plan=(await savedProject(page)).plan;await page.keyboard.press('p');await toScreen(page,plan.width/2,plan.height/2).then(q=>page.mouse.click(q.x,q.y));await page.keyboard.press('v');
    assert.equal(await page.locator('#crop-offer').isVisible(),false);
-   await page.locator('#crop-start').click();await page.locator('#crop-actions').waitFor();
+   await pk.schritt(page,1);await page.locator('#crop-start').click();await page.locator('#crop-actions').waitFor();
    await drag(page,[50,50],[350,350]);const i=await info(page);assert.match(i.t,/1 Markierung außerhalb/);assert.match(i.t,/unscharf/);
    assert.equal(await page.locator('#crop-info').evaluate(e=>e.classList.contains('warn')),true);
    await page.locator('#crop-redraw').click();assert.equal(await page.locator('#crop-info').isVisible(),false);assert.equal(await page.locator('#crop-confirm').isDisabled(),true);

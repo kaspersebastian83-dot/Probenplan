@@ -1,5 +1,15 @@
 # Änderungen
 
+## 2.0.0 – 5. November 2026
+
+- **Einfache Oberfläche (Spektron Schritt 3)** wie LabelKit 5.0 und FotoKit 2.0: oben das Kopfband (Spektron-Leiste v3, kompakt), auf der Karte drei Schritte – ① Plan laden · ② Proben setzen · ③ Plan ausgeben. Rechts steht je Schritt nur, was dazugehört (Planliste und „Plan vorbereiten“ · Probenliste · Ausgabe mit „Darstellung“ und „Weitere Anlagen“), unten „Mehr …“, der Speicherstand und eine Hauptaktion.
+- ② beginnt gleich mit der nächsten offenen Probe: „Als Nächstes setzen: P3 · EG Flur … · einfach in den Plan tippen“ mit „Überspringen“ und „Pause“. Ohne offene Probe hält PlanKit an („Probe von Hand“ wählen). Ein Tipp auf einen vorhandenen Punkt wählt ihn aus, statt eine Probe darauf zu setzen.
+- „＋ Plan“ heißt jetzt „＋ Weiteren Plan (Geschoss) …“ bzw. „Diesen Plan ersetzen …“; Pläne wechseln oben rechts auf der Karte.
+- Ausgabe: im Projektordner ist „Word · Anlage Probenahme“ vorgewählt, ohne Ordner PDF A4, danach die letzte Wahl. Nach dem Speichern „Weiter: Bericht →“, bis sich am Plan etwas ändert.
+- Kennungen von Laborproben kommen aus LabelKit und sind in PlanKit nicht mehr änderbar.
+- Entfallen (nur Darstellung): Werkzeugleiste links, Planleiste unten, Reiter der Seitenleiste, Schalter „Neue Liste (Test)“ mit der alten langen Spalte, Legende unter der Karte, Dunkelmodus-Regel. Alle Tastenkürzel bleiben; ein Kürzel aus einem anderen Schritt wechselt erst dorthin.
+- Projektdatei, Speicherorte und Exporte unverändert.
+
 ## 1.53.0 – 1. November 2026
 
 - Spektron-Leiste v2: Schritt „BerichtKit · Brandbericht“ bzw. „· Asbestbericht“, wenn BerichtKit sich die Berichtsart des Projekts gemerkt hat (der Link öffnet genau diese); Haken bei BerichtKit nur für einen gespeicherten Bericht dieser Art, dessen Datei noch in „Mitteilungen“ liegt (Projekte ohne BerichtKit-Angaben wie bisher nach dem Dateinamen). Nach dem gespeicherten Bericht heißt der Knopf „Weiter: Ans Büro übergeben →“ (Projektzentrale, eigenes Fenster). „Weiter“ nennt im Tooltip Ziel und Grund. Keine Nummern mehr an den Schritten (✓ reicht), die eigene App ist deutlicher markiert, „Aktuelles Projekt“ im Projektmenü lädt nicht mehr neu.
