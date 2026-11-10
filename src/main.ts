@@ -1345,8 +1345,8 @@ function saveToFolder(explicit:boolean){
   try{
    if(!await access)throw Error('Schreibzugriff fehlt. Bitte „Speichern“ klicken und Zugriff erlauben.');
    let expected=folderRevision;
-   if(await ortWechselPruefen(f))return;   // K1: unmittelbar vor dem Schreiben – auch für schon eingereihte Speichervorgänge
    for(;;){
+    if(await ortWechselPruefen(f))return;   // K1: unmittelbar vor jedem Schreibversuch – auch eingereiht und nach „Meine Fassung übernehmen“
     try{
      const result=await saveFolderProject(f,JSON.stringify(snapshot),expected);folderRevision=result.revision;folderBlocked=false;
      if(folder===f&&generation===saveRevision){folderDirty=false;$('saved').textContent=`✓ In „${planPfad(f)}“ gespeichert`;
