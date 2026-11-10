@@ -1345,6 +1345,7 @@ function saveToFolder(explicit:boolean){
   try{
    if(!await access)throw Error('Schreibzugriff fehlt. Bitte „Speichern“ klicken und Zugriff erlauben.');
    let expected=folderRevision;
+   if(await ortWechselPruefen(f))return;   // K1: unmittelbar vor dem Schreiben – auch für schon eingereihte Speichervorgänge
    for(;;){
     try{
      const result=await saveFolderProject(f,JSON.stringify(snapshot),expected);folderRevision=result.revision;folderBlocked=false;
@@ -1418,10 +1419,19 @@ async function zweiOrteZeigen(){
   const el=document.getElementById('zwei-orte'),f=folder;if(!el)return;
   const z=f?await zweiOrteZeilen(f.dir,['plankit','projekt','labelkit','resultkit','fotokit','anlagenProtokoll']):[];
   if(folder!==f)return;el.hidden=!z.length;el.innerHTML=z.map(t=>escape(t)).join('<br>');
-  // K1 (Codex): gilt für die PlanKit-Datei inzwischen ein anderer Ort als beim Öffnen (z. B. Umzug, während PlanKit offen war)?
-  // Dann nichts mehr über den alten Ordner speichern, bis das Projekt neu geöffnet ist.
-  if(f&&!ortGewechselt){const pk=await ort(f.dir,'plankit').catch(()=>null);if(folder===f&&pk&&(pk.wo==='neu')!==!!f.daten){ortGewechselt=true;clearTimeout(folderTimer);folderTimer=0;
-   $('saved').textContent='⚠ Speicherort geändert – Projekt neu öffnen';toast(`Die PlanKit-Datei dieses Projekts liegt inzwischen in „${pk.pfad}“. PlanKit speichert nichts mehr über den alten Ordner – bitte das Projekt neu öffnen (Projektzentrale oder „Projektordner öffnen“).`,true);}}
+  if(f)await ortWechselPruefen(f);
+}
+/** K1 (Codex): gilt für die PlanKit-Datei inzwischen ein anderer Ort als beim Öffnen (z. B. Umzug, während PlanKit offen war)?
+    Dann nichts mehr über den alten Ordner speichern, bis das Projekt neu geöffnet ist. Beim Fokus und unmittelbar vor jedem
+    Schreiben geprüft. Die Fassung bleibt als Browsersicherung; beim Neu-Öffnen bietet PlanKit sie an. → true = gewechselt */
+async function ortWechselPruefen(f:ProjectFolder):Promise<boolean>{
+  if(ortGewechselt)return true;
+  const pk=await ort(f.dir,'plankit').catch(()=>null);
+  if(folder!==f||!pk||(pk.wo==='neu')===!!f.daten)return false;
+  ortGewechselt=true;clearTimeout(folderTimer);folderTimer=0;
+  $('saved').textContent='⚠ Speicherort geändert – Projekt neu öffnen';
+  toast(`Die PlanKit-Datei dieses Projekts liegt inzwischen in „${pk.pfad}“. PlanKit speichert nichts mehr über den alten Ordner – bitte das Projekt neu öffnen (Projektzentrale oder „Projektordner öffnen“). Deine Fassung bleibt als Browsersicherung erhalten.`,true);
+  return true;
 }
 async function enterFolder(dir:Parameters<typeof openFolder>[0]){
   const entering=++folderOpening;
