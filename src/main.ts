@@ -21,7 +21,7 @@ import {labelkitReport,stornierteProben} from './labelkit';
 import {stornoTreffer,stornoText,stornoDetail,stornoKey,stornoPunktEntfernen,type Storno,type StornoTreffer} from './storno';
 import {berichtAlsReport,liesErgebnisse,standKennung,planHinterResultKit,hinterText,ERGEBNIS_DATEI,type Ergebnisse} from './ergebnisse';
 import {copyInfo,copiesToOffer,type StoredCopy,fileInfo,fileRevision,FolderConflict,saveFolderProject,writeProjectCopy,KEEP_RECENT,findSubdir,listFiles,openFolder,parseProjName,permission,pickFolder,projectDirOf,projectFileName,supported as folderSupported,writeFile,writeExportFile,existingExports,archiv,AUFTRAEGE,LABOR,PLAENE,type ProjectFolder,planOrdner,planPfad} from './folder';
-import {ort} from './so';
+import {ort,zweiOrteZeilen} from './so';
 import {exportImage,exportLayout} from './export';
 import {annexFileName,createAnnex,saveAnnex,saveDocument,ANNEX_DIR} from './annex-run';
 import {COMPANY,PAPERS,renderSheet,sheetLayout,type Paper} from './sheet';
@@ -66,6 +66,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML=`
 <div class="history"><button id="undo" class="tb" aria-label="Rückgängig" title="Rückgängig (Strg+Z)" disabled>↶</button><button id="redo" class="tb" aria-label="Wiederherstellen" title="Wiederherstellen (Strg+Umschalt+Z)" disabled>↷</button></div>
 <span class="tb-spacer"></span><span id="saved" role="status">Lokal. Vertraulich. Ohne Upload.</span><span id="offline" class="status">● Offline wird vorbereitet</span>
 <button id="help" class="tb" title="Bedienung, Tastenkürzel & Offlinebetrieb">?</button><button id="results-toggle" class="tb" title="Ergebniskarte: Proben nach Bewertung einfärben (K)" aria-pressed="false" data-key="k" disabled>Ergebnisse</button><button id="export-open" class="tb export-btn" title="Bild für das Gutachten exportieren" disabled>↓ Export …</button><button id="panel-toggle" class="tb" title="Liste mit Markierungen, Laborproben und Flächen ein-/ausblenden (L)" aria-pressed="false" aria-controls="side-panel">☰ Liste</button></header>
+<div id="zwei-orte" class="zwei-orte" role="status" hidden></div>
 <main class="kit-workspace">
 <nav class="rail" aria-label="Werkzeuge"><div class="modes" role="group" aria-label="Werkzeug"><button data-mode="navigate" data-key="v" class="mode active" title="Ansicht bewegen – verschieben & zoomen (V)"><span class="tool-icon">↔</span><span>Ansicht<small>Verschieben & zoomen</small></span></button><button data-mode="sample" data-key="p" class="mode" title="Probe setzen – fortlaufend nummeriert (P)" disabled><span class="tool-icon sample-icon">P</span><span>Probe<small>Fortlaufend nummeriert</small></span></button><button data-mode="fire" data-key="b" class="mode" title="Brandherd setzen (B)" disabled><span class="tool-icon fire-icon">★</span><span>Brandherd<small>Roter Stern</small></span></button><button data-mode="edit" data-key="e" class="mode" title="Markierung bearbeiten – Punkt oder Beschriftung ziehen (E)" disabled><span class="tool-icon">↖</span><span>Bearbeiten<small>Punkt oder Beschriftung ziehen</small></span></button></div></nav>
 <section class="kit-canvas" aria-label="Planarbeitsfläche"><div id="stage"><svg id="drawing" xmlns="http://www.w3.org/2000/svg" aria-label="Grundriss mit Markierungen"><image id="base-plan"/><g id="marks"></g></svg><div id="welcome"><div class="plan-illustration"><span class="mini-wall a"></span><span class="mini-wall b"></span><span class="mini-wall c"></span><span class="mini-point">P1</span></div><span class="eyebrow">VOM GRUNDRISS ZUM PROBENPLAN</span><h2>Hier beginnt Ihre<br>Dokumentation.</h2><p>Öffnen Sie einen Polycam-Export oder ein Planbild.<br>Ihre Gebäudedaten bleiben im Browser.</p><button id="welcome-load" class="primary">Grundriss auswählen <span>↗</span></button><button id="welcome-sketch" class="welcome-sketch">✎ Kein Plan? Skizze zeichnen</button><span class="tiny welcome-sketch-hint">Räume mit Maßen, Türen und Fenster – danach Proben setzen wie auf einem Grundriss</span><span class="tiny">SVG bevorzugt · scharfer Export bis 4.600 px</span></div>
@@ -99,7 +100,7 @@ document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Wa
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Raumbuch</h3><p>Liste → „Raumbuch bearbeiten …“: je Raum Befund (Proben mit Messwert und Oberflächenart, Brandherd) und Bewertung nach der Skala der Ergebniskarte – beides berechnet. Sie tragen je Raum Maßnahme und Bemerkung ein; Räume ohne Probe kommen mit Status dazu (Sichtprüfung unauffällig / auffällig, nicht begangen). Der Raum kommt aus LabelKit („Raum / Ort“) oder steht unter „Markierungen“ im Feld „Raum“. Ähnliche Schreibweisen (z. B. „Kü.“ und „Küche“) lassen sich zusammenführen. Ausgabe als Word-Anlage und als Tabelle für Excel (CSV) in „Mitteilungen“. Keine Flächen und Mengen – die Mengenermittlung bleibt beim ausführenden Unternehmen. Der Raum kommt aus „Raum / Ort“ in LabelKit; bei der Bezeichnung nach Handbuch („EG Küche Brandraum Decke“) zählen Geschoss und Raum, Zusatz und Bauteil bleiben bei der Probe. Steht ein eigenes Bauteil dahinter („EG Wohnzimmer Schrank oben“), die Zeilen im Raumbuch zusammenführen.</p><h3>Oberflächenart</h3><p>Aufsicht, Ansicht oder Untersicht je Probe kommt beim „Proben übernehmen“ aus LabelKit (Spalte „Oberflächenart“). Fehlt sie dort, lässt sie sich unter „Markierungen“ wählen; eine Eingabe in PlanKit bleibt auch bei erneutem Import. Am Schild ein Balken unten (Aufsicht), links (Ansicht) oder oben (Untersicht), dazu im Wertkästchen der Ergebniskarte und in der Legende.</p>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Skizze (kein Plan vorhanden)</h3><p>Links in der Werkzeugleiste „✎ Skizze“ (ohne Plan: neue Skizze, sonst als weiterer Plan; auf einer Skizze: bearbeiten), Startseite „Kein Plan? Skizze zeichnen“ oder unten „＋ Skizze“ für ein weiteres Geschoss. <b>Raum</b>: von Ecke zu Ecke aufziehen (Raster 10 cm, Räume rasten an Wänden ein), danach Name, Breite und Tiefe in Metern eintippen. <b>Wand</b>: frei ziehen, auch schräg (15°-Schritte rasten ein, Länge eintippbar). <b>Tür</b>/<b>Fenster</b>: auf eine Wand tippen (Tür 0,90 m mit Aufschlag, Fenster 1,20 m). <b>Text</b>: antippen und eintippen, z. B. „Treppe“. <b>Auswählen</b>: Räume, Wände, Texte ziehen, Ecke unten rechts ändert die Raumgröße, Entf löscht. „Skizze fertig“ schneidet die Zeichenfläche auf die Räume zu; der Maßstab ist automatisch gesetzt. „Skizze“ links bearbeitet sie weiter; Proben bleiben an ihrer Stelle.</p><h3>Schnellskizze (Test)</h3><p>Schneller ohne Maße: „☰ Räume aus Liste“ – Räume eintippen (einer pro Zeile, „Küche Brandraum“ markiert den Brandraum), „Raster erzeugen“, dann die Räume ziehen und anordnen. „Skizze – nicht maßstäblich“ (Standard bei neuen Skizzen): kein Maßstab, keine m², Stempel auf dem Plan. Wird eine Probe in einen Raum gesetzt, steht der Raumname gleich unter „Raum“ (fürs Raumbuch). Abschalten: Haken „Schnellskizze (Test)“ in der Skizzenleiste – die Skizze verhält sich dann wie bisher.</p>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Entzerren (Fluchtplan fotografiert)</h3><p>„Entzerren“ (W) links in der Leiste: die vier Ecken des Plans im Foto antippen oder ziehen – 1 oben links, 2 oben rechts, 3 unten rechts, 4 unten links. Die Lupe zeigt die Ecke vergrößert. Seitenverhältnis „wie im Foto“ oder DIN quer/hoch (Fluchtpläne sind meist A3/A4). „Entzerren“ rechnet ein gerades Bild; Proben und Flächen werden mitgerechnet. Ein vorhandener Maßstab und die Nordrichtung werden dabei entfernt und sind neu zu setzen. Rückgängig stellt das Foto wieder her; die Fotodatei selbst bleibt unverändert.</p>');
-document.getElementById('app-version')!.textContent='v2.0.0';document.querySelector<HTMLElement>('.brand')!.title='PlanKit v2.0.0';
+document.getElementById('app-version')!.textContent='v2.0.1';document.querySelector<HTMLElement>('.brand')!.title='PlanKit v2.0.1';
 document.querySelector('#help-dialog h2')!.insertAdjacentHTML('afterend','<h3>Neu in PlanKit 1.16.1 · 20.10.2026</h3><p>Projektzentrale und Spektron-Leiste übergeben Projekte jetzt über #projekt im Fragment. Sonderzeichen bleiben erhalten; alte ?projekt-Links funktionieren weiterhin und werden nach dem Laden bereinigt. Projektwechsel laden auch bereits geöffnete App-Fenster neu; eine Warnung vor ungesicherten Eingaben kann den Wechsel abbrechen. Die Anlagenaktion aktion=anlage wird ebenfalls im Fragment übergeben. Installiertes PlanKit nach einer Online-Aktualisierung vollständig schließen und erneut öffnen.</p>');
 const colorOptions=PALETTE.map(c=>`<option value="${c.color}">${c.title} · ${c.suggestion}</option>`).join('');
 document.querySelector('.modes')!.insertAdjacentHTML('beforeend','<button data-mode="area-draw" class="mode" disabled><span class="tool-icon">⬡</span><span>Fläche zeichnen<small>Eckpunkte setzen & abschließen</small></span></button><button data-mode="area-edit" class="mode" disabled><span class="tool-icon">◇</span><span>Fläche bearbeiten<small>Ecken oder ganze Fläche ziehen</small></span></button>');
@@ -1205,6 +1206,7 @@ document.querySelector('#help-dialog h3')!.insertAdjacentHTML('beforebegin','<h3
 // Mit ?projekt=<Ordnername> oder „Projekt …“ arbeitet PlanKit direkt im Ordner „Pläne“ des Projekts:
 // automatisches Speichern als „Probenplan <Projekt>.probenplan“, Bilder ebenfalls dorthin, Laborberichte aus „Laborergebnisse“.
 let folder:ProjectFolder|null=null,folderRevision:string|null=null,folderDirty=false,folderTimer=0,folderBlocked=false,projectData:Record<string,unknown>={};
+let ortGewechselt=false;   // K1: Speicherort der PlanKit-Datei hat sich seit dem Öffnen geändert → nichts mehr speichern
 let folderWriting:Promise<void>=Promise.resolve();
 let folderOpening=0;
 const projectReader=createProjectDataReader(projectDataChanged);
@@ -1335,6 +1337,7 @@ function scheduleFolderSave(){clearTimeout(folderTimer);$('saved').textContent=`
 async function flushFolder(){if(folderTimer){clearTimeout(folderTimer);folderTimer=0;await saveToFolder(false);}await folderWriting.catch(()=>{});await saveQueue.catch(()=>{});return !folderDirty;}
 function saveToFolder(explicit:boolean){
  clearTimeout(folderTimer);folderTimer=0;const f=folder;if(!f||!project||(folderBlocked&&!explicit))return folderWriting;
+ if(ortGewechselt){if(explicit)toast('Nicht gespeichert: der Speicherort der PlanKit-Datei hat sich geändert – bitte das Projekt neu öffnen.',true);return folderWriting;}   // K1
  // Request permission while still in the Save button's user gesture.
  const access=permission(f.dir,explicit),snapshot=clone(project),generation=saveRevision;
  folderWriting=folderWriting.catch(()=>{}).then(async()=>{
@@ -1343,6 +1346,7 @@ function saveToFolder(explicit:boolean){
    if(!await access)throw Error('Schreibzugriff fehlt. Bitte „Speichern“ klicken und Zugriff erlauben.');
    let expected=folderRevision;
    for(;;){
+    if(await ortWechselPruefen(f))return;   // K1: unmittelbar vor jedem Schreibversuch – auch eingereiht und nach „Meine Fassung übernehmen“
     try{
      const result=await saveFolderProject(f,JSON.stringify(snapshot),expected);folderRevision=result.revision;folderBlocked=false;
      if(folder===f&&generation===saveRevision){folderDirty=false;$('saved').textContent=`✓ In „${planPfad(f)}“ gespeichert`;
@@ -1399,7 +1403,7 @@ async function projectDataForExport(){
   const choice=await ask('Gemeinsame Projektdaten möglicherweise veraltet',projectDataWarning(status),['Abbrechen','Für diesen Export ausdrücklich verwenden']);
   return folder===f&&projectReader.state===status&&choice==='Für diesen Export ausdrücklich verwenden';
 }
-window.addEventListener('focus',()=>{void refreshProjectData();void resultkitLesen();void labelkitLesen();});
+window.addEventListener('focus',()=>{void refreshProjectData();void resultkitLesen();void labelkitLesen();void zweiOrteZeigen();});   // K1: Zeile auch beim Zurückkommen neu prüfen
 setInterval(()=>{if(!document.hidden&&!busy&&folder&&!projectReader.state.checking)void refreshProjectData();if(!document.hidden&&folder){void resultkitLesen();void labelkitLesen();}},20000);
 $('resultkit-warning-go').onclick=()=>$('lab-import').click();
 $('save-project').insertAdjacentHTML('afterend','<button id="emergency-copy" class="tb" title="Geöffnete Fassung zusätzlich als Datei herunterladen" hidden>Notfallkopie</button>');
@@ -1409,6 +1413,25 @@ async function renderFolderPlans(){
   const files=(await listFiles(folder.plaene,/\.(pdf|svg|png|jpe?g|zip)$/i)).filter(f=>!/^Probenplan /i.test(f.name)).slice(0,8);
   box.hidden=!files.length;box.innerHTML=files.length?`<span class="eyebrow">AUS „${escape(PLAENE.toUpperCase())}“</span>`+files.map((f,i)=>`<button data-plan-file="${i}">${escape(f.name)}</button>`).join(''):'';
   box.onclick=async e=>{const b=(e.target as HTMLElement).closest<HTMLElement>('[data-plan-file]');if(!b)return;const f=files[Number(b.dataset.planFile)];await importFile(await f.handle.getFile());};
+}
+/** K1: App-Dateien an zwei Orten (in „_Spektron“ und am früheren Ort) – eine sichtbare Zeile je Bereich, den PlanKit nutzt. Nur lesen. */
+async function zweiOrteZeigen(){
+  const el=document.getElementById('zwei-orte'),f=folder;if(!el)return;
+  const z=f?await zweiOrteZeilen(f.dir,['plankit','projekt','labelkit','resultkit','fotokit','anlagenProtokoll']):[];
+  if(folder!==f)return;el.hidden=!z.length;el.innerHTML=z.map(t=>escape(t)).join('<br>');
+  if(f)await ortWechselPruefen(f);
+}
+/** K1 (Codex): gilt für die PlanKit-Datei inzwischen ein anderer Ort als beim Öffnen (z. B. Umzug, während PlanKit offen war)?
+    Dann nichts mehr über den alten Ordner speichern, bis das Projekt neu geöffnet ist. Beim Fokus und unmittelbar vor jedem
+    Schreiben geprüft. Die Fassung bleibt als Browsersicherung; beim Neu-Öffnen bietet PlanKit sie an. → true = gewechselt */
+async function ortWechselPruefen(f:ProjectFolder):Promise<boolean>{
+  if(ortGewechselt)return true;
+  const pk=await ort(f.dir,'plankit').catch(()=>null);
+  if(folder!==f||!pk||(pk.wo==='neu')===!!f.daten)return false;
+  ortGewechselt=true;clearTimeout(folderTimer);folderTimer=0;
+  $('saved').textContent='⚠ Speicherort geändert – Projekt neu öffnen';
+  toast(`Die PlanKit-Datei dieses Projekts liegt inzwischen in „${pk.pfad}“. PlanKit speichert nichts mehr über den alten Ordner – bitte das Projekt neu öffnen (Projektzentrale oder „Projektordner öffnen“). Deine Fassung bleibt als Browsersicherung erhalten.`,true);
+  return true;
 }
 async function enterFolder(dir:Parameters<typeof openFolder>[0]){
   const entering=++folderOpening;
@@ -1432,11 +1455,11 @@ async function enterFolder(dir:Parameters<typeof openFolder>[0]){
    const selected=await chooseStoredVersion(target,canonical,currentRevision,!!next,preservedBrowserDraft);if(selected===null)return;
    if(selected){next=selected;recovered=true;}
   }
-  const transition=()=>{if(entering!==folderOpening)throw Error('Ein neuerer Projektwechsel ist bereits aktiv.');folder=target;folderRevision=currentRevision;folderDirty=recovered;folderBlocked=false;projectReader.select(target);};
+  const transition=()=>{if(entering!==folderOpening)throw Error('Ein neuerer Projektwechsel ist bereits aktiv.');folder=target;folderRevision=currentRevision;folderDirty=recovered;folderBlocked=false;ortGewechselt=false;projectReader.select(target);};
   if(entering!==folderOpening)return;
   if(next){if(!next.report)next.report=target.name;await install(next,true,transition);$('saved').textContent=recovered?'Wiederhergestellt – bitte prüfen und „Speichern“ klicken':`✓ Aus „${planPfad(target)}“ geladen`;}
   else{await preserveUnsavedProject();transition();labUI?.reset();project=null;history.clear();render();$('saved').textContent=`Projekt ${target.name}`;}
-  showFolder();void refreshProjectData();resultkitStand=null;void resultkitLesen();stornoStand=null;void labelkitLesen();$('folder-prompt').hidden=true;await renderFolderPlans();
+  showFolder();void zweiOrteZeigen();void refreshProjectData();resultkitStand=null;void resultkitLesen();stornoStand=null;void labelkitLesen();$('folder-prompt').hidden=true;await renderFolderPlans();
   PROJEKT_URL.setzen(target.name);
   (window as any).MosaikLeiste?.aktualisieren();
   toast(next?`Projekt ${target.name}: Probenplan aus „${planPfad(target)}“ geöffnet.`:`Projekt ${target.name}: noch kein Probenplan – Grundriss wählen.`);
@@ -1548,8 +1571,8 @@ document.getElementById('wand-title')!.insertAdjacentHTML('afterend',`<p class="
   // Tastenkürzel: neue Namen; ein Kürzel aus einem anderen Schritt wechselt erst dorthin
   for(const h3 of hilfe.querySelectorAll('h3'))if(h3.textContent==='Tastenkürzel'){const p=h3.nextElementSibling as HTMLElement;p.innerHTML='<b>P</b> Probe von Hand · <b>B</b> Brandherd · <b>E</b> Punkte verschieben · <b>V</b> oder <b>Esc</b> Pause · <b>F</b> Fläche zeichnen · <b>G</b> Fläche bearbeiten · <b>R</b>/<b>Umschalt+R</b> drehen · <b>C</b> zuschneiden · <b>A</b> ausrichten · <b>W</b> entzerren · <b>K</b> Ergebnisfarben · <b>L</b> Spalte rechts ein/aus · <b>+</b>/<b>−</b> Zoom · <b>0</b> Einpassen · <b>&lt;</b>/<b>&gt;</b> Punktgröße · <b>Bild↑</b>/<b>Bild↓</b> Plan wechseln · <b>Strg+Z</b>/<b>Strg+Y</b> rückgängig/wiederholen · <b>Entf</b> löschen. Liegt das Werkzeug in einem anderen Schritt, wechselt PlanKit erst dorthin (z. B. C → ① Plan laden).</p>';}
   // Version, Offline und Änderungen
-  const neu=document.createElement('h3');neu.id='pk-aenderungen';neu.textContent='Neu in PlanKit 2.0.0 · 05.11.2026';
-  const neuP=document.createElement('p');neuP.textContent='Einfache Oberfläche wie LabelKit und FotoKit: oben das Kopfband mit Projekt und Arbeitsschritten, auf der Karte drei Schritte – ① Plan laden, ② Proben setzen, ③ Plan ausgeben. Rechts steht je Schritt nur, was dazugehört; unten „Mehr …“, der Speicherstand und eine Hauptaktion. In ② ist gleich die nächste offene Probe dran („Als Nächstes setzen …“ – in den Plan tippen); ein Tipp auf einen vorhandenen Punkt wählt ihn aus, statt eine Probe darauf zu setzen. Kennungen von Laborproben kommen aus LabelKit und sind hier nicht mehr änderbar. Planformat, Speicherorte und Exporte sind unverändert.';
+  const neu=document.createElement('h3');neu.id='pk-aenderungen';neu.textContent='Neu in PlanKit 2.0.1 · 10.11.2026';
+  const neuP=document.createElement('p');neuP.textContent='Dateien an zwei Orten: Liegt die PlanKit-Datei (oder Projekt-, LabelKit-, Ergebnisdaten) in „_Spektron“ und zusätzlich am früheren Ort, z. B. eine Notfallkopie in „Pläne“, gilt immer die in „_Spektron“. Eine Zeile oben nennt beide Dateien mit Datum; gelöscht wird nichts. – 2.0.0: Einfache Oberfläche wie LabelKit und FotoKit: oben das Kopfband mit Projekt und Arbeitsschritten, auf der Karte drei Schritte – ① Plan laden, ② Proben setzen, ③ Plan ausgeben. Rechts steht je Schritt nur, was dazugehört; unten „Mehr …“, der Speicherstand und eine Hauptaktion. In ② ist gleich die nächste offene Probe dran („Als Nächstes setzen …“ – in den Plan tippen); ein Tipp auf einen vorhandenen Punkt wählt ihn aus, statt eine Probe darauf zu setzen. Kennungen von Laborproben kommen aus LabelKit und sind hier nicht mehr änderbar. Planformat, Speicherorte und Exporte sind unverändert.';
   const versionZeile=document.createElement('p');versionZeile.id='pk-version-zeile';versionZeile.className='tiny';versionZeile.append(`PlanKit ${$('app-version').textContent?.replace(/^v/,'')} · `,$('offline'));
   for(const h3 of hilfe.querySelectorAll('h3'))if(/^Neu in PlanKit/.test(h3.textContent||'')){h3.before(neu,versionZeile,neuP);break;}
 }
