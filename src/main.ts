@@ -1400,7 +1400,7 @@ async function projectDataForExport(){
   const choice=await ask('Gemeinsame Projektdaten möglicherweise veraltet',projectDataWarning(status),['Abbrechen','Für diesen Export ausdrücklich verwenden']);
   return folder===f&&projectReader.state===status&&choice==='Für diesen Export ausdrücklich verwenden';
 }
-window.addEventListener('focus',()=>{void refreshProjectData();void resultkitLesen();void labelkitLesen();});
+window.addEventListener('focus',()=>{void refreshProjectData();void resultkitLesen();void labelkitLesen();void zweiOrteZeigen();});   // K1: Zeile auch beim Zurückkommen neu prüfen
 setInterval(()=>{if(!document.hidden&&!busy&&folder&&!projectReader.state.checking)void refreshProjectData();if(!document.hidden&&folder){void resultkitLesen();void labelkitLesen();}},20000);
 $('resultkit-warning-go').onclick=()=>$('lab-import').click();
 $('save-project').insertAdjacentHTML('afterend','<button id="emergency-copy" class="tb" title="Geöffnete Fassung zusätzlich als Datei herunterladen" hidden>Notfallkopie</button>');
