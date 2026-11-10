@@ -1,5 +1,10 @@
 # Änderungen
 
+## 2.0.1 – 10. November 2026 · Dateien an zwei Orten (Audit K1)
+
+- `src/spektron-ordner.js` byte-gleich mit Projektzentrale 1.43.0: liegt die PlanKit-Datei (`.probenplan`) in `_Spektron/PlanKit`, gilt sie – auch wenn in „Pläne“ eine weitere `.probenplan` liegt (z. B. eine Notfallkopie); vorher schaltete die das Projekt ohne Hinweis auf „Pläne“ zurück. Gleiches für Projekt-, LabelKit-, Ergebnis- und FotoKit-Dateien, die PlanKit liest.
+- Neue Zeile `#zwei-orte` zwischen Kopf und Arbeitsfläche: beide Dateien mit Datum, welche gilt (`zweiOrteZeilen` in `src/so.ts`). Gelöscht wird nichts.
+
 ## 2.0.0 – 5. November 2026
 
 - **Einfache Oberfläche (Spektron Schritt 3)** wie LabelKit 5.0 und FotoKit 2.0: oben das Kopfband (Spektron-Leiste v3, kompakt), auf der Karte drei Schritte – ① Plan laden · ② Proben setzen · ③ Plan ausgeben. Rechts steht je Schritt nur, was dazugehört (Planliste und „Plan vorbereiten“ · Probenliste · Ausgabe mit „Darstellung“ und „Weitere Anlagen“), unten „Mehr …“, der Speicherstand und eine Hauptaktion.
