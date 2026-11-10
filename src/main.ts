@@ -1206,6 +1206,7 @@ document.querySelector('#help-dialog h3')!.insertAdjacentHTML('beforebegin','<h3
 // Mit ?projekt=<Ordnername> oder „Projekt …“ arbeitet PlanKit direkt im Ordner „Pläne“ des Projekts:
 // automatisches Speichern als „Probenplan <Projekt>.probenplan“, Bilder ebenfalls dorthin, Laborberichte aus „Laborergebnisse“.
 let folder:ProjectFolder|null=null,folderRevision:string|null=null,folderDirty=false,folderTimer=0,folderBlocked=false,projectData:Record<string,unknown>={};
+let ortGewechselt=false;   // K1: Speicherort der PlanKit-Datei hat sich seit dem Öffnen geändert → nichts mehr speichern
 let folderWriting:Promise<void>=Promise.resolve();
 let folderOpening=0;
 const projectReader=createProjectDataReader(projectDataChanged);
@@ -1336,6 +1337,7 @@ function scheduleFolderSave(){clearTimeout(folderTimer);$('saved').textContent=`
 async function flushFolder(){if(folderTimer){clearTimeout(folderTimer);folderTimer=0;await saveToFolder(false);}await folderWriting.catch(()=>{});await saveQueue.catch(()=>{});return !folderDirty;}
 function saveToFolder(explicit:boolean){
  clearTimeout(folderTimer);folderTimer=0;const f=folder;if(!f||!project||(folderBlocked&&!explicit))return folderWriting;
+ if(ortGewechselt){if(explicit)toast('Nicht gespeichert: der Speicherort der PlanKit-Datei hat sich geändert – bitte das Projekt neu öffnen.',true);return folderWriting;}   // K1
  // Request permission while still in the Save button's user gesture.
  const access=permission(f.dir,explicit),snapshot=clone(project),generation=saveRevision;
  folderWriting=folderWriting.catch(()=>{}).then(async()=>{
@@ -1416,6 +1418,10 @@ async function zweiOrteZeigen(){
   const el=document.getElementById('zwei-orte'),f=folder;if(!el)return;
   const z=f?await zweiOrteZeilen(f.dir,['plankit','projekt','labelkit','resultkit','fotokit','anlagenProtokoll']):[];
   if(folder!==f)return;el.hidden=!z.length;el.innerHTML=z.map(t=>escape(t)).join('<br>');
+  // K1 (Codex): gilt für die PlanKit-Datei inzwischen ein anderer Ort als beim Öffnen (z. B. Umzug, während PlanKit offen war)?
+  // Dann nichts mehr über den alten Ordner speichern, bis das Projekt neu geöffnet ist.
+  if(f&&!ortGewechselt){const pk=await ort(f.dir,'plankit').catch(()=>null);if(folder===f&&pk&&(pk.wo==='neu')!==!!f.daten){ortGewechselt=true;clearTimeout(folderTimer);folderTimer=0;
+   $('saved').textContent='⚠ Speicherort geändert – Projekt neu öffnen';toast(`Die PlanKit-Datei dieses Projekts liegt inzwischen in „${pk.pfad}“. PlanKit speichert nichts mehr über den alten Ordner – bitte das Projekt neu öffnen (Projektzentrale oder „Projektordner öffnen“).`,true);}}
 }
 async function enterFolder(dir:Parameters<typeof openFolder>[0]){
   const entering=++folderOpening;
@@ -1439,7 +1445,7 @@ async function enterFolder(dir:Parameters<typeof openFolder>[0]){
    const selected=await chooseStoredVersion(target,canonical,currentRevision,!!next,preservedBrowserDraft);if(selected===null)return;
    if(selected){next=selected;recovered=true;}
   }
-  const transition=()=>{if(entering!==folderOpening)throw Error('Ein neuerer Projektwechsel ist bereits aktiv.');folder=target;folderRevision=currentRevision;folderDirty=recovered;folderBlocked=false;projectReader.select(target);};
+  const transition=()=>{if(entering!==folderOpening)throw Error('Ein neuerer Projektwechsel ist bereits aktiv.');folder=target;folderRevision=currentRevision;folderDirty=recovered;folderBlocked=false;ortGewechselt=false;projectReader.select(target);};
   if(entering!==folderOpening)return;
   if(next){if(!next.report)next.report=target.name;await install(next,true,transition);$('saved').textContent=recovered?'Wiederhergestellt – bitte prüfen und „Speichern“ klicken':`✓ Aus „${planPfad(target)}“ geladen`;}
   else{await preserveUnsavedProject();transition();labUI?.reset();project=null;history.clear();render();$('saved').textContent=`Projekt ${target.name}`;}

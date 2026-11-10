@@ -4,6 +4,7 @@
 
 - `src/spektron-ordner.js` byte-gleich mit Projektzentrale 1.43.0: liegt die PlanKit-Datei (`.probenplan`) in `_Spektron/PlanKit`, gilt sie – auch wenn in „Pläne“ eine weitere `.probenplan` liegt (z. B. eine Notfallkopie); vorher schaltete die das Projekt ohne Hinweis auf „Pläne“ zurück. Gleiches für Projekt-, LabelKit-, Ergebnis- und FotoKit-Dateien, die PlanKit liest.
 - Neue Zeile `#zwei-orte` zwischen Kopf und Arbeitsfläche: beide Dateien mit Datum, welche gilt (`zweiOrteZeilen` in `src/so.ts`). Gelöscht wird nichts.
+- Die Zeile wird auch beim Zurückkommen ins Fenster neu geprüft. Gilt für die PlanKit-Datei inzwischen ein anderer Ort als beim Öffnen (z. B. Umzug, während PlanKit offen war), speichert PlanKit nichts mehr über den alten Ordner, bis das Projekt neu geöffnet ist (Status „⚠ Speicherort geändert“).
 
 ## 2.0.0 – 5. November 2026
 
