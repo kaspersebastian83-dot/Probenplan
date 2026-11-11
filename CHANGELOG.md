@@ -1,5 +1,10 @@
 # Änderungen
 
+## 2.2.0 – 11. November 2026 · Chlorid genau 10 µg/cm² „im Bereich“ (Audit m7, Entscheidung 4)
+
+- **`KORROSION-CHLORID v2`** (gleich in ResultKit, PlanKit, FotoKit, BerichtKit): Die Stufe „oberhalb“ trägt `ueber: true` und zählt erst über 10 µg/cm² (100 mg/m² usw.); genau 10 liegt „im Bereich“, genau 5 bleibt „im Bereich“. Keine neue Zahl, keine Rundung. `rate`/`rangeText` → Ergebniskarte, Legende (Bildschirm, PDF/PNG-Export), Anlage Probenahme, Raumbuch, Wandansichten, Skalen-Editor („5 – 10 µg/cm²“ · „> 10 µg/cm²“).
+- **Angepasste Chlorid-Skala** (`results.vds` in der `.probenplan`): gleiche Stufenzahl und Grenzen wie die Referenz → dieselbe Regel (`vdsRegel`, nur im Speicher); andere Grenzen → jede Kategorie ab ihrem „ab“-Wert wie bisher. `setScale` speichert ohne `ueber` – `.probenplan` unverändert. Hinweis im Skalen-Editor.
+
 ## 2.1.1 – 11. November 2026 · LabelKit-Dateiregel überall (Audit o7, o8, o13, m1)
 
 - **„Ordner seit der Übernahme geändert“ (o13):** Der Stand zählt nur noch die LabelKit-Datei dieses Projekts (dieselbe Wahl wie „Proben übernehmen“) – wie ResultKit 2.3, Projektzentrale 1.44 und FotoKit 2.1.2. Eine fremde Datei gibt den Hinweis nicht mehr. Einmalig kann er erscheinen, wo bisher eine fremde oder eine nur nach Änderungsdatum neuere datierte Datei mitzählte: in ResultKit einmal „Erneut übernehmen“.

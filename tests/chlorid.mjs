@@ -8,12 +8,12 @@ registerHooks({
  resolve(specifier,context,next){if(specifier.startsWith('.')&&context.parentURL){const url=new URL(specifier,context.parentURL);if(!extname(url.pathname)&&existsSync(fileURLToPath(url)+'.ts'))return next(url.href+'.ts',context);}return next(specifier,context);},
  load(url,context,next){if(url.endsWith('.ts'))return{format:'module',source:stripTypeScriptTypes(readFileSync(fileURLToPath(url),'utf8'),{mode:'transform'}),shortCircuit:true};return next(url,context);}
 });
-// Chlorid nach VdS 2357 (5–10 µg/cm² korrosionschemisch relevante Größenordnung): wie in ResultKit und FotoKit (KORROSION-CHLORID v1).
+// Chlorid nach VdS 2357 (5–10 µg/cm² korrosionschemisch relevante Größenordnung): wie in ResultKit und FotoKit (KORROSION-CHLORID v2: genau 10 µg/cm² noch „im Bereich“).
 const {chloridScale,scaleFor,rate,valueOf,wertFuer,units}=await import('../src/results.ts');
 let n=0;const ok=(name,fn)=>{fn();n++;console.log('OK Chlorid: '+name);};
-ok('drei Kategorien in µg/cm²: < 5 grün, 5 – < 10 amber, ≥ 10 rot',()=>{
+ok('drei Kategorien in µg/cm²: < 5 grün, 5 – 10 amber, > 10 rot',()=>{
  const s=chloridScale('Chlorid','µg/cm²');assert.deepEqual(s.cats.map(c=>c.from),[0,5,10]);
- assert.deepEqual([4.9,5,9.9,10,26].map(v=>rate(s,v)),[0,1,1,2,2]);
+ assert.deepEqual([4.9,5,9.9,10,26].map(v=>rate(s,v)),[0,1,1,1,2]);
  assert.match(s.cats[1].name,/im Bereich der korrosionschemisch relevanten Größenordnung/);
 });
 ok('ältere Berichte in mg/m²: Grenzen umgerechnet (1 µg/cm² = 10 mg/m²)',()=>{
