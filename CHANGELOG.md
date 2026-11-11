@@ -1,5 +1,11 @@
 # Änderungen
 
+## 2.1.1 – 11. November 2026 · LabelKit-Dateiregel überall (Audit o7, o8, o13, m1)
+
+- **„Ordner seit der Übernahme geändert“ (o13):** Der Stand zählt nur noch die LabelKit-Datei dieses Projekts (dieselbe Wahl wie „Proben übernehmen“) – wie ResultKit 2.3, Projektzentrale 1.44 und FotoKit 2.1.2. Eine fremde Datei gibt den Hinweis nicht mehr. Einmalig kann er erscheinen, wo bisher eine fremde oder eine nur nach Änderungsdatum neuere datierte Datei mitzählte: in ResultKit einmal „Erneut übernehmen“.
+- **Anlage Probenahme:** Quelle „Probenerfassung LabelKit (Projektdatei)“ und Bohrkern-Zuordnung nur aus der Datei dieses Projekts (bisher die neueste beliebige). Keine eigene Datei, nur fremde → Prüfpunkt „Keine LabelKit-Datei dieses Projekts …“.
+- `spektron-ordner.js` (LabelKit-Hauptdatei nach Projektnummer, o7) und Leiste v3 („Proben ✓“ nur für eine Datei dieses Projekts, o8) byte-gleich mit den anderen Apps. `.probenplan` unverändert.
+
 ## 2.1.0 – 11. November 2026 · Audit Kernkette (M5, m10, m1)
 
 - **Laborproben prüfen (M5):** Kommt die Liste aus LabelKit oder aus ResultKit (`_Ergebnisse.json`), sind P-Nummer, Probenreferenz, Beschreibung, Probenart, Labor-Nr., Probenahmedatum, Berichtsnummer, Auftragsreferenz und Labor nur lesbar; „Zeile hinzufügen“ entfällt, unter „Bei belegter Kennung“ gibt es für solche Proben kein „Nächste freie P-Nummer“ mehr. Form, Reihenfolge und Entfernen bleiben. Eine Zeile sagt, woher die Daten kommen (LabelKit bzw. Prüfbericht). Freier Plan mit XML/PDF direkt: wie bisher änderbar (Messwerte waren und sind nirgends eintippbar).

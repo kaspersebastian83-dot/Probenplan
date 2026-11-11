@@ -10,6 +10,7 @@ import {hasValues,prepare,rateMarkers} from './results';
 import {berichtQuellen,vorlaeufigeBerichte,vorlaeufigText} from './lab-provenance';
 import {fileInfo,fileRevision,findSubdir,listFiles,projectFileName,planOrdner,planPfad,AUFTRAEGE,LABOR,type ProjectFolder} from './folder';
 import {ort,ortZumSchreiben} from './so';
+import {eigeneLabelkitDatei,keineLabelkitDateiText,labelkitDateiWaehlen} from './labelkit';
 
 export const ANNEX_DIR='Mitteilungen',ANNEX_LOG='_Anlagen-Protokoll.txt',FOTOS='Fotos',FOTOKIT_FILE='_Bildumbenenner.json';
 export interface AnnexOptions {title:string;maxPhotos:number;results:boolean;objekt:string;projectData:Record<string,unknown>;projectDataSource?:File|null;projectDataStale?:boolean;app:string;progress?:(text:string)=>void}
@@ -111,9 +112,13 @@ export async function createAnnex(p:Project,folder:ProjectFolder|null,o:AnnexOpt
     // Nur Berichte, aus denen Proben im Projekt stammen (ersetzte vorläufige Berichte nicht), je Datei einmal
     for(const {name,origin:r} of berichtQuellen(project))
       await hashSource(lab,LABOR,name,`Laborbericht ${r.bericht||''} ${r.labor?`(${r.labor})`:''}`.replace(/\s+/g,' ').trim(),sources,missing);
-    const lk=await ort(folder.dir,'labelkit'),auftraege=lk.dir,daten=auftraege?(await listFiles(auftraege,/_Daten\.json$/i))[0]:undefined;   // „Laboraufträge“ oder künftig „_Spektron/LabelKit“
+    // Audit m1 (2.1.1): nur die LabelKit-Datei dieses Projekts (dieselbe Wahl wie „Proben übernehmen“ und LabelKit 5.1), nie die neueste beliebige
+    const lk=await ort(folder.dir,'labelkit'),auftraege=lk.dir,alle=auftraege?await listFiles(auftraege,/_Daten\.json$/i):[];   // „Laboraufträge“ oder „_Spektron/LabelKit“
+    const texte=new Map<(typeof alle)[number],string|null>();for(const d of alle)if(eigeneLabelkitDatei(d.name,folder.nr))texte.set(d,await d.handle.getFile().then(x=>x.text()).catch(()=>null));
+    const wahl=labelkitDateiWaehlen(alle,folder.nr,d=>texte.get(d)??null),daten=wahl.datei??undefined;
+    if(!daten&&wahl.fremd.length)extra.push({text:'Keine LabelKit-Datei dieses Projekts – Bohrkern-IDs auf Fotos bleiben unzugeordnet',ok:false,detail:keineLabelkitDateiText(lk.wo==='neu'?lk.pfad:AUFTRAEGE,folder.nr,wahl.fremd)});
     let bk:Map<string,string[]>|undefined;
-    if(daten){const file=await daten.handle.getFile(),bytes=await file.arrayBuffer();sources.push({role:'Probenerfassung LabelKit (neueste Datei)',name:`${lk.wo==='neu'?lk.pfad:AUFTRAEGE}/${daten.name}`,stand:stand(file.lastModified),sha:await sha(bytes)});
+    if(daten){const file=await daten.handle.getFile(),bytes=await file.arrayBuffer();sources.push({role:'Probenerfassung LabelKit (Projektdatei)',name:`${lk.wo==='neu'?lk.pfad:AUFTRAEGE}/${daten.name}`,stand:stand(file.lastModified),sha:await sha(bytes)});
       try{bk=bohrkernNummern(JSON.parse(new TextDecoder().decode(bytes)));}catch{/* unlesbar: Bohrkern-IDs auf Fotos bleiben unzugeordnet (Prüfprotokoll nennt sie) */}}
     const pjDir=o.projectDataSource===undefined?(await ort(folder.dir,'projekt')).dir:null;
     const pj=o.projectDataSource===undefined?(pjDir?await fileInfo(pjDir,'_Projekt.json'):null):o.projectDataSource;
