@@ -7,7 +7,8 @@ export interface LabOrigin {id:string;bericht:string;labor:string;auftragsrefere
 export interface Wert {p:string;r:string;u:string}
 export interface LabData {ref:string;desc:string;art?:string;labNr?:string;datum?:string;bericht?:string;reportId?:string;werte?:Wert[]}
 /** Ergebniskarte: Kategorie ab einem Wert (erste Kategorie ab 0), Farbe als #rrggbb. */
-export interface Category {name:string;from:number;color:string}
+/** ueber: nur im Speicher (KORROSION-CHLORID v2) – zählt erst über `from`; steht nie in einer Datei. */
+export interface Category {name:string;from:number;color:string;ueber?:boolean}
 export interface Scale {name:string;cats:Category[]}
 /** scales: eigene Skalen je Parameter|Einheit. vds: im Projekt angepasste VdS-Referenzen (ab 1.27) – getrennt, damit die eigene Skala erhalten bleibt. */
 /** Bewerteter Parameter „Automatisch – je Probenart“: jede Probe nach ihrem Hauptwert (Σ16 EPA-PAK, Chlorid, Asbest). */
