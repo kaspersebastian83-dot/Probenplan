@@ -112,7 +112,9 @@ for(const engine of ['chromium','webkit']){
    const p=await downloadedProject(page);assert.equal(p.labReports.length,4);assert.equal(new Set(p.labReports.map(r=>r.id)).size,4);assert.equal(p.pending.length,6);
    await page.reload();await page.locator('[data-plabel]').first().waitFor();
    for(const r of p.labReports){const {json}=await jsonExport(page,r.id);assert.equal(json.bericht,r.bericht);assert.equal(json.labor,r.labor);assert.equal(json.auftragsreferenz,r.auftragsreferenz);assert.deepEqual(json.proben.map(r=>r.label),p.pending.filter(row=>row.reportId===r.id).map(r=>r.label));}
-   const selected=p.labReports[1],edited=await jsonExport(page,selected.id,{bericht:'Manuell korrigierte Nummer',quelle:'C:\\private\\manual.xml'});assert.equal(edited.json.bericht,'Manuell korrigierte Nummer');assert.equal(edited.json.quelle,'manual.xml');assert.equal(edited.json.proben.length,2);assert.deepEqual(await savedProject(page),p);
+   // 2.1.0 (Audit M5): aus dem Projekt vorbelegte Angaben sind nur lesbar – die Berichtsnummer lässt sich nicht mehr überschreiben.
+   const selected=p.labReports[1];await pk.probenlisteSpeichern(page);await page.locator('#lab-report-select').selectOption(selected.id);assert.equal(await page.locator('[data-summary=bericht]').evaluate(e=>e.readOnly),true);await page.locator('#lab-summary').getByText('Abbrechen',{exact:true}).click();
+   const edited=await jsonExport(page,selected.id);assert.equal(edited.json.bericht,selected.bericht);assert.equal(edited.json.proben.length,2);assert.deepEqual(await savedProject(page),p);
   });
   await check(`${engine}: Abbruch und Überspringen bewahren Zuordnungen, Ersetzen ist explizit und undo-fähig`,async()=>{
    const before=await savedProject(page);await review(page,[file('replacement.xml',labXML(labRows.slice(0,2)))]);

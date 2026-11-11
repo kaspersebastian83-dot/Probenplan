@@ -1,5 +1,14 @@
 # Änderungen
 
+## 2.1.0 – 11. November 2026 · Audit Kernkette (M5, m10, m1)
+
+- **Laborproben prüfen (M5):** Kommt die Liste aus LabelKit oder aus ResultKit (`_Ergebnisse.json`), sind P-Nummer, Probenreferenz, Beschreibung, Probenart, Labor-Nr., Probenahmedatum, Berichtsnummer, Auftragsreferenz und Labor nur lesbar; „Zeile hinzufügen“ entfällt, unter „Bei belegter Kennung“ gibt es für solche Proben kein „Nächste freie P-Nummer“ mehr. Form, Reihenfolge und Entfernen bleiben. Eine Zeile sagt, woher die Daten kommen (LabelKit bzw. Prüfbericht). Freier Plan mit XML/PDF direkt: wie bisher änderbar (Messwerte waren und sind nirgends eintippbar).
+- **Im Projekt keine beliebige Datei mehr (M5):** „Andere Datei …“ entfällt; Dateiauswahl und Ziehen ins Fenster lehnen im Projekt jede Datei ab. Proben kommen nur aus LabelKit und ResultKit dieses Projekts, an dem Ort, den `spektron-ordner.js` nennt.
+- **„Probenliste speichern“:** aus dem Projekt vorbelegte Angaben (Berichtsnummer, Labor, Auftragsreferenz, Quelldatei) sind nur lesbar, leere Felder bleiben zum Ergänzen.
+- **LabelKit-Datei (m1):** „Proben übernehmen …“, der Storno-Hinweis und die Wandansichten lesen nur noch die Datei dieses Projekts – dieselbe Wahl wie LabelKit 5.1 (Name beginnt mit der Projektnummer, auch die datierten Namen; „<Nr>_Daten.json“ vor später gespeicherten nach `gespeichertAm`). Liegt keine eigene Datei dort, lädt PlanKit nichts und sagt es in einer Zeile – nie die neueste fremde Datei.
+- **Umbenannter Projektordner (m10):** Fehlt „Probenplan <Ordner>.probenplan“ und liegt genau eine Projektdatei dieses Projekts unter früherem Namen dort, fragt PlanKit „Projektdatei unter früherem Ordnernamen“ und speichert nach „Öffnen und unter neuem Namen speichern“ unter dem neuen Namen. Die alte Datei bleibt unverändert; beim nächsten Öffnen keine Frage mehr. Mehrere solche Dateien: der bisherige Dialog.
+- `.probenplan`-Format, `spektron-ordner.js`, `mosaik-leiste.js` unverändert.
+
 ## 2.0.1 – 10. November 2026 · Dateien an zwei Orten (Audit K1)
 
 - `src/spektron-ordner.js` byte-gleich mit Projektzentrale 1.43.0: liegt die PlanKit-Datei (`.probenplan`) in `_Spektron/PlanKit`, gilt sie – auch wenn in „Pläne“ eine weitere `.probenplan` liegt (z. B. eine Notfallkopie); vorher schaltete die das Projekt ohne Hinweis auf „Pläne“ zurück. Gleiches für Projekt-, LabelKit-, Ergebnis- und FotoKit-Dateien, die PlanKit liest.

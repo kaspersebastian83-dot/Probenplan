@@ -20,6 +20,26 @@ function description(p:Probe){
 }
 function isoDate(v:unknown){const s=str(v);if(validDate(s))return s;const m=/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(s);if(m){const iso=`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;if(validDate(iso))return iso;}return '';}
 
+/** Audit Kernkette m1 (2.1.0) – dieselbe Dateiwahl wie LabelKit 5.1 (`eigeneProjektdatei`/`projektdateienLesen`):
+ *  Projektdatei dieses Projekts = Name beginnt mit der Projektnummer („26.0604_Daten.json“, auch die datierten
+ *  „26.0604_12.10.2025_Daten.json“; nicht „26.06041…“). Andere „…_Daten.json“ werden nie gelesen. Geladen wird die feste Datei
+ *  „<Nr>_Daten.json“, eine andere eigene nur, wenn sie laut „gespeichertAm“ später gespeichert wurde; ohne feste Datei die neueste
+ *  eigene nach Änderungsdatum. Keine eigene Datei → null (nie auf die neueste fremde ausweichen). */
+const lkSchluessel=(s:string)=>String(s).normalize('NFC').trim().toLowerCase();
+export function eigeneLabelkitDatei(name:string,nr:string){const n=String(name).normalize('NFC').trim();return !!nr&&n.startsWith(nr)&&!/^\d/.test(n.slice(nr.length));}
+const speicherZeit=(text:string)=>{try{const t=Date.parse(JSON.parse(text).gespeichertAm);return Number.isNaN(t)?null:t;}catch{return null;}};
+export function labelkitDateiWaehlen<T extends {name:string;lastModified:number}>(dateien:T[],nr:string,text:(d:T)=>string|null):{datei:T|null;fremd:string[]}{
+  const eigen=dateien.filter(d=>eigeneLabelkitDatei(d.name,nr)),fremd=dateien.filter(d=>!eigeneLabelkitDatei(d.name,nr)).map(d=>d.name).sort((a,b)=>a.localeCompare(b));
+  const fest=eigen.find(d=>lkSchluessel(d.name)===lkSchluessel(`${nr}_Daten.json`));let datei:T|null=null;
+  if(fest){const ft=text(fest);let beste=(ft===null?null:speicherZeit(ft))??fest.lastModified;datei=fest;for(const d of eigen){if(d===fest)continue;const t=text(d),z=t===null?null:speicherZeit(t);if(z!==null&&z>beste){beste=z;datei=d;}}}
+  else for(const d of eigen)if(!datei||d.lastModified>datei.lastModified)datei=d;
+  return {datei,fremd};
+}
+/** Eine Zeile, wenn am LabelKit-Ort keine Datei dieses Projekts liegt (nur fremde oder gar keine). */
+export function keineLabelkitDateiText(pfad:string,nr:string,fremd:string[]){
+  return `In „${pfad}“ liegt keine LabelKit-Datei von Projekt ${nr}${fremd.length?` – nur „${fremd[0]}“${fremd.length>1?` und ${fremd.length-1} weitere`:''} (nach dem Namen nicht von diesem Projekt). PlanKit lädt sie nicht.`:'.'}`;
+}
+
 /** Stornierte Proben einer LabelKit-Projektdatei (`storniert` an der Probe, ab LabelKit 4.49.0), je P-Nummer einmal, sortiert.
  *  Jeder wahre Wert gilt als storniert; LabelKit schreibt `{am, kuerzel, grund}`. */
 export function stornierteProben(data:unknown):Storno[]{
@@ -41,7 +61,7 @@ export function labelkitReport(text:string,quelle:string,project:string|null,con
   if(project!==null&&!target)throw Error('LabelKit-Import blockiert: Die Projektnummer des aktiven Projekts ist nicht erkennbar. Bitte den passenden Projektordner öffnen.');
   if(target&&nr&&nr!==target)throw Error(`Projektzuordnung blockiert: „${quelle}“ gehört zu Projekt ${nr}, das aktive Projekt zu ${target}. Bitte die Datei und den Projektordner prüfen und das passende Projekt öffnen.`);
   if(!nr&&!confirmMissingProject?.(`„${quelle}“ enthält keine Projektnummer (ältere Datei). ${target?`Die Zugehörigkeit zu Projekt ${target}`:'Die Zugehörigkeit zum geöffneten freien Plan'} kann nicht automatisch geprüft werden.\n\nHaben Sie die Datei geprüft und gehört sie zu diesem Projekt? Nur dann mit OK übernehmen.`))throw Error('LabelKit-Import abgebrochen: Die Datei ohne Projektnummer wurde nicht ausdrücklich dem aktiven Projekt zugeordnet.');
-  const report=blankReport();report.quelle=quelle;report.labor='LabelKit (Probenerfassung)';report.bericht='';report.auftragsreferenz=nr||target||'';report.sources={};
+  const report=blankReport();report.quelle=quelle;report.labor='LabelKit (Probenerfassung)';report.bericht='';report.auftragsreferenz=nr||target||'';report.sources={};report.herkunft='labelkit';
   const seen=new Set<number>();let rueckstell=0;report.storniert=stornierteProben(data);
   for(const [key,type] of LISTS)for(const raw of (Array.isArray(data[key])?data[key] as Probe[]:[])){
     if(!raw||typeof raw!=='object')continue;

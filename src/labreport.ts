@@ -3,7 +3,7 @@ import {sourceFilename} from './lab-provenance';
 import type {Storno} from './storno';
 export interface TextItem {text:string;x:number;y:number;width:number;height:number}
 export interface TextPage {width:number;height:number;items:TextItem[]}
-export interface LabReport {bericht:string;labor:string;auftragsreferenz:string;quelle:string;batch:string;sources:LabSources;rows:LabSample[];expected:number|null;references:string[];warnings:string[];vorlaeufig?:boolean;/** Nur LabelKit: stornierte Proben (nicht in `rows`, Nummern bleiben vergeben) */storniert?:Storno[];results:{ref:string;parameter:string;result:string;unit:string;loq:string}[]}
+export interface LabReport {bericht:string;labor:string;auftragsreferenz:string;quelle:string;batch:string;sources:LabSources;rows:LabSample[];expected:number|null;references:string[];warnings:string[];vorlaeufig?:boolean;/** Woher die Prüfliste kommt (nur im Speicher, nie in der Projektdatei): dann sind Nummer, Texte und Labordaten im Prüfdialog schreibgeschützt (Audit M5). Ohne Angabe: freier Plan, XML/PDF direkt gelesen. */herkunft?:'labelkit'|'resultkit';/** Nur LabelKit: stornierte Proben (nicht in `rows`, Nummern bleiben vergeben) */storniert?:Storno[];results:{ref:string;parameter:string;result:string;unit:string;loq:string}[]}
 export const MAX_WERTE=300;
 const tidy=(s:string)=>s.normalize('NFC').replace(/\s+/g,' ').trim();
 const norm=(s:string)=>tidy(s).toLocaleLowerCase('de').replace(/[^\p{L}\p{N}]/gu,'');

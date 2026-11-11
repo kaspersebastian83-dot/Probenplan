@@ -35,15 +35,15 @@ try{
   await new Promise((resolve,reject)=>{const r=indexedDB.open('mosaik-suite',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>{const t=r.result.transaction('kv','readwrite');t.objectStore('kv').put(archiv,'archiv');t.oncomplete=()=>{r.result.close();resolve();};t.onerror=()=>reject(t.error);};r.onerror=()=>reject(r.error);});
  },NAME);
  await page.goto(`${base}/#projekt=${encodeURIComponent(NAME)}`);await page.reload();await page.locator('#folder-plans button',{hasText:'Muster.svg'}).click();await page.locator('#welcome').waitFor({state:'hidden'});
- async function write(nr){await page.evaluate(async({name,nr})=>{const p=await(await(await navigator.storage.getDirectory()).getDirectoryHandle('F1-Testarchiv')).getDirectoryHandle(name),lab=await p.getDirectoryHandle('Laboraufträge');const w=await(await lab.getFileHandle('26.0999_Daten.json',{create:true})).createWritable();await w.write(JSON.stringify({projekt:{nr},proben:[{id:1,_nr:1,z2:'FREMDES PROJEKT',matrix:'Wischprobe'}]}));await w.close();},{name:NAME,nr});}
+ async function write(nr){await page.evaluate(async({name,nr})=>{const p=await(await(await navigator.storage.getDirectory()).getDirectoryHandle('F1-Testarchiv')).getDirectoryHandle(name),lab=await p.getDirectoryHandle('Laboraufträge');const w=await(await lab.getFileHandle('26.0101_Daten.json',{create:true})).createWritable();   /* 2.1.0 (m1): nur Dateien mit der eigenen Nummer im Namen werden angeboten – die fremde Nummer steht im Inhalt */await w.write(JSON.stringify({projekt:{nr},proben:[{id:1,_nr:1,z2:'FREMDES PROJEKT',matrix:'Wischprobe'}]}));await w.close();},{name:NAME,nr});}
  async function select(){await pk.proben(page);await page.locator('#lab-folder-dialog [data-labelkit]').click();}
  async function disk(){return page.evaluate(async name=>{const p=await(await(await navigator.storage.getDirectory()).getDirectoryHandle('F1-Testarchiv')).getDirectoryHandle(name),d=await p.getDirectoryHandle('Pläne');return(await(await d.getFileHandle(`Probenplan ${name}.probenplan`)).getFile()).text();},NAME);}
 
  // Auch die manuelle Dateiauswahl muss die echte Ordnernummer benutzen, selbst bei leerem Gutachtenfeld.
  await openExport(page);await page.locator('#report').fill('');await page.locator('#date').focus();await closeExport(page);
- await page.locator('#lab-files').setInputFiles(file('26.0999'));await page.locator('#toast.error',{hasText:'Projektzuordnung blockiert'}).waitFor();assert.match(await page.locator('#toast').textContent(),/26\.0999.*26\.0101/);assert.equal(await page.locator('#lab-review').isVisible(),false);
- await page.locator('#lab-files').setInputFiles(file('26.0101'));await page.locator('#lab-review').waitFor();await page.locator('#lab-review button',{hasText:'Abbrechen'}).click();
- console.log('OK F1 Browser: manuelle Auswahl im Ordner prüft dessen Nummer trotz leerem Gutachtenfeld');
+ // 2.1.0 (Audit M5): Im Projekt nimmt PlanKit gar keine Datei von Hand mehr – weder fremde noch eigene Nummer.
+ for(const nr of ['26.0999','26.0101']){await page.locator('#lab-files').setInputFiles(file(nr));await page.locator('#toast.error',{hasText:'Im Projekt kommen die Proben nur aus LabelKit und ResultKit'}).waitFor();assert.equal(await page.locator('#lab-review').isVisible(),false);}
+ console.log('OK F1 Browser: im Projektordner keine Datei von Hand (fremde und eigene Nummer)');
  await openExport(page);await page.locator('#report').fill(NAME);await page.locator('#date').focus();await closeExport(page);
  await page.locator('#save-project').click();await page.locator('#toast',{hasText:'Gespeichert'}).waitFor();const before=await disk();
  await write('26.0999');await select();await page.locator('#toast.error',{hasText:'Projektzuordnung blockiert'}).waitFor();
