@@ -1480,7 +1480,7 @@ async function enterFolder(dir:Parameters<typeof openFolder>[0]){
   PROJEKT_URL.setzen(target.name);
   (window as any).MosaikLeiste?.aktualisieren();
   toast(next?`Projekt ${target.name}: Probenplan aus „${planPfad(target)}“ geöffnet.`:`Projekt ${target.name}: noch kein Probenplan – Grundriss wählen.`);
-  if(umbenannt&&!recovered&&folder===target&&project){folderDirty=true;await saveToFolder(true);$('saved').textContent=`✓ Aus „${umbenannt}“ geöffnet, gespeichert als „${projectFileName(target)}“`;}
+  if(umbenannt&&!recovered&&folder===target&&project){folderDirty=true;await saveToFolder(true);if(folder===target&&!folderDirty)$('saved').textContent=`✓ Aus „${umbenannt}“ geöffnet, gespeichert als „${projectFileName(target)}“`;}   // nur nach bestätigtem Speichern (Codex #88); sonst bleibt die Meldung von saveToFolder
 }
 async function openFromZentrale(name:string){
   const root=await archiv();
