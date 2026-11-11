@@ -17,10 +17,10 @@ import {vorlaeufigeBerichte,vorlaeufigText,verwendeteBerichte} from './lab-prove
 import {kwPaar,wandStand,wandSvg,wandBlocks,wandCSV,wandName,wandHinweise,vorschlag as wandVorschlag,type WandStand,type WandBildDatei} from './wandansicht';
 import {candidates,loadImage,readPlan,validateProject,type Candidate} from './import';
 import {download,restoreLocal,saveLocal,type FreieKopie} from './storage';
-import {labelkitReport,stornierteProben} from './labelkit';
+import {eigeneLabelkitDatei,keineLabelkitDateiText,labelkitDateiWaehlen,labelkitReport,stornierteProben} from './labelkit';
 import {stornoTreffer,stornoText,stornoDetail,stornoKey,stornoPunktEntfernen,type Storno,type StornoTreffer} from './storno';
 import {berichtAlsReport,liesErgebnisse,standKennung,planHinterResultKit,hinterText,ERGEBNIS_DATEI,type Ergebnisse} from './ergebnisse';
-import {copyInfo,copiesToOffer,type StoredCopy,fileInfo,fileRevision,FolderConflict,saveFolderProject,writeProjectCopy,KEEP_RECENT,findSubdir,listFiles,openFolder,parseProjName,permission,pickFolder,projectDirOf,projectFileName,supported as folderSupported,writeFile,writeExportFile,existingExports,archiv,AUFTRAEGE,LABOR,PLAENE,type ProjectFolder,planOrdner,planPfad} from './folder';
+import {copyInfo,copiesToOffer,type StoredCopy,fileInfo,fileRevision,FolderConflict,saveFolderProject,writeProjectCopy,KEEP_RECENT,findSubdir,listFiles,openFolder,parseProjName,permission,pickFolder,projectDirOf,projectFileName,supported as folderSupported,writeFile,writeExportFile,existingExports,archiv,AUFTRAEGE,LABOR,PLAENE,type FolderFile,type ProjectFolder,planOrdner,planPfad} from './folder';
 import {ort,zweiOrteZeilen} from './so';
 import {exportImage,exportLayout} from './export';
 import {annexFileName,createAnnex,saveAnnex,saveDocument,ANNEX_DIR} from './annex-run';
@@ -100,7 +100,7 @@ document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Wa
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Raumbuch</h3><p>Liste → „Raumbuch bearbeiten …“: je Raum Befund (Proben mit Messwert und Oberflächenart, Brandherd) und Bewertung nach der Skala der Ergebniskarte – beides berechnet. Sie tragen je Raum Maßnahme und Bemerkung ein; Räume ohne Probe kommen mit Status dazu (Sichtprüfung unauffällig / auffällig, nicht begangen). Der Raum kommt aus LabelKit („Raum / Ort“) oder steht unter „Markierungen“ im Feld „Raum“. Ähnliche Schreibweisen (z. B. „Kü.“ und „Küche“) lassen sich zusammenführen. Ausgabe als Word-Anlage und als Tabelle für Excel (CSV) in „Mitteilungen“. Keine Flächen und Mengen – die Mengenermittlung bleibt beim ausführenden Unternehmen. Der Raum kommt aus „Raum / Ort“ in LabelKit; bei der Bezeichnung nach Handbuch („EG Küche Brandraum Decke“) zählen Geschoss und Raum, Zusatz und Bauteil bleiben bei der Probe. Steht ein eigenes Bauteil dahinter („EG Wohnzimmer Schrank oben“), die Zeilen im Raumbuch zusammenführen.</p><h3>Oberflächenart</h3><p>Aufsicht, Ansicht oder Untersicht je Probe kommt beim „Proben übernehmen“ aus LabelKit (Spalte „Oberflächenart“). Fehlt sie dort, lässt sie sich unter „Markierungen“ wählen; eine Eingabe in PlanKit bleibt auch bei erneutem Import. Am Schild ein Balken unten (Aufsicht), links (Ansicht) oder oben (Untersicht), dazu im Wertkästchen der Ergebniskarte und in der Legende.</p>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Skizze (kein Plan vorhanden)</h3><p>Links in der Werkzeugleiste „✎ Skizze“ (ohne Plan: neue Skizze, sonst als weiterer Plan; auf einer Skizze: bearbeiten), Startseite „Kein Plan? Skizze zeichnen“ oder unten „＋ Skizze“ für ein weiteres Geschoss. <b>Raum</b>: von Ecke zu Ecke aufziehen (Raster 10 cm, Räume rasten an Wänden ein), danach Name, Breite und Tiefe in Metern eintippen. <b>Wand</b>: frei ziehen, auch schräg (15°-Schritte rasten ein, Länge eintippbar). <b>Tür</b>/<b>Fenster</b>: auf eine Wand tippen (Tür 0,90 m mit Aufschlag, Fenster 1,20 m). <b>Text</b>: antippen und eintippen, z. B. „Treppe“. <b>Auswählen</b>: Räume, Wände, Texte ziehen, Ecke unten rechts ändert die Raumgröße, Entf löscht. „Skizze fertig“ schneidet die Zeichenfläche auf die Räume zu; der Maßstab ist automatisch gesetzt. „Skizze“ links bearbeitet sie weiter; Proben bleiben an ihrer Stelle.</p><h3>Schnellskizze (Test)</h3><p>Schneller ohne Maße: „☰ Räume aus Liste“ – Räume eintippen (einer pro Zeile, „Küche Brandraum“ markiert den Brandraum), „Raster erzeugen“, dann die Räume ziehen und anordnen. „Skizze – nicht maßstäblich“ (Standard bei neuen Skizzen): kein Maßstab, keine m², Stempel auf dem Plan. Wird eine Probe in einen Raum gesetzt, steht der Raumname gleich unter „Raum“ (fürs Raumbuch). Abschalten: Haken „Schnellskizze (Test)“ in der Skizzenleiste – die Skizze verhält sich dann wie bisher.</p>');
 document.querySelector('#help-dialog ol')!.insertAdjacentHTML('afterend','<h3>Entzerren (Fluchtplan fotografiert)</h3><p>„Entzerren“ (W) links in der Leiste: die vier Ecken des Plans im Foto antippen oder ziehen – 1 oben links, 2 oben rechts, 3 unten rechts, 4 unten links. Die Lupe zeigt die Ecke vergrößert. Seitenverhältnis „wie im Foto“ oder DIN quer/hoch (Fluchtpläne sind meist A3/A4). „Entzerren“ rechnet ein gerades Bild; Proben und Flächen werden mitgerechnet. Ein vorhandener Maßstab und die Nordrichtung werden dabei entfernt und sind neu zu setzen. Rückgängig stellt das Foto wieder her; die Fotodatei selbst bleibt unverändert.</p>');
-document.getElementById('app-version')!.textContent='v2.0.1';document.querySelector<HTMLElement>('.brand')!.title='PlanKit v2.0.1';
+document.getElementById('app-version')!.textContent='v2.1.0';document.querySelector<HTMLElement>('.brand')!.title='PlanKit v2.1.0';
 document.querySelector('#help-dialog h2')!.insertAdjacentHTML('afterend','<h3>Neu in PlanKit 1.16.1 · 20.10.2026</h3><p>Projektzentrale und Spektron-Leiste übergeben Projekte jetzt über #projekt im Fragment. Sonderzeichen bleiben erhalten; alte ?projekt-Links funktionieren weiterhin und werden nach dem Laden bereinigt. Projektwechsel laden auch bereits geöffnete App-Fenster neu; eine Warnung vor ungesicherten Eingaben kann den Wechsel abbrechen. Die Anlagenaktion aktion=anlage wird ebenfalls im Fragment übergeben. Installiertes PlanKit nach einer Online-Aktualisierung vollständig schließen und erneut öffnen.</p>');
 const colorOptions=PALETTE.map(c=>`<option value="${c.color}">${c.title} · ${c.suggestion}</option>`).join('');
 document.querySelector('.modes')!.insertAdjacentHTML('beforeend','<button data-mode="area-draw" class="mode" disabled><span class="tool-icon">⬡</span><span>Fläche zeichnen<small>Eckpunkte setzen & abschließen</small></span></button><button data-mode="area-edit" class="mode" disabled><span class="tool-icon">◇</span><span>Fläche bearbeiten<small>Ecken oder ganze Fläche ziehen</small></span></button>');
@@ -1003,9 +1003,9 @@ function wandKey(){return `plankit-wand-anlage:${folder?.name||''}`;}
 async function wandLaden(){
   if(!project)throw Error('Kein Projekt geöffnet.');
   if(!folder)throw Error('Die Wandansichten brauchen den Projektordner (Bohrkerne aus LabelKit). Bitte das Projekt aus der Projektzentrale öffnen.');
-  const lk=await ort(folder.dir,'labelkit'),dir=lk.dir,f=dir?(await listFiles(dir,/_Daten\.json$/i))[0]:undefined,pfad=lk.wo==='neu'?lk.pfad:AUFTRAEGE;   // „Laboraufträge“ oder künftig „_Spektron/LabelKit“
-  if(!f)throw Error(`In „${AUFTRAEGE}“ liegt keine LabelKit-Datei (…_Daten.json).`);
-  let daten:unknown;try{daten=JSON.parse(await (await f.handle.getFile()).text());}catch{throw Error(`„${pfad}/${f.name}“ ist nicht lesbar.`);}
+  const lk=await labelkitProjektdatei(folder),f=lk.datei,pfad=lk.pfad;   // „Laboraufträge“ oder künftig „_Spektron/LabelKit“; nur die Datei dieses Projekts (Audit m1)
+  if(!f)throw Error(lk.fremd.length?keineLabelkitDateiText(pfad,folder.nr,lk.fremd):`In „${pfad}“ liegt keine LabelKit-Datei (…_Daten.json).`);
+  let daten:unknown;try{if(lk.text===null)throw Error();daten=JSON.parse(lk.text);}catch{throw Error(`„${pfad}/${f.name}“ ist nicht lesbar.`);}
   return {st:wandStand(daten,project),datei:`${pfad}/${f.name}`};
 }
 function wandFreigeben(){for(const u of wandUrls)URL.revokeObjectURL(u);wandUrls=[];}
@@ -1247,9 +1247,9 @@ let stornoStand:{folder:ProjectFolder|null;liste:Storno[]}|null=null,stornoBild=
 async function labelkitLesen(){
   const f=folder;if(!f)return;
   let liste:Storno[]|null=null;
-  try{const dir=(await ort(f.dir,'labelkit')).dir,dateien=dir?(await listFiles(dir,/_Daten\.json$/i)).sort((a,b)=>b.lastModified-a.lastModified):[];   // wie „Proben übernehmen …“: die neueste
-   if(!dateien[0])liste=[];
-   else{const data=JSON.parse(await (await dateien[0].handle.getFile()).text()),nr=String(data?.projekt?.nr??'').trim();
+  try{const lk=await labelkitProjektdatei(f);   // wie „Proben übernehmen …“: die Datei dieses Projekts (Audit m1), nie eine fremde
+   if(!lk.datei)liste=[];
+   else{if(lk.text===null)throw Error('unlesbar');const data=JSON.parse(lk.text),nr=String(data?.projekt?.nr??'').trim();
     // Datei eines anderen Projekts (kopiert oder liegen geblieben): nichts daraus ableiten. Nummer mit Adresse dahinter zählt als Nummer.
     liste=!nr||/^\d{2}\.\d+/.exec(nr)?.[0]===f.nr?stornierteProben(data):[];}
   }catch{liste=null;}   // unlesbar oder gerade im Schreiben: bisherigen Stand behalten
@@ -1285,7 +1285,7 @@ async function stornoEntfernen(t:StornoTreffer){
 }
 for(const id of ['project-badge','project-data-retry'])$(id).onclick=()=>void refreshProjectData(true);
 document.querySelector('#welcome-load')!.insertAdjacentHTML('afterend','<div id="folder-prompt" class="folder-prompt" hidden><p id="folder-prompt-text"></p><button id="folder-allow" class="primary">Zugriff erlauben und Projekt öffnen</button></div><div id="folder-plans" class="folder-plans" hidden></div>');
-document.body.insertAdjacentHTML('beforeend','<dialog id="ask-dialog"><h2 id="ask-title"></h2><p id="ask-text"></p><div class="dialog-actions" id="ask-actions"></div></dialog><dialog id="lab-folder-dialog"><form method="dialog"><button class="close" aria-label="Schließen">×</button></form><span class="eyebrow">PROBEN ÜBERNEHMEN</span><h2>Welche Proben übernehmen?</h2><p class="muted">Die Probenerfassung aus LabelKit oder ein in ResultKit geprüfter Prüfbericht mit Messwerten.</p><div id="lab-folder-list"></div><div class="dialog-actions"><button id="lab-folder-other">Andere Datei …</button></div></dialog>');
+document.body.insertAdjacentHTML('beforeend','<dialog id="ask-dialog"><h2 id="ask-title"></h2><p id="ask-text"></p><div class="dialog-actions" id="ask-actions"></div></dialog><dialog id="lab-folder-dialog"><form method="dialog"><button class="close" aria-label="Schließen">×</button></form><span class="eyebrow">PROBEN ÜBERNEHMEN</span><h2>Welche Proben übernehmen?</h2><p class="muted">Die Probenerfassung aus LabelKit oder ein in ResultKit geprüfter Prüfbericht mit Messwerten.</p><div id="lab-folder-list"></div></dialog>');
 /** Auswahl als Knöpfe; ein Knopf ist Text oder {label,value,title}. Grün ist `primary` (Wert), sonst der letzte Knopf. */
 type Wahl=string|{label:string;value:string;title?:string};
 function ask(title:string,text:string,choices:Wahl[],primary?:string):Promise<string>{return new Promise(resolve=>{const d=$<HTMLDialogElement>('ask-dialog');$('ask-title').textContent=title;$('ask-text').textContent=text;const list=choices.map(c=>typeof c==='string'?{label:c,value:c}:c),main=primary??list[list.length-1]?.value;$('ask-actions').replaceChildren(...list.map(c=>{const b=document.createElement('button');b.textContent=c.label;if(c.title)b.title=c.title;if(c.value===main)b.className='primary';b.onclick=()=>{d.close();resolve(c.value);};return b;}));d.oncancel=e=>{e.preventDefault();};d.showModal();});}
@@ -1433,6 +1433,21 @@ async function ortWechselPruefen(f:ProjectFolder):Promise<boolean>{
   toast(`Die PlanKit-Datei dieses Projekts liegt inzwischen in „${pk.pfad}“. PlanKit speichert nichts mehr über den alten Ordner – bitte das Projekt neu öffnen (Projektzentrale oder „Projektordner öffnen“). Deine Fassung bleibt als Browsersicherung erhalten.`,true);
   return true;
 }
+/** Audit m10: Projektordner umbenannt (z. B. „Dr.Ka“ → „Dr. Ka“) – die Projektdatei trägt noch den früheren Namen.
+ *  Genau eine gültige Hauptdatei dieses Projekts nach der gemeinsamen Regel (SpektronOrdner.planHaupt: „Probenplan <Nummer> …“,
+ *  keine Sicherung) → eine Frage. Nichts wird umbenannt, verschoben oder gelöscht. undefined = wie bisher weiter, null = Abbrechen. */
+async function frueherenNamenPruefen(target:ProjectFolder):Promise<{project:Project;name:string}|null|undefined>{
+  const so=(globalThis as unknown as {SpektronOrdner?:{planHaupt?:(n:string,a:string,k:{nr:string})=>boolean}}).SpektronOrdner;if(!so?.planHaupt)return undefined;
+  const neu=projectFileName(target),kandidaten=(await listFiles(planOrdner(target),/\.probenplan$/i)).filter(d=>d.name!==neu&&so.planHaupt!(d.name,'file',{nr:target.nr}));
+  if(kandidaten.length!==1)return undefined;   // keine oder mehrere: der bisherige Dialog mit allen Fassungen
+  const alt=kandidaten[0];let project:Project;
+  try{project=await validateProject(JSON.parse(await (await alt.handle.getFile()).text()));}catch{return undefined;}
+  const OEFFNEN='Öffnen und unter neuem Namen speichern';
+  const choice=await ask('Projektdatei unter früherem Ordnernamen',`In „${planPfad(target)}“ liegt „${alt.name}“ – der Projektordner heißt inzwischen „${target.name}“. PlanKit öffnet diese Datei und speichert ab jetzt unter „${neu}“. Die alte Datei bleibt unverändert liegen; sie kann später von Hand gelöscht werden.`,['Abbrechen','Andere Fassung wählen …',OEFFNEN],OEFFNEN);
+  if(choice==='Abbrechen')return null;
+  if(choice!==OEFFNEN)return undefined;
+  return {project,name:alt.name};
+}
 async function enterFolder(dir:Parameters<typeof openFolder>[0]){
   const entering=++folderOpening;
   if(!await permission(dir,true)){toast('Ohne Schreibrecht auf den Projektordner kann PlanKit dort nicht speichern.',true);return;}
@@ -1442,6 +1457,8 @@ async function enterFolder(dir:Parameters<typeof openFolder>[0]){
   if(project&&!folder&&!await allowReplace('projekt'))return;
   const canonical=await fileInfo(planOrdner(target),projectFileName(target));let file=canonical,next:Project|null=null,recovered=false,preservedBrowserDraft:string|null=null;
   if(file){try{next=await validateProject(JSON.parse(await file.text()));}catch{/* Offer explicit recovery below; never overwrite a damaged file automatically. */}}
+  let umbenannt:string|null=null;   // m10: Datei unter früherem Ordnernamen geöffnet → gleich unter dem neuen Namen speichern
+  if(!canonical){const alt=await frueherenNamenPruefen(target);if(alt===null)return;if(alt){next=alt.project;umbenannt=alt.name;}}
   const local=await restoreLocal(folderKey(target)).catch(()=>null) as {savedAt:number;project:Project;dirty?:boolean;baseRevision?:string|null}|null;
   const currentRevision=await fileRevision(canonical);
   const localDiffers=local?.project&&JSON.stringify(local.project)!==JSON.stringify(next);
@@ -1451,7 +1468,7 @@ async function enterFolder(dir:Parameters<typeof openFolder>[0]){
    if(choice==='Datei verwenden'){try{preservedBrowserDraft=await writeProjectCopy(target,'Wiederherstellung',JSON.stringify(local!.project));}catch(e){fail(e);return;}}
    if(choice==='Browser-Fassung verwenden'){try{next=await validateProject(local!.project);recovered=true;}catch(e){fail(e);return;}}
   }
-  if(!recovered){
+  if(!recovered&&!umbenannt){
    const selected=await chooseStoredVersion(target,canonical,currentRevision,!!next,preservedBrowserDraft);if(selected===null)return;
    if(selected){next=selected;recovered=true;}
   }
@@ -1463,6 +1480,7 @@ async function enterFolder(dir:Parameters<typeof openFolder>[0]){
   PROJEKT_URL.setzen(target.name);
   (window as any).MosaikLeiste?.aktualisieren();
   toast(next?`Projekt ${target.name}: Probenplan aus „${planPfad(target)}“ geöffnet.`:`Projekt ${target.name}: noch kein Probenplan – Grundriss wählen.`);
+  if(umbenannt&&!recovered&&folder===target&&project){folderDirty=true;await saveToFolder(true);if(folder===target&&!folderDirty)$('saved').textContent=`✓ Aus „${umbenannt}“ geöffnet, gespeichert als „${projectFileName(target)}“`;}   // nur nach bestätigtem Speichern (Codex #88); sonst bleibt die Meldung von saveToFolder
 }
 async function openFromZentrale(name:string){
   const root=await archiv();
@@ -1473,12 +1491,21 @@ async function openFromZentrale(name:string){
   $('folder-allow').onclick=async()=>{if(await permission(root,true))await go();else toast('Ohne Zugriff auf den Archivordner kann das Projekt nicht geöffnet werden.',true);};
 }
 $('open-folder').onclick=async()=>{if(busy||cropping||!requireFinished())return;try{const dir=await pickFolder();if(!dir)return;const projectDir=await projectDirOf(dir);if(!projectDir){toast('Bitte den Projektordner (z. B. „26.0123 Köln“) oder dessen Ordner „Pläne“ wählen.',true);return;}await enterFolder(projectDir);}catch(e){fail(e);}};
+/** LabelKit-Projektdatei am geltenden Ort (Audit m1, dieselbe Wahl wie LabelKit 5.1): nur Dateien, deren Name mit der
+ *  Projektnummer beginnt; keine eigene → datei null (nie die neueste fremde). alle = jede …_Daten.json, neueste zuerst. */
+async function labelkitProjektdatei(f:ProjectFolder){
+  const lk=await ort(f.dir,'labelkit'),pfad=lk.wo==='neu'?lk.pfad:AUFTRAEGE,alle:FolderFile[]=lk.dir?await listFiles(lk.dir,/_Daten\.json$/i):[];
+  const texte=new Map<FolderFile,string|null>();
+  for(const d of alle)if(eigeneLabelkitDatei(d.name,f.nr))texte.set(d,await d.handle.getFile().then(x=>x.text()).catch(()=>null));
+  const {datei,fremd}=labelkitDateiWaehlen(alle,f.nr,d=>texte.get(d)??null);
+  return {datei,text:datei?texte.get(datei)??null:null,fremd,alle,pfad};
+}
 // Laborbericht im Projekt: Auswahl aus „Laborergebnisse“
 $('lab-import').onclick=async()=>{
   if(!folder||!project){input('lab-files').click();return;}
   // Im Projekt kommen Messwerte nur noch aus ResultKit („Laborergebnisse/_Ergebnisse.json“); LabelKit-Probenerfassung wie bisher.
   const target=folder,dir=await findSubdir(target.dir,LABOR),files=dir?await listFiles(dir,/\.(xml|pdf)$/i):[];
-  const auftraege=(await ort(target.dir,'labelkit')).dir,erfassungen=auftraege?(await listFiles(auftraege,/_Daten\.json$/i)).sort((a,b)=>b.lastModified-a.lastModified):[];
+  const lk=await labelkitProjektdatei(target),erfassung=lk.datei,erfassungen=lk.alle;   // Audit m1: nur die Datei dieses Projekts; erfassungen[0] (neueste) nur für den Stand wie ResultKit
   let ergebnisse:Ergebnisse|null=null,ergebnisFehler='',veraltet=false;
   const ergDir=(await ort(target.dir,'resultkit')).dir;   // _Ergebnisse.json: „Laborergebnisse“ oder künftig „_Spektron/ResultKit“; Prüfberichte bleiben in „Laborergebnisse“
   if(ergDir)try{const datei=await fileInfo(ergDir,ERGEBNIS_DATEI);if(datei){ergebnisse=liesErgebnisse(await datei.text());
@@ -1492,11 +1519,12 @@ $('lab-import').onclick=async()=>{
   const stand=ergebnisFehler?`<p class="lab-resultkit warn">${escape(ergebnisFehler)}</p>`:!ergebnisse?`<p class="lab-resultkit${files.length?' warn':''}">${files.length?`In „${escape(LABOR)}“ liegen Prüfberichte, die noch nicht in ResultKit geprüft und übernommen sind.`:'Noch keine Laborergebnisse aus ResultKit.'} Laborberichte werden in ResultKit importiert und geprüft – danach stehen sie hier zur Auswahl.</p>`
    :`<p class="lab-resultkit${veraltet?' warn':''}">${veraltet?'Seit der Übernahme in ResultKit hat sich der Ordner geändert – bitte dort prüfen und erneut übernehmen. Bis dahin gilt der übernommene Stand:':`Aus ResultKit übernommen am ${escape(clock(Date.parse(ergebnisse.uebernommen)))}${ergebnisse.vollstaendig?'':' (Zwischenstand – noch nicht alle Proben)'}:`}</p>`;
   const d=$<HTMLDialogElement>('lab-folder-dialog');
-  $('lab-folder-list').innerHTML=(erfassungen.length?erfassungen.map((f,i)=>`<button class="choice labelkit-choice" data-labelkit="${i}">Probenerfassung aus LabelKit: ${escape(f.name)}<small>${escape(clock(f.lastModified))} · „${escape(AUFTRAEGE)}“${i===0&&erfassungen.length>1?' · neueste':''} – Proben vorab als „Noch zu platzieren“, Messwerte folgen aus ResultKit</small></button>`).join(''):`<p class="muted tiny" id="labelkit-missing">Noch keine Probenerfassung aus LabelKit in „${escape(AUFTRAEGE)}“ – zuerst in LabelKit im Projekt speichern.</p>`)
+  $('lab-folder-list').innerHTML=(erfassung?`<button class="choice labelkit-choice" data-labelkit="0">Probenerfassung aus LabelKit: ${escape(erfassung.name)}<small>${escape(clock(erfassung.lastModified))} · „${escape(lk.pfad)}“ – Proben vorab als „Noch zu platzieren“, Messwerte folgen aus ResultKit</small></button>${lk.fremd.length?`<p class="muted tiny" id="labelkit-fremd">${escape(`Daneben ${lk.fremd.length===1?'liegt':'liegen'} „${lk.fremd[0]}“${lk.fremd.length>1?` und ${lk.fremd.length-1} weitere`:''} – nach dem Namen nicht von Projekt ${target.nr}; PlanKit lädt sie nicht.`)}</p>`:''}`
+   :lk.fremd.length?`<p class="muted tiny warn" id="labelkit-missing">${escape(keineLabelkitDateiText(lk.pfad,target.nr,lk.fremd))}</p>`:`<p class="muted tiny" id="labelkit-missing">Noch keine Probenerfassung aus LabelKit in „${escape(lk.pfad)}“ – zuerst in LabelKit im Projekt speichern.</p>`)
    +stand+entries.map((b,i)=>`<button class="choice" data-ergebnis="${i}">Prüfbericht ${escape(b.bericht||b.sources.xml||'ohne Nummer')}${b.vorlaeufig?' · vorläufig':''}<small>${b.proben.length} Probe${b.proben.length===1?'':'n'} mit Messwerten · ${escape([b.sources.xml,b.sources.pdf].filter(Boolean).join(' + '))}${im.has(`${b.bericht}|${b.vorlaeufig?1:0}`)?' · bereits im Plan':''}</small></button>`).join('')
    +`<p class="lab-resultkit-link"><a class="hilfe-link" href="${escape(resultkit)}" target="resultkit" rel="noopener" title="Laborergebnisse des Projekts in ResultKit prüfen, importieren und übernehmen">🧪 ResultKit öffnen</a></p>`;
-  $('lab-folder-list').onclick=async e=>{const lk=(e.target as HTMLElement).closest<HTMLElement>('[data-labelkit]');if(lk){const erfassung=erfassungen[Number(lk.dataset.labelkit)],target=folder,active=project;d.close();try{const text=await (await erfassung.handle.getFile()).text();if(!target||folder!==target||project!==active)throw Error('LabelKit-Import abgebrochen: Das aktive Projekt wurde während des Lesens gewechselt. Bitte die Datei erneut auswählen.');labUI?.show(labelkitReport(text,erfassung.name,target.name,message=>window.confirm(message)));}catch(err){fail(err);}return;}const b=(e.target as HTMLElement).closest<HTMLElement>('[data-ergebnis]');if(!b)return;d.close();if(folder!==target||!project){fail(Error('Abgebrochen: Das aktive Projekt wurde gewechselt.'));return;}labUI?.show(berichtAlsReport(entries[Number(b.dataset.ergebnis)]));};
-  $('lab-folder-other').onclick=()=>{d.close();input('lab-files').click();};d.showModal();
+  $('lab-folder-list').onclick=async e=>{const lkb=(e.target as HTMLElement).closest<HTMLElement>('[data-labelkit]');if(lkb&&erfassung){const target=folder,active=project;d.close();try{const text=await (await erfassung.handle.getFile()).text();if(!target||folder!==target||project!==active)throw Error('LabelKit-Import abgebrochen: Das aktive Projekt wurde während des Lesens gewechselt. Bitte die Datei erneut auswählen.');labUI?.show(labelkitReport(text,erfassung.name,target.name,message=>window.confirm(message)));}catch(err){fail(err);}return;}const b=(e.target as HTMLElement).closest<HTMLElement>('[data-ergebnis]');if(!b)return;d.close();if(folder!==target||!project){fail(Error('Abgebrochen: Das aktive Projekt wurde gewechselt.'));return;}labUI?.show(berichtAlsReport(entries[Number(b.dataset.ergebnis)]));};
+  d.showModal();
 };
 document.querySelector('#help-dialog h3')!.insertAdjacentHTML('beforebegin',`<h3>Projektordner</h3><p>Aus der Projektzentrale „Plan bearbeiten“ wählen oder hier „📁 Projekt …“ und den Projektordner (z. B. „26.0123 Köln“) auswählen. PlanKit speichert dann jede Änderung automatisch als „Probenplan &lt;Projekt&gt;.probenplan“ im Ordner „_Spektron/PlanKit“, bei älteren, noch nicht umgezogenen Projekten in „${PLAENE}“. Exportierte Bilder und PDFs bleiben in „${PLAENE}“. Grundrisse aus „${PLAENE}“, die Probenerfassung aus LabelKit („_Spektron/LabelKit“, früher „${AUFTRAEGE}“) und die in ResultKit geprüften Ergebnisse („_Spektron/ResultKit/_Ergebnisse.json“, früher „${LABOR}/_Ergebnisse.json“) stehen direkt zur Auswahl. Mit LabelKit erfasste Proben erscheinen so schon vor dem Laborbericht unter „Noch zu platzieren“; liegt der Bericht in ResultKit vor, ergänzt „Alle Konflikte: Aktualisieren“ Labordaten und Messwerte. Laborberichte (XML/PDF) werden im Projekt nur in ResultKit importiert. Hat ein Kollege den Plan zwischenzeitlich gespeichert, fragt PlanKit nach, statt zu überschreiben. Vor jedem Überschreiben bleibt die vorherige Datei als eindeutig benannte „(vorher …)“-Kopie erhalten, dazu ein geprüfter „(Speicherkandidat …)“ der neuen Fassung; von beiden behält PlanKit die jeweils ${KEEP_RECENT} neuesten. Wird der Plan ersetzt (neuer Grundriss, neue Skizze, „Meine Fassung übernehmen“), bleibt die bisherige Fassung als „(${ERSETZEN_KOPIE} …)“ – diese Kopien werden nie automatisch gelöscht. Beim Öffnen fragt PlanKit nur, wenn neben einer gültigen Projektdatei eine Fassung liegt, die nicht in ihr steht (abgebrochenes oder gleichzeitiges Speichern); fehlt die Datei oder ist sie beschädigt, stehen alle Fassungen seitenweise zur Auswahl. Es wird nichts automatisch zusammengeführt. Bei Fehlern „Speichern“ erneut versuchen und ggf. Ordnerzugriff erlauben; „Notfallkopie“ lädt die geöffnete Fassung herunter. Nach einem Abbruch Wiederherstellungs-/Browserfassung ausdrücklich auswählen, prüfen und speichern.</p>`);
 const startProject=PROJEKT_URL.projekt;
@@ -1571,8 +1599,8 @@ document.getElementById('wand-title')!.insertAdjacentHTML('afterend',`<p class="
   // Tastenkürzel: neue Namen; ein Kürzel aus einem anderen Schritt wechselt erst dorthin
   for(const h3 of hilfe.querySelectorAll('h3'))if(h3.textContent==='Tastenkürzel'){const p=h3.nextElementSibling as HTMLElement;p.innerHTML='<b>P</b> Probe von Hand · <b>B</b> Brandherd · <b>E</b> Punkte verschieben · <b>V</b> oder <b>Esc</b> Pause · <b>F</b> Fläche zeichnen · <b>G</b> Fläche bearbeiten · <b>R</b>/<b>Umschalt+R</b> drehen · <b>C</b> zuschneiden · <b>A</b> ausrichten · <b>W</b> entzerren · <b>K</b> Ergebnisfarben · <b>L</b> Spalte rechts ein/aus · <b>+</b>/<b>−</b> Zoom · <b>0</b> Einpassen · <b>&lt;</b>/<b>&gt;</b> Punktgröße · <b>Bild↑</b>/<b>Bild↓</b> Plan wechseln · <b>Strg+Z</b>/<b>Strg+Y</b> rückgängig/wiederholen · <b>Entf</b> löschen. Liegt das Werkzeug in einem anderen Schritt, wechselt PlanKit erst dorthin (z. B. C → ① Plan laden).</p>';}
   // Version, Offline und Änderungen
-  const neu=document.createElement('h3');neu.id='pk-aenderungen';neu.textContent='Neu in PlanKit 2.0.1 · 10.11.2026';
-  const neuP=document.createElement('p');neuP.textContent='Dateien an zwei Orten: Liegt die PlanKit-Datei (oder Projekt-, LabelKit-, Ergebnisdaten) in „_Spektron“ und zusätzlich am früheren Ort, z. B. eine Notfallkopie in „Pläne“, gilt immer die in „_Spektron“. Eine Zeile oben nennt beide Dateien mit Datum; gelöscht wird nichts. – 2.0.0: Einfache Oberfläche wie LabelKit und FotoKit: oben das Kopfband mit Projekt und Arbeitsschritten, auf der Karte drei Schritte – ① Plan laden, ② Proben setzen, ③ Plan ausgeben. Rechts steht je Schritt nur, was dazugehört; unten „Mehr …“, der Speicherstand und eine Hauptaktion. In ② ist gleich die nächste offene Probe dran („Als Nächstes setzen …“ – in den Plan tippen); ein Tipp auf einen vorhandenen Punkt wählt ihn aus, statt eine Probe darauf zu setzen. Kennungen von Laborproben kommen aus LabelKit und sind hier nicht mehr änderbar. Planformat, Speicherorte und Exporte sind unverändert.';
+  const neu=document.createElement('h3');neu.id='pk-aenderungen';neu.textContent='Neu in PlanKit 2.1.0 · 11.11.2026';
+  const neuP=document.createElement('p');neuP.textContent='Laborproben aus LabelKit und ResultKit: Nummer, Beschreibung und Labordaten lassen sich beim Übernehmen nicht mehr ändern – Korrekturen in LabelKit bzw. im Prüfbericht. Im Projekt kommen Proben nur noch aus LabelKit und ResultKit dieses Projekts („Andere Datei …“ entfällt). Eine LabelKit-Datei eines anderen Projekts wird nie gelesen. Wurde der Projektordner umbenannt, fragt PlanKit einmal und speichert dann unter dem neuen Namen; die alte Datei bleibt liegen. – 2.0.1: Dateien an zwei Orten: Liegt die PlanKit-Datei (oder Projekt-, LabelKit-, Ergebnisdaten) in „_Spektron“ und zusätzlich am früheren Ort, z. B. eine Notfallkopie in „Pläne“, gilt immer die in „_Spektron“. Eine Zeile oben nennt beide Dateien mit Datum; gelöscht wird nichts. – 2.0.0: Einfache Oberfläche wie LabelKit und FotoKit: oben das Kopfband mit Projekt und Arbeitsschritten, auf der Karte drei Schritte – ① Plan laden, ② Proben setzen, ③ Plan ausgeben. Rechts steht je Schritt nur, was dazugehört; unten „Mehr …“, der Speicherstand und eine Hauptaktion. In ② ist gleich die nächste offene Probe dran („Als Nächstes setzen …“ – in den Plan tippen); ein Tipp auf einen vorhandenen Punkt wählt ihn aus, statt eine Probe darauf zu setzen. Kennungen von Laborproben kommen aus LabelKit und sind hier nicht mehr änderbar. Planformat, Speicherorte und Exporte sind unverändert.';
   const versionZeile=document.createElement('p');versionZeile.id='pk-version-zeile';versionZeile.className='tiny';versionZeile.append(`PlanKit ${$('app-version').textContent?.replace(/^v/,'')} · `,$('offline'));
   for(const h3 of hilfe.querySelectorAll('h3'))if(/^Neu in PlanKit/.test(h3.textContent||'')){h3.before(neu,versionZeile,neuP);break;}
 }

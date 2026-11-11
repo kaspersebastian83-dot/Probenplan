@@ -85,7 +85,7 @@ async function manual(target,nr,approval,change){
  const errors=[],prompts=[];let active={},currentTarget=target,shown=0;
  const context=vm.createContext({labelkitReport,window:{confirm:m=>{prompts.push(m);return approval;}}});
  const UI=vm.runInContext(manualMethod+'; TestUI',context),ui=new UI();
- Object.assign(ui,{hooks:{project:()=>active,labelkitProject:()=>currentTarget,blocked:()=>false,busy(){},error:e=>errors.push(e.message)},review:{open:false,showModal(){shown++;}},open:{},choices:new Map(),meta:new Map(),renderTable(){},render(){}});
+ Object.assign(ui,{hooks:{project:()=>active,labelkitProject:()=>currentTarget,blocked:()=>false,busy(){},error:e=>errors.push(e.message)},review:{open:false,showModal(){shown++;}},open:{},choices:new Map(),meta:new Map(),renderTable(){},render(){},oeffnen(){this.review.showModal();}});   // 2.1.0: Füllen und Zeigen in oeffnen()
  await ui.import([{name:quelle,text:async()=>{if(change==='project')active={};if(change==='target')currentTarget='26.0888';return JSON.stringify(data(nr));}}]);
  return{errors,prompts,shown,report:ui.report,loading:ui.loading};
 }
@@ -98,13 +98,13 @@ for(const change of ['project','target']){
 console.log('OK F1 manueller Handler: freier Plan, Zielnummer, Altdateien und Projektwechsel');
 // Der tatsächliche asynchrone Klickhandler darf die Prüftabelle erst nach erfolgreicher Zuordnung öffnen.
 const main=readFileSync(new URL('../src/main.ts',import.meta.url),'utf8');
-const start=main.indexOf("$('lab-folder-list').onclick=async e=>"),end=main.indexOf("\n  $('lab-folder-other')",start);
+const start=main.indexOf("$('lab-folder-list').onclick=async e=>"),end=main.indexOf("\n  d.showModal();",start);   // 2.1.0: „Andere Datei …“ entfällt
 assert.ok(start>=0&&end>start);
 const handler=stripTypeScriptTypes(main.slice(start,end),{mode:'transform'});
 async function ui(nr,approval,changeProject=false){
  const shown=[],errors=[],prompts=[],list={},folder={name:project},active={report:project};let context;
  const handle={getFile:async()=>{if(changeProject)context.folder={name:'26.0888 Anderes Projekt'};return{text:async()=>JSON.stringify(data(nr))};}};
- context=vm.createContext({$:()=>list,folder,project:active,erfassungen:[{name:quelle,handle}],d:{close(){}},labelkitReport,labUI:{show:r=>shown.push(r)},window:{confirm:m=>{prompts.push(m);return approval;}},fail:e=>errors.push(e.message)});
+ context=vm.createContext({$:()=>list,folder,project:active,erfassung:{name:quelle,handle},   /* 2.1.0: nur die Datei dieses Projekts */d:{close(){}},labelkitReport,labUI:{show:r=>shown.push(r)},window:{confirm:m=>{prompts.push(m);return approval;}},fail:e=>errors.push(e.message)});
  vm.runInContext(handler,context);await list.onclick({target:{closest:()=>({dataset:{labelkit:'0'}})}});
  return{shown,errors,prompts};
 }

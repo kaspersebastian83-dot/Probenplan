@@ -44,7 +44,7 @@ function lage(p:Record<string,unknown>,a:Record<string,unknown>|undefined):{surf
 export function berichtAlsReport(b:ErgebnisBericht):LabReport{
  const r=blankReport();
  return {...r,bericht:b.bericht,labor:b.labor,auftragsreferenz:b.auftragsreferenz,batch:b.batch||'',sources:{...b.sources},quelle:[b.sources.xml,b.sources.pdf].filter(Boolean).join(' + ')||'ResultKit',
-  rows:b.proben.map(p=>({...p,label:p.label||referenceLabel(p.ref),...(p.werte?{werte:p.werte.map(w=>({...w}))}:{})})),expected:b.proben.length,...(b.vorlaeufig?{vorlaeufig:true}:{})};
+  rows:b.proben.map(p=>({...p,label:p.label||referenceLabel(p.ref),...(p.werte?{werte:p.werte.map(w=>({...w}))}:{})})),expected:b.proben.length,herkunft:'resultkit',...(b.vorlaeufig?{vorlaeufig:true}:{})};
 }
 
 /** Dateistand wie in ResultKit (Name|Größe|Zeit, sortiert): weicht er ab, wurde der Ordner nach der Übernahme geändert. */
