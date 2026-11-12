@@ -92,7 +92,7 @@ for(const engine of engines){
    await page.keyboard.press('Escape');   // Auswahl aufheben
    await page.locator('#trace-done').click();await page.locator('#trace-check').waitFor();
    assert.equal(await page.locator('#trace-tools').isVisible(),false);assert.equal(await page.locator('#trace-done').isVisible(),false);
-   assert.match(await page.locator('#trace-check').textContent(),/Stimmen die nachgezeichneten Räume mit dem Plan überein/);
+   assert.match(await page.locator('#trace-check').textContent(),/Stimmen Wände und Räume mit dem Plan überein/);
    assert.equal(await page.locator('#sketch-overlay [data-trace-room]').first().getAttribute('fill'),'none','Prüfen: nur Umrisse');
    await drag(page,[700,500],[1000,800]);assert.equal((await trace(page)).rooms.length,2,'Ziehen zeichnet beim Prüfen nichts');
    assert.equal(await page.locator('#trace-wer-feld').isVisible(),true,'kein Kürzel gemerkt: einmal fragen');

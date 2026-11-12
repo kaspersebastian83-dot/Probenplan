@@ -108,6 +108,7 @@ export class Oberflaeche{
   const leer=h('div',{id:'pk-proben-leer',class:'pk-leer',hidden:''});const gross=h('button',{type:'button',id:'pk-import-gross',class:'sp-knopf-app sp-knopf'},'Proben aus LabelKit übernehmen …');gross.onclick=()=>$('lab-import').click();   // derselbe Weg wie der kleine Knopf (im Projekt: Auswahl aus „Laborergebnisse“/„Laboraufträge“)
   leer.append(gross,h('p',{class:'tiny'},'oder eigene Proben mit „Probe von Hand“ setzen'));importKnopf.after(leer);
   const ergebnis=h('div',{class:'pk-ergebnisfarben'});const rt=$('results-toggle');rt.className='pk-schalter';rt.textContent='Ergebnisfarben zeigen';ergebnis.append(rt);
+  const nz=$('trace-toggle');nz.className='pk-schalter';ergebnis.append(nz);const nv=$('trace-vergleich');nv.className='pk-klein pk-vergleich';ergebnis.append(nv);   // ruhige Zeile darunter: Liste „Bitte nachsehen“ jederzeit, ohne die Nachzeichnung zu öffnen   // „Nachgezeichnete Räume zeigen“ (ab 2.4.0), nur sichtbar, wenn der Plan eine Nachzeichnung hat
   s2.append(ergebnis);
   moveTo(alt,'weiter-switch');const sw=document.querySelector('.weiter-switch');if(sw)alt.append(sw);
   // ③ Plan ausgeben: Exportkarte (nicht modal, offen), Darstellung, Weitere Anlagen
