@@ -1,4 +1,5 @@
 import {clone,type Plan,type Preparation,type Project,type Rect,type Point} from './model';
+import {cropTrace,rotateTrace,tracePoints,CROP_TRACE_ERROR,LOCK_TRACE} from './trace';
 /** Affine Abbildung wie bei Canvas/SVG: [a,b,c,d,e,f] bildet (x,y) auf (a·x+c·y+e, b·x+d·y+f) ab. */
 export type Matrix=[number,number,number,number,number,number];
 /** Feinausrichtung höchstens ±45°; größere Drehungen über die 90°-Knöpfe. */
@@ -43,6 +44,7 @@ export function rotateProject(project:Project,direction:1|-1){
   for(const m of project.markers){const pt=turn(m.x,m.y),label=turn(m.lx,m.ly);m.x=pt.x;m.y=pt.y;m.lx=label.x;m.ly=label.y;}
   for(const area of project.areas||[])area.points=area.points.map(pt=>turn(pt.x,pt.y));
   if(typeof plan.north==='number')plan.north=((plan.north+direction*90)%360+360)%360;
+  if(plan.trace)rotateTrace(plan.trace,direction,w,h);   // Nachzeichnung dreht exakt mit, „geprüft“ bleibt
   plan.preparation=p;plan.width=h;plan.height=w;project.version=Math.max(project.version,project.areas?3:2) as Project['version'];
 }
 export function cropProject(project:Project,rect:Rect){
@@ -51,7 +53,9 @@ export function cropProject(project:Project,rect:Rect){
   const outside=project.markers.filter(m=>m.x<rect.x||m.y<rect.y||m.x>rect.x+rect.width||m.y>rect.y+rect.height);
   if(outside.length)throw Error(`${outside.length} Markierung(en) liegen außerhalb des Zuschnitts. Wählen Sie einen Bereich, der alle Probenpunkte und Brandherde enthält.`);
   if((project.areas||[]).some(a=>a.points.some(p=>p.x<rect.x-.01||p.y<rect.y-.01||p.x>rect.x+rect.width+.01||p.y>rect.y+rect.height+.01)))throw Error('Der Zuschnitt muss alle Eckpunkte der eingezeichneten Flächen enthalten. Bitte einen größeren Ausschnitt wählen oder die betreffende Fläche vorher bearbeiten/löschen.');
+  if(plan.trace&&tracePoints(plan.trace).some(q=>q.x<rect.x-.01||q.y<rect.y-.01||q.x>rect.x+rect.width+.01||q.y>rect.y+rect.height+.01))throw Error(CROP_TRACE_ERROR);
   const p=preparation(plan);p.crop={x:p.crop.x+rect.x,y:p.crop.y+rect.y,width:rect.width,height:rect.height};
+  if(plan.trace)cropTrace(plan.trace,rect);
   for(const m of project.markers){m.x-=rect.x;m.y-=rect.y;m.lx-=rect.x;m.ly-=rect.y;}
   for(const area of project.areas||[])area.points=area.points.map(pt=>({x:Math.max(0,Math.min(rect.width,pt.x-rect.x)),y:Math.max(0,Math.min(rect.height,pt.y-rect.y))}));
   plan.preparation=p;plan.width=rect.width;plan.height=rect.height;project.version=Math.max(project.version,project.areas?3:2) as Project['version'];
@@ -64,6 +68,7 @@ export function cropProject(project:Project,rect:Rect){
  */
 export function alignProject(project:Project,delta:number){
   if(!Number.isFinite(delta))throw Error('Ungültiger Drehwinkel.');
+  if(project.plan.trace)throw Error(LOCK_TRACE);   // ein schräg gedrehtes Rechteck ist kein Raumrechteck mehr
   const plan=project.plan,old=preparation(plan),before=fineAngle(old),angle=Math.round((before+delta)*100)/100;
   if(Math.abs(angle)>MAX_ANGLE)throw Error(`Feinausrichtung höchstens ±${MAX_ANGLE}°. Für größere Drehungen zuerst um 90° drehen.`);
   if(angle===before)return;
@@ -83,5 +88,5 @@ export function alignProject(project:Project,delta:number){
   for(const {m,pt,label} of markers){m.x=pt.x-crop.x;m.y=pt.y-crop.y;m.lx=label.x-crop.x;m.ly=label.y-crop.y;}
   for(const {a,points} of areas)a.points=points.map(p=>({x:Math.max(0,Math.min(crop.width,p.x-crop.x)),y:Math.max(0,Math.min(crop.height,p.y-crop.y))}));
   if(typeof plan.north==='number')plan.north=Math.round(((plan.north+angle-before)%360+360)%360*100)/100%360;
-  plan.preparation=next;plan.width=crop.width;plan.height=crop.height;project.version=6;
+  plan.preparation=next;plan.width=crop.width;plan.height=crop.height;project.version=Math.max(project.version,6) as Project['version'];   // nie herabsetzen (Format 7: Nachzeichnung auf einem anderen Plan)
 }

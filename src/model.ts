@@ -1,4 +1,5 @@
 import type {Sketch} from './sketch';
+import type {Trace} from './trace';
 export type Kind = 'sample' | 'fire';
 export interface LabSources {xml?:string;pdf?:string}
 /** vorlaeufig: Labor-XML mit IsPreliminaryReport="true" (ab 1.28) – Werte können sich mit dem endgültigen Bericht ändern. */
@@ -54,12 +55,13 @@ export interface Area { id:string; label:string; name:string; color:string; opac
 export interface Preparation { sourceWidth:number; sourceHeight:number; rotation:0|90|180|270; crop:Rect; angle?:number }
 /** Maßstab je Plan: eine gemessene Strecke in Planeinheiten und ihre wahre Länge in Metern. Drehen/Zuschneiden ändern die Einheit nicht. */
 export interface Calibration { units:number; meters:number }
-export interface Plan { name: string; width: number; height: number; data: string; vector: boolean; markerScale?:number; autoLabels?:false; valueLabels?:true; /** Oberflächenart als Balken am Plan (Standard an; gespeichert nur „aus“) */surfaceBars?:false; sketch?:Sketch; calibration?:Calibration; north?:number; preparation?:Preparation; pdf?:{page:number; totalPages:number; renderLongSide:number} }
+export interface Plan { name: string; width: number; height: number; data: string; vector: boolean; markerScale?:number; autoLabels?:false; valueLabels?:true; /** Oberflächenart als Balken am Plan (Standard an; gespeichert nur „aus“) */surfaceBars?:false; sketch?:Sketch; /** Nachzeichnung über einem geladenen Plan (ab 2.3.0, Format 7) – nie zusammen mit sketch */trace?:Trace; calibration?:Calibration; north?:number; preparation?:Preparation; pdf?:{page:number; totalPages:number; renderLongSide:number} }
 // Mehrere Pläne (Geschosse) ab Format 5: Der aktive Plan steht wie bisher in plan/markers/areas,
 // in sheets[active] nur Kennung und Name. Alle anderen Pläne liegen vollständig in sheets.
 export interface Sheet { id:string; name:string; plan?:Plan; markers?:Marker[]; areas?:Area[] }
 // Format 6: wie 5, zusätzlich Feinausrichtung (Preparation.angle). Ältere PlanKit-Versionen lehnen es ab, statt den Winkel still zu übergehen.
-export type Version = 1|2|3|4|5|6;
+// Format 7: wie 6, zusätzlich Nachzeichnung (Plan.trace). Ältere PlanKit-Versionen lehnen es ab, statt die Nachzeichnung beim Speichern still zu verlieren.
+export type Version = 1|2|3|4|5|6|7;
 /** Raumbuch (ab 1.24): je Raum Maßnahme und Bemerkung; Räume ohne Probe mit Status. Befund und Bewertung werden nie gespeichert,
  *  sondern immer aus den Proben berechnet. alias: Raumschlüssel → Schlüssel des Raums, in den er zusammengeführt wurde. */
 export type RaumStatus='unauffaellig'|'auffaellig'|'nicht_begangen';
@@ -67,7 +69,7 @@ export const RAUM_STATUS:readonly RaumStatus[]=['unauffaellig','auffaellig','nic
 export interface RaumEintrag {floor:string;name:string;status?:RaumStatus;massnahme?:string;bemerkung?:string}
 export interface Raumbuch {rooms:RaumEintrag[];alias?:Record<string,string>}
 export interface Project { format: 'probenplan'; version: Version; plan: Plan; markers: Marker[]; nextSample: number; nextFire: number; report: string; date: string; areas?:Area[]; nextArea?:number; pending?:LabSample[]; labReports?:LabOrigin[]; sheets?:Sheet[]; active?:number; results?:ResultSettings; trials?:Trials; raumbuch?:Raumbuch }
-const clonePlan=(plan:Plan):Plan=>({...plan,...(plan.sketch?{sketch:structuredClone(plan.sketch)}:{}),...(plan.calibration?{calibration:{...plan.calibration}}:{}),...(plan.preparation?{preparation:structuredClone(plan.preparation)}:{}),...(plan.pdf?{pdf:{...plan.pdf}}:{})});
+const clonePlan=(plan:Plan):Plan=>({...plan,...(plan.sketch?{sketch:structuredClone(plan.sketch)}:{}),...(plan.trace?{trace:structuredClone(plan.trace)}:{}),...(plan.calibration?{calibration:{...plan.calibration}}:{}),...(plan.preparation?{preparation:structuredClone(plan.preparation)}:{}),...(plan.pdf?{pdf:{...plan.pdf}}:{})});
 const cloneMarkers=(markers:Marker[])=>markers.map(m=>({...m,...(m.lab?{lab:{...m.lab}}:{})}));
 const cloneAreas=(areas:Area[])=>areas.map(a=>({...a,points:a.points.map(pt=>({...pt}))}));
 export const clone = <T>(value: T): T => {
