@@ -135,6 +135,24 @@ check('Verbinden: überlappende Rechtecke ergeben einen Umriss; Tür auf der gem
   assert.deepEqual(segs.filter(g=>g.owner==='b'&&g.x1===300&&g.x2===300).map(g=>[g.y1,g.y2]),[[300,500]]);
   assert.doesNotThrow(()=>T.validateTrace(t,p));
 });
+check('Verbinden: liegt das gewählte Rechteck über dem Ziel, bleibt das Ziel darunter antippbar',()=>{
+  const t={rooms:[room('klein','Nische',200,200,100,100),room('gross','Raum 2',100,100,400,300)],walls:[],openings:[]};   // „gross“ ist später gezeichnet und deckt „klein“ ganz zu
+  assert.equal(T.rectAt(t,{x:250,y:250}).id,'gross');assert.equal(T.rectAtOutside(t,{x:250,y:250},['gross']).id,'klein');
+  assert.equal(T.rectAtOutside(t,{x:450,y:350},['gross']),null,'neben dem Ziel: nichts');
+  T.joinTraceRoom(t,'gross',T.rectAtOutside(t,{x:250,y:250},['gross']).id);assert.equal(t.rooms[1].joins,'klein');assert.equal(t.rooms[1].name,'Nische');
+  assert.equal(T.rectAtOutside(t,{x:250,y:250},T.roomParts(t,t.rooms[1]).map(r=>r.id)),null,'der eigene Raum ist kein Ziel');
+});
+check('Verbundenes Rechteck ohne Kontakt wird wieder ein eigener Raum – beim Verschieben, Verkleinern, Löschen eines Zwischenstücks',()=>{
+  const p=plan(),neu=()=>({rooms:[room('a','Halle',100,100,300,200),room('b','Halle',400,100,200,200,{joins:'a'}),room('c','Halle',600,100,200,200,{joins:'a'})],walls:[],openings:[]});
+  let t=neu();assert.equal(T.releaseDetached(t),0,'Kette a–b–c: c hängt über b am Raum');
+  T.setChecked(t,'2026-11-12','Ben');T.moveTraceRoom(t,p,'c',0,400,{...t.rooms[2]},0);assert.equal(T.releaseDetached(t),1);
+  assert.equal(t.rooms[2].joins,undefined);assert.equal(t.rooms[2].name,'Halle','eigener Raum mit dem bisherigen Namen');assert.equal(t.rooms[1].joins,'a','b bleibt verbunden');assert.equal(t.checked,undefined);
+  t=neu();T.moveTraceRoom(t,p,'b',0,500,{...t.rooms[1]},0);assert.equal(T.releaseDetached(t),2,'Zwischenstück weg: b und c verlieren den Kontakt');
+  t=neu();T.resizeTraceRoom(t,p,'a',200,200,0);assert.equal(T.releaseDetached(t),2,'Hauptrechteck verkleinert');assert.deepEqual(t.rooms.map(r=>r.joins),[undefined,undefined,undefined]);
+  t=neu();T.removeTraceRoom(t,'b');assert.deepEqual(t.rooms.map(r=>[r.id,r.joins]),[['a',undefined],['c',undefined]],'Zwischenstück gelöscht');
+  t=neu();T.moveTraceRoom(t,p,'b',0,150,{...t.rooms[1]},0);assert.equal(T.releaseDetached(t),0,'b nur ein Stück verschoben: alle berühren sich noch');assert.equal(t.rooms[2].joins,'a');
+  assert.doesNotThrow(()=>T.validateTrace(t,p));
+});
 check('Kein neues Dateiformat: Wände, Türen, Fenster und Verbindung bestehen die Prüfung von 2.3.0 und überstehen Drehen und Zuschnitt',()=>{
   const p=createProject(plan()),t=leer();p.plan.trace=t;p.version=7;
   T.addTraceRoom(t,T.traceRoomFrom(t,p.plan,{x:100,y:100},{x:400,y:300},TOL));T.addTraceRoom(t,T.traceRoomFrom(t,p.plan,{x:400,y:100},{x:600,y:300},TOL));

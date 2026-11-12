@@ -148,6 +148,11 @@ for(const engine of engines){
    await tap(page,teil.x+40,teil.y+60);await page.locator('#trace-unjoin').click();t=await trace(page);
    assert.equal(t.rooms[2].joins,undefined);assert.equal(t.rooms[2].name,'Küche','eigener Raum mit dem bisherigen Namen');
    await page.locator('#trace-hint').click();await page.keyboard.press('Control+z');assert.equal((await trace(page)).rooms[2].joins,kueche,'Lösen ist ein Rückgängig-Schritt');
+   // den Teil vom Raum wegziehen: die Verbindung löst sich im selben Schritt, mit Hinweis – ein Rückgängig stellt beides wieder her
+   await tap(page,teil.x+40,teil.y+60);await drag(page,[teil.x+40,teil.y+60],[teil.x+40,teil.y+260]);
+   await page.locator('#toast',{hasText:'berührt seinen Raum nicht mehr'}).waitFor();t=await trace(page);
+   assert.ok(t.rooms[2].y>teil.y+100,'verschoben');assert.equal(t.rooms[2].joins,undefined,'ohne Kontakt keine Verbindung');assert.equal(t.rooms[2].name,'Küche');
+   await page.locator('#trace-hint').click();await page.keyboard.press('Control+z');t=await trace(page);assert.equal(t.rooms[2].joins,kueche);assert.equal(t.rooms[2].y,teil.y,'ein Schritt: Lage und Verbindung zurück');
    const p=await savedProject(page);assert.equal(p.version,7,'weiter Format 7');assert.deepEqual(Object.keys(p.plan.trace).sort(),['openings','rooms','walls']);
    assert.deepEqual(p.markers,start.markers,'bis hierher wurde keine Probe angefasst');
   });

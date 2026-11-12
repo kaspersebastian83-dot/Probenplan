@@ -36,6 +36,8 @@ export function mainRoom(t:Trace,r:TraceRoom):TraceRoom{return r.joins?t.rooms.f
 const inside=(r:TraceRoom,p:Point)=>p.x>=r.x&&p.x<=r.x+r.w&&p.y>=r.y&&p.y<=r.y+r.h;
 /** Rechteck unter dem Punkt (zuletzt gezeichnetes zuerst). */
 export function rectAt(t:Trace,p:Point):TraceRoom|null{for(let i=t.rooms.length-1;i>=0;i--)if(inside(t.rooms[i],p))return t.rooms[i];return null;}
+/** Rechteck unter dem Punkt, das NICHT zu diesen Kennungen gehört – Ziel für „gehört zu Raum …“: liegt das gewählte Rechteck über dem Ziel, bleibt das Ziel darunter antippbar. */
+export function rectAtOutside(t:Trace,p:Point,ohne:string[]):TraceRoom|null{for(let i=t.rooms.length-1;i>=0;i--)if(!ohne.includes(t.rooms[i].id)&&inside(t.rooms[i],p))return t.rooms[i];return null;}
 /** Raum unter dem Punkt – für die Raumangabe an Proben: Name und Kennung des Hauptrechtecks. */
 export function traceRoomAt(t:Trace,p:Point):TraceRoom|null{const r=rectAt(t,p);return r?mainRoom(t,r):null;}
 export function nextTraceRoomName(t:Trace){let n=t.rooms.filter(r=>!r.joins).length+1;while(t.rooms.some(r=>r.name===`Raum ${n}`))n++;return `Raum ${n}`;}
@@ -70,7 +72,7 @@ export function removeTraceRoom(t:Trace,id:string):{heir:string|null}{
   const gone=t.rooms.find(r=>r.id===id);if(!gone)return {heir:null};
   t.rooms=t.rooms.filter(r=>r.id!==id);let heir:TraceRoom|undefined;
   if(!gone.joins){heir=t.rooms.find(r=>r.joins===id);if(heir){delete heir.joins;heir.name=gone.name;if(gone.fire)heir.fire=true;for(const r of t.rooms)if(r.joins===id)r.joins=heir.id;}}
-  dropTraceOrphans(t);uncheck(t);return {heir:heir?.id||null};
+  releaseDetached(t);dropTraceOrphans(t);uncheck(t);return {heir:heir?.id||null};
 }
 /** Raum umbenennen (wirkt auf das Hauptrechteck und alle Teile). „geprüft“ bleibt. */
 export function renameTraceRoom(t:Trace,id:string,name:string):{main:string;old:string}|null{
@@ -91,6 +93,15 @@ export function joinTraceRoom(t:Trace,partId:string,targetId:string){
 }
 /** „Verbindung lösen“: der Teil wird wieder ein eigener Raum (mit dem bisherigen Namen). */
 export function unjoinTraceRoom(t:Trace,id:string){const r=t.rooms.find(x=>x.id===id);if(!r?.joins)return;delete r.joins;uncheck(t);}
+/** Verbundene Rechtecke müssen ihren Raum berühren (wie beim Verbinden verlangt). Teile, die nach Verschieben, Größe ändern oder Löschen keinen
+ *  Kontakt mehr zum Hauptrechteck haben (auch nicht über andere Teile), werden wieder eigene Räume mit dem bisherigen Namen. Gibt ihre Zahl zurück. */
+export function releaseDetached(t:Trace):number{
+  let n=0;
+  for(const m of t.rooms){if(m.joins)continue;const teile=t.rooms.filter(r=>r.joins===m.id);if(!teile.length)continue;
+    const dran=new Set<TraceRoom>([m]);for(let neu=true;neu;){neu=false;for(const r of teile)if(!dran.has(r)&&[...dran].some(g=>touches(g,r))){dran.add(r);neu=true;}}
+    for(const r of teile)if(!dran.has(r)){delete r.joins;n++;}}
+  if(n){dropTraceOrphans(t);uncheck(t);}return n;
+}
 /** Alle Rechtecke des Raums, zu dem r gehört (Hauptrechteck und Teile). */
 export function roomParts(t:Trace,r:TraceRoom):TraceRoom[]{const m=mainRoom(t,r);return t.rooms.filter(x=>x===m||x.joins===m.id);}
 

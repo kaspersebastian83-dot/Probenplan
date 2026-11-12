@@ -6,7 +6,7 @@
 import type {SketchOpening} from './sketch';
 import {extendSketch,trimSketch,addOpening,addRoom,addText,addWall,cloneSketch,hit,meters,moveRoom,moveText,moveWall,openingAt,removeRoom,removeWall,resizeCanvas,resizeRoom,roomFrom,setOpeningWidth,setWallLength,sketchPlan,sketchSVG,wallFrom,wallLength,parseRoomList,roomsFromList,quickSketchOn,setQuickSketch,TEXT_SIZES,type Sketch,type SketchKind,type SketchRoom,type SketchText,type SketchWall} from './sketch';
 import {escape,type Plan,type Point,type Project} from './model';
-import {addTraceOpening,addTraceRoom,addTraceWall,cloneTrace,joinTraceRoom,moveTraceOpening,moveTraceOpeningEnd,moveTraceRoom,moveTraceWall,moveTraceWallEnd,openingEnds,probenAbgleich,raeumeUebernehmen,rectAt,mainRoom,removeTraceOpening,removeTraceRoom,removeTraceWall,renameTraceRoom,resizeTraceRoom,roomParts,setChecked,setTraceFire,traceEmpty,traceHit,traceOpeningOn,traceRoomAt,traceRoomFrom,traceSegments,traceSegNear,traceWallFrom,unjoinTraceRoom,type Trace,type TraceRoom,type TraceSeg} from './trace';
+import {addTraceOpening,addTraceRoom,addTraceWall,cloneTrace,joinTraceRoom,moveTraceOpening,moveTraceOpeningEnd,moveTraceRoom,moveTraceWall,moveTraceWallEnd,openingEnds,probenAbgleich,raeumeUebernehmen,rectAt,rectAtOutside,releaseDetached,mainRoom,removeTraceOpening,removeTraceRoom,removeTraceWall,renameTraceRoom,resizeTraceRoom,roomParts,setChecked,setTraceFire,traceEmpty,traceHit,traceOpeningOn,traceRoomAt,traceRoomFrom,traceSegments,traceSegNear,traceWallFrom,unjoinTraceRoom,type Trace,type TraceRoom,type TraceSeg} from './trace';
 export interface Kamera {x:number;y:number;width:number;height:number}
 /** Was der Editor von main.ts braucht. project/camera/busy/cropping sind lebende Werte (Getter/Setter in main.ts). */
 export interface Wirt {
@@ -270,7 +270,7 @@ function verbinden(sk:Arbeit,part:TraceRoom,ziel:TraceRoom){
 }
 function traceDown(e:PointerEvent,sk:Arbeit,pt:Point,k:number,base:{id:number;start:Point;screen:{x:number;y:number};moved:boolean}){
   const t=sk.s,weit=(a:Point)=>Math.hypot(a.x-pt.x,a.y-pt.y);sk.drag=null;
-  if(sk.joining){sk.joining=false;const part=selRoom() as TraceRoom|undefined,ziel=rectAt(t,pt);
+  if(sk.joining){sk.joining=false;const part=selRoom() as TraceRoom|undefined,ziel=part?rectAtOutside(t,pt,roomParts(t,part).map(r=>r.id)):null;   // das gewählte Rechteck (und sein Raum) zählt nicht als Ziel – ein Rechteck darunter bleibt antippbar
     if(!part||!ziel){renderSketch();toast('Bitte den Raum antippen, zu dem das Rechteck gehört.',true);return;}
     verbinden(sk,part,ziel);return;}
   if(sk.tool==='room'||sk.tool==='wall')sk.drag={...base,kind:'draw'};
@@ -312,7 +312,11 @@ function traceDrop(sk:Arbeit,d:Zug){
     if(o)sketchTry(()=>{addTraceOpening(sk.s,o);sk.sel={type:'opening',id:o.id};});
     else{renderSketch();toast(d.moved?'Zu klein – bitte von Kante zu Kante ziehen.':'Diese Wand ist dafür zu kurz.',true);}
     return;}
-  if(d.kind!=='pan'&&d.moved)sketchTry(()=>{});else renderSketch();
+  if(d.kind!=='pan'&&d.moved){let los=0;
+    // Raum verschoben oder in der Größe geändert: ein verbundenes Rechteck, das seinen Raum nicht mehr berührt, wird wieder ein eigener Raum (derselbe Rückgängig-Schritt)
+    sketchTry(()=>{if(d.room)los=releaseDetached(sk.s);});
+    if(los)toast(los===1?'Das Rechteck berührt seinen Raum nicht mehr – die Verbindung ist gelöst.':`${los} Rechtecke berühren ihren Raum nicht mehr – die Verbindungen sind gelöst.`);}
+  else renderSketch();
 }
 function startTrace(){const p=wirt.project;if(!p||p.plan.sketch||wirt.busy||wirt.cropping||!requireFinished())return;
   sketching={ziel:'nachzeichnung',ansicht:'beides',pruefen:false,s:traceAlsSkizze(p.plan),tool:'room',sel:null,drag:null,draft:null,draftWall:null,joining:false,draftOpening:null};werOffen=false;abgleich=null;renderAbgleich();
