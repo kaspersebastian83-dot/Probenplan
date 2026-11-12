@@ -334,13 +334,13 @@ $('trace-done').onclick=()=>{const sk=sketching;if(!sk||sk.ziel!=='nachzeichnung
   if(traceEmpty(sk.s)){endTrace();toast('Noch nichts nachgezeichnet. „Räume nachzeichnen“ in Schritt ① öffnet es wieder.');return;}
   sk.pruefen=true;sk.sel=null;sk.draft=null;sk.draftWall=null;sk.draftOpening=null;sk.joining=false;sk.ansicht='beides';werOffen=false;renderSketch();fitBelow('trace-actions');renderSketch();if(!kuerzelLesen())focusField('trace-kuerzel');};
 $('trace-change').onclick=()=>{if(!sketching)return;sketching.pruefen=false;renderSketch();};
-$('trace-later').onclick=()=>{const offen=!wirt.project?.plan.trace?.checked;endTrace();abgleichOeffnen();toast(offen?'Nachzeichnung gespeichert – noch nicht geprüft. „Räume nachzeichnen“ in Schritt ① öffnet sie wieder.':'Nachzeichnung unverändert – sie ist geprüft.');};
+$('trace-later').onclick=()=>{const offen=!wirt.project?.plan.trace?.checked;endTrace();if(abgleichOeffnen())return;toast(offen?'Nachzeichnung gespeichert – noch nicht geprüft. „Räume nachzeichnen“ in Schritt ① öffnet sie wieder.':'Nachzeichnung unverändert – sie ist geprüft.');};
 $('trace-wer-aendern').onclick=()=>{werOffen=true;input('trace-kuerzel').value=kuerzelLesen();renderSketch();focusField('trace-kuerzel');};
 input('trace-kuerzel').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('trace-ok').click();}};
 $('trace-ok').onclick=()=>{const sk=sketching,t=wirt.project?.plan.trace;if(!sk?.pruefen||!t||traceEmpty(t))return;
   let by=kuerzelLesen();
   if(werOffen||!by){by=input('trace-kuerzel').value.replace(/\s+/g,' ').trim().slice(0,40);if(!by){werOffen=true;renderSketch();focusField('trace-kuerzel');toast('Bitte dein Kürzel eintragen – es steht mit dem Datum an der Nachzeichnung.',true);return;}kuerzelMerken(by);werOffen=false;}
-  const datum=heute();mutate(p=>{if(p.plan.trace)setChecked(p.plan.trace,datum,by);});endTrace();abgleichOeffnen();toast(`Nachzeichnung geprüft (${by}, ${datumDE(datum)}).`);};
+  const datum=heute();mutate(p=>{if(p.plan.trace)setChecked(p.plan.trace,datum,by);});endTrace();if(abgleichOeffnen())return;toast(`Nachzeichnung geprüft (${by}, ${datumDE(datum)}).`);};
 /* ---------- Schon gesetzte Proben (E22, ab 2.4.0) ----------
    Nach „Fertig“ (geprüft oder „Später prüfen“) eine Karte: das Angebot für Proben OHNE Raum („Übernehmen“ = ein Rückgängig-Schritt) und getrennt
    die Liste „Bitte nachsehen“ der Abweichungen. Die Liste ändert nie etwas; ein Klick zeigt die Probe im Plan. Die Karte sperrt nichts. */
@@ -348,14 +348,15 @@ let abgleich:{angebot:boolean}|null=null;
 function renderAbgleich(){
   const karte=$('trace-proben'),p=wirt.project,a=abgleich&&p&&!sketching?probenAbgleich(p.plan.trace,p.markers):null;
   const zeigAngebot=!!a&&abgleich!.angebot&&a.ohne.length>0,zeigListe=!!a&&a.abweichend.length>0;
-  if(!zeigAngebot&&!zeigListe){if(!sketching)abgleich=null;karte.hidden=true;return;}
+  if(!zeigAngebot&&!zeigListe){if(!sketching)abgleich=null;if(!karte.hidden){karte.hidden=true;if(!sketching&&!wirt.busy)fit();}return;}   // Karte weg: Plan wieder ganz einpassen
   karte.hidden=false;$('trace-angebot').hidden=!zeigAngebot;$('trace-abweichung').hidden=!zeigListe;
   const li=(text:string)=>{const x=document.createElement('li');x.textContent=text;return x;};
   if(zeigAngebot){const n=a!.ohne.length;$('trace-angebot-titel').textContent=n===1?'1 Probe ohne Raum liegt in einem nachgezeichneten Raum – Raum übernehmen?':`${n} Proben ohne Raum liegen in einem nachgezeichneten Raum – Raum übernehmen?`;
     $('trace-angebot-liste').replaceChildren(...a!.ohne.map(v=>li(`${v.label} → ${v.raum}`)));}
   if(zeigListe)$('trace-abweichung-liste').replaceChildren(...a!.abweichend.map(v=>{const x=document.createElement('li'),b=document.createElement('button');b.type='button';b.dataset.probe=v.id;b.textContent=`${v.label}: an der Probe steht „${v.steht}“, der Punkt liegt in „${v.liegt}“`;x.append(b);return x;}));
 }
-function abgleichOeffnen(){abgleich={angebot:true};renderAbgleich();}
+/** Karte zeigen, falls es etwas zu zeigen gibt (true). Der Plan wird darunter eingepasst; der Stand steht ohnehin in Schritt ①. */
+function abgleichOeffnen(){abgleich={angebot:true};renderAbgleich();if($('trace-proben').hidden)return false;fitBelow('trace-proben');return true;}
 $('trace-uebernehmen').onclick=()=>{const p=wirt.project;if(!p||!abgleich||wirt.busy)return;const liste=probenAbgleich(p.plan.trace,p.markers).ohne;if(!liste.length)return;let n=0;
   abgleich.angebot=false;mutate(q=>{n=raeumeUebernehmen(q.markers,liste);});renderAbgleich();toast(`${n} ${n===1?'Probe hat':'Proben haben'} jetzt ihren Raum. „Rückgängig“ nimmt es zurück.`);};
 $('trace-nicht-jetzt').onclick=()=>{if(abgleich)abgleich.angebot=false;renderAbgleich();};
