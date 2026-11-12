@@ -90,6 +90,14 @@ check('Zuschnitt: Nachzeichnung verschiebt sich mit den Proben; außerhalb wird 
   assert.throws(()=>cropProject(q,{x:150,y:0,width:900,height:900}),/Zuschnitt muss die Nachzeichnung enthalten/);
   assert.equal(JSON.stringify(q),vorher,'abgelehnter Zuschnitt ändert nichts');
 });
+check('Zuschnitt durch eine Tür wird abgelehnt (beide Enden zählen, nicht nur die Mitte); knapp daneben geht',()=>{
+  // Tür: Mitte (400|200), senkrecht, Breite 60 → reicht von y=170 bis y=230
+  const p=sample();p.plan.trace.rooms=[];p.plan.trace.walls=[];const vorher=JSON.stringify(p);
+  assert.throws(()=>cropProject(p,{x:0,y:200,width:1200,height:700}),/Zuschnitt muss die Nachzeichnung enthalten/,'Schnitt durch die Türmitte');
+  assert.throws(()=>cropProject(p,{x:0,y:0,width:1200,height:215}),/Zuschnitt muss die Nachzeichnung enthalten/,'Schnitt durch das untere Türende');
+  assert.equal(JSON.stringify(p),vorher);
+  cropProject(p,{x:0,y:170,width:1200,height:60});assert.deepEqual([p.plan.trace.openings[0].x,p.plan.trace.openings[0].y,p.plan.trace.openings[0].w],[400,30,60]);
+});
 check('Ausrichten ist gesperrt, solange es eine Nachzeichnung gibt; ohne sie wie bisher',()=>{
   const p=sample(),vorher=JSON.stringify(p);
   assert.throws(()=>alignProject(p,2),/Erst ausrichten, dann nachzeichnen/);assert.equal(JSON.stringify(p),vorher);

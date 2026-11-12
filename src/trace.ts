@@ -97,8 +97,10 @@ export function rotateTrace(t:Trace,direction:1|-1,w:number,h:number){
   for(const wl of t.walls){const a=turn(wl.x1,wl.y1),b=turn(wl.x2,wl.y2);wl.x1=r2(a.x);wl.y1=r2(a.y);wl.x2=r2(b.x);wl.y2=r2(b.y);}
   for(const o of t.openings){const p=turn(o.x,o.y);o.x=r2(p.x);o.y=r2(p.y);o.a=r2(((o.a+direction*90+540)%360)-180);}
 }
-/** Alle Punkte der Nachzeichnung (Ecken, Wandenden, Öffnungsmitten). */
-export function tracePoints(t:Trace):Point[]{return [...t.rooms.flatMap(r=>[{x:r.x,y:r.y},{x:r.x+r.w,y:r.y+r.h}]),...t.walls.flatMap(w=>[{x:w.x1,y:w.y1},{x:w.x2,y:w.y2}]),...t.openings.map(o=>({x:o.x,y:o.y}))];}
+/** Alle Punkte der Nachzeichnung: Raumecken, Wandenden und beide Enden jeder Öffnung (Mitte ± halbe Breite entlang ihrer Richtung) –
+ *  ein Zuschnitt, der eine Tür oder ein Fenster durchschneidet, wird so abgelehnt statt sie still zu kappen. */
+export function tracePoints(t:Trace):Point[]{return [...t.rooms.flatMap(r=>[{x:r.x,y:r.y},{x:r.x+r.w,y:r.y+r.h}]),...t.walls.flatMap(w=>[{x:w.x1,y:w.y1},{x:w.x2,y:w.y2}]),
+  ...t.openings.flatMap(o=>{const a=o.a*Math.PI/180,dx=Math.cos(a)*o.w/2,dy=Math.sin(a)*o.w/2;return [{x:o.x-dx,y:o.y-dy},{x:o.x+dx,y:o.y+dy}];})];}
 export const CROP_TRACE_ERROR='Der Zuschnitt muss die Nachzeichnung enthalten. Bitte einen größeren Ausschnitt wählen oder die Nachzeichnung vorher ändern/löschen.';
 /** Zuschnitt: verschieben; liegt etwas außerhalb, wird der Zuschnitt abgelehnt (wie bei Proben). */
 export function cropTrace(t:Trace,rect:Rect){
