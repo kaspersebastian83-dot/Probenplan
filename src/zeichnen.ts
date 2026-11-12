@@ -3,9 +3,10 @@
    • Nachzeichnung: Räume ÜBER einem geladenen Plan (plan.trace, Planeinheiten, kein Raster, keine Maße), mit Prüfschritt.
    Zeiger, Auswahl, Tasten und „je Aktion ein Rückgängig-Schritt“ sind gemeinsam; was sich unterscheidet, steht an der Stelle als Zweig.
    main.ts reicht über „Wirt“ nur das hinein, was der Editor von der Karte braucht (Projekt, Kamera, Sperre, Zeichenfläche). */
+import type {SketchOpening} from './sketch';
 import {extendSketch,trimSketch,addOpening,addRoom,addText,addWall,cloneSketch,hit,meters,moveRoom,moveText,moveWall,openingAt,removeRoom,removeWall,resizeCanvas,resizeRoom,roomFrom,setOpeningWidth,setWallLength,sketchPlan,sketchSVG,wallFrom,wallLength,parseRoomList,roomsFromList,quickSketchOn,setQuickSketch,TEXT_SIZES,type Sketch,type SketchKind,type SketchRoom,type SketchText,type SketchWall} from './sketch';
 import {escape,type Plan,type Point,type Project} from './model';
-import {addTraceRoom,cloneTrace,moveTraceRoom,rectAt,mainRoom,removeTraceRoom,renameTraceRoom,resizeTraceRoom,setChecked,setTraceFire,traceEmpty,traceRoomFrom,type Trace,type TraceRoom} from './trace';
+import {addTraceOpening,addTraceRoom,addTraceWall,cloneTrace,joinTraceRoom,moveTraceOpening,moveTraceOpeningEnd,moveTraceRoom,moveTraceWall,moveTraceWallEnd,openingEnds,probenAbgleich,raeumeUebernehmen,rectAt,mainRoom,removeTraceOpening,removeTraceRoom,removeTraceWall,renameTraceRoom,resizeTraceRoom,roomParts,setChecked,setTraceFire,traceEmpty,traceHit,traceOpeningOn,traceRoomAt,traceRoomFrom,traceSegments,traceSegNear,traceWallFrom,unjoinTraceRoom,type Trace,type TraceRoom,type TraceSeg} from './trace';
 export interface Kamera {x:number;y:number;width:number;height:number}
 /** Was der Editor von main.ts braucht. project/camera/busy/cropping sind lebende Werte (Getter/Setter in main.ts). */
 export interface Wirt {
@@ -16,8 +17,9 @@ export interface Wirt {
   setMode(next:string):void; render():void; fit():void; fitBelow(panel:string):void; requireFinished():boolean; clearSelection():void;
   /** Rückfrage mit Knöpfen (vorhandener Dialog). */ ask(title:string,text:string,choices:string[],primary?:string):Promise<string>;
   /** Kürzel der Mitarbeiterliste (falls geladen) – Vorschläge für „Wer prüft?“. */ kuerzel():string[];
+  /** Probe im Plan zeigen: auswählen und in die Mitte holen. */ zeige(markerId:string):void;
 }
-export interface SkizzenEditor {readonly aktiv:boolean; readonly zieht:boolean; /** Skizze bearbeiten */start():void; /** Räume über dem geladenen Plan nachzeichnen */nachzeichnen():void; render():void; resync():void}
+export interface SkizzenEditor {readonly aktiv:boolean; readonly zieht:boolean; /** Skizze bearbeiten */start():void; /** Räume über dem geladenen Plan nachzeichnen */nachzeichnen():void; render():void; resync():void; /** nach jedem Neuzeichnen der Karte: Liste „Proben und Räume“ aktuell halten */nachRender():void}
 /** Wohin gezeichnet wird. */
 type Ziel='skizze'|'nachzeichnung';
 /** Was im Nachzeichnen zu sehen ist: Plan und Nachzeichnung, nur der Plan, nur die Nachzeichnung. */
@@ -35,10 +37,27 @@ function traceAlsSkizze(plan:Plan):Sketch{const t=plan.trace?cloneTrace(plan.tra
 /** Geometrie ohne Namen und Brandraum: ändert sie sich, ist die Nachzeichnung nicht mehr „geprüft“. */
 const geometrie=(t:{rooms:TraceRoom[];walls:SketchWall[];openings:unknown[]})=>JSON.stringify([t.rooms.map(r=>[r.id,r.x,r.y,r.w,r.h,r.joins||'']),t.walls,t.openings]);
 type SketchTool='room'|'wall'|'door'|'window'|'text'|'select';
+const BLAU='#4179b2',BRAND='#c2620c';
+/** Die Nachzeichnung als SVG-Inhalt (Planeinheiten; k = Planeinheiten je Bildschirmpixel, damit Linien am Bildschirm gleich stark bleiben).
+ *  umriss: Prüfansicht – keine Flächenfüllung, kräftige Linien. Raumkanten kommen aus traceSegments: die Kante zwischen verbundenen Rechtecken fehlt. */
+export function traceBild(t:Trace,k:number,umriss:boolean):string{
+  const text=(x:number,y:number,v:string,size:number,color:string)=>`<text x="${x}" y="${y}" text-anchor="middle" font-family="Arial" font-weight="700" font-size="${k*size}" fill="${color}" stroke="#fff" stroke-width="${k*3}" paint-order="stroke">${escape(v)}</text>`;
+  const feuer=new Set(t.rooms.filter(r=>r.fire).map(r=>r.id)),deck=umriss?1:.7;let out='';
+  for(const r of t.rooms)out+=`<rect data-trace-room="${r.id}" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="${umriss?'none':r.fire?'rgba(232,145,45,.22)':'rgba(65,121,178,.12)'}"/>`;
+  for(const g of traceSegments(t))out+=g.room?`<line data-trace-edge="${g.owner}" x1="${g.x1}" y1="${g.y1}" x2="${g.x2}" y2="${g.y2}" stroke="${feuer.has(g.owner)?BRAND:BLAU}" stroke-opacity="${deck}" stroke-width="${k*(umriss?3.5:2.5)}" stroke-linecap="square"/>`
+    :`<line data-trace-wall="${g.owner}" x1="${g.x1}" y1="${g.y1}" x2="${g.x2}" y2="${g.y2}" stroke="${BLAU}" stroke-opacity="${deck}" stroke-width="${k*4}" stroke-linecap="round"/>`;
+  // Tür: weiße Lücke mit zwei Endstrichen. Fenster: weiße Lücke mit Mittellinie.
+  for(const o of t.openings){const h=o.w/2;out+=`<g data-trace-opening="${o.kind}" data-id="${o.id}" transform="translate(${o.x} ${o.y}) rotate(${o.a})"><rect x="${-h}" y="${-k*4.5}" width="${o.w}" height="${k*9}" fill="#fff" stroke="${BLAU}" stroke-width="${k*1.5}"/>${o.kind==='window'?`<line x1="${-h}" y1="0" x2="${h}" y2="0" stroke="${BLAU}" stroke-width="${k*1.5}"/>`:`<path d="M${-h} ${-k*7}V${k*7}M${h} ${-k*7}V${k*7}" stroke="${BLAU}" stroke-width="${k*2.5}" fill="none"/>`}</g>`;}
+  for(const r of t.rooms)if(!r.joins){out+=text(r.x+r.w/2,r.y+r.h/2+k*4,r.name,13,r.fire?'#8a3f10':'#1f4f86');if(r.fire)out+=text(r.x+r.w/2,r.y+r.h/2+k*18,'Brandraum',10,'#8a3f10');}
+  return out;
+}
 export function skizzenEditor(wirt:Wirt):SkizzenEditor{
 const {svg,image,$,input,updateCamera,point,mutate,toast,setMode,fitBelow,requireFinished}=wirt,sketchLayer=wirt.layer,render=()=>wirt.render(),fit=()=>wirt.fit();
 /** Skizze: Arbeitskopie s; Änderungen werden je abgeschlossener Aktion als ein Rückgängig-Schritt übernommen. Auch hier ist cropping gesetzt. */
-let sketching:{ziel:Ziel;ansicht:Ansicht;pruefen:boolean;s:Sketch;tool:SketchTool;sel:{type:SketchKind;id:string}|null;drag:{id:number;kind:'draw'|'move'|'resize'|'pan';start:Point;screen:{x:number;y:number};room?:SketchRoom;wall?:SketchWall;text?:SketchText;cam?:Kamera;moved:boolean}|null;draft:SketchRoom|null;draftWall:SketchWall|null}|null=null;
+/** Nur Nachzeichnen: joining = „gehört zu Raum …“ wartet auf den Tipp; draftOpening = Tür/Fenster beim Ziehen; drag.snap = Stand vor dem Ziehen. */
+type Zug={id:number;kind:'draw'|'move'|'resize'|'pan'|'opening'|'wall-end'|'op-end';start:Point;screen:{x:number;y:number};room?:SketchRoom;wall?:SketchWall;text?:SketchText;opening?:SketchOpening;seg?:TraceSeg;end?:number;snap?:Trace;cam?:Kamera;moved:boolean};
+interface Arbeit {ziel:Ziel;ansicht:Ansicht;pruefen:boolean;s:Sketch;tool:SketchTool;sel:{type:SketchKind;id:string}|null;drag:Zug|null;draft:SketchRoom|null;draftWall:SketchWall|null;joining?:boolean;draftOpening?:SketchOpening|null}
+let sketching:Arbeit|null=null;
 /* ---------- Skizze (ab 1.21) ----------
    Kein Plan vorhanden: Räume als Rechtecke mit Maßen (Raster 10 cm, Einrasten an Wänden), freie auch schräge Wände,
    Türen und Fenster auf jeder Wand, freier Text. Ergebnis ist ein normaler SVG-Plan mit Maßstab; die Skizze bleibt am Plan. */
@@ -118,7 +137,10 @@ $('sketch-door-flip').onclick=()=>{const o=selOpening();if(o)sketchTry(()=>{o.si
 input('sketch-text').onchange=()=>{const t=selText(),v=input('sketch-text').value.replace(/\s+/g,' ').trim().slice(0,80);if(t&&v&&v!==t.text)sketchTry(()=>{t.text=v;});else renderSketch();};
 $<HTMLSelectElement>('sketch-text-size').onchange=()=>{const t=selText();if(t)sketchTry(()=>{t.size=Number($<HTMLSelectElement>('sketch-text-size').value);});};
 const removeSel=()=>{const sk=sketching;if(!sk?.sel)return;const {type,id}=sk.sel;sk.sel=null;
-  if(sk.ziel==='nachzeichnung'){if(sk.pruefen||type!=='room')return;let erbe:string|null=null;
+  if(sk.ziel==='nachzeichnung'){if(sk.pruefen)return;sk.joining=false;
+    if(type==='wall'){sketchTry(()=>removeTraceWall(sk.s,id));return;}
+    if(type==='opening'){sketchTry(()=>removeTraceOpening(sk.s,id));return;}
+    if(type!=='room')return;let erbe:string|null=null;
     // Proben, deren Raum aus diesem Rechteck stammt, zeigen danach auf das neue Hauptrechteck (falls es Teile gab)
     sketchTry(()=>{erbe=removeTraceRoom(sk.s,id).heir;},p=>{if(erbe)for(const m of p.markers)if(m.raumSkizze===id)m.raumSkizze=erbe;});return;}
   sketchTry(()=>{
@@ -141,12 +163,13 @@ svg.addEventListener('pointerdown',e=>{
   const base={id:e.pointerId,start:pt,screen:{x:e.clientX,y:e.clientY},moved:false};
   const nach=sk.ziel==='nachzeichnung';
   if(nach&&sk.pruefen){sk.drag={...base,kind:'pan',cam:{...wirt.camera}};svg.setPointerCapture(e.pointerId);return;}   // Prüfen: nur schauen
+  if(nach){traceDown(e,sk,pt,k,base);return;}
   if(sk.tool==='room'||sk.tool==='wall'){sk.drag={...base,kind:'draw'};}
   else if(sk.tool==='door'||sk.tool==='window'){const o=openingAt(sk.s,pt,sk.tool,Math.max(40,k*18));if(!o){toast('Bitte auf eine Wand tippen.',true);return;}sketchTry(()=>{addOpening(sk.s,o);sk.sel={type:'opening',id:o.id};});return;}
   else if(sk.tool==='text'){if(pt.x<0||pt.y<0||pt.x>sk.s.width||pt.y>sk.s.height)return;let t:SketchText|null=null;sketchTry(()=>{t=addText(sk.s,pt);sk.sel={type:'text',id:t.id};sk.tool='select';});if(t)focusField('sketch-text');return;}
   else{const r=selRoom();
     if(r&&Math.abs(pt.x-(r.x+r.w))<k*14&&Math.abs(pt.y-(r.y+r.h))<k*14)sk.drag={...base,kind:'resize',room:{...r}};
-    else{let h=hit(sk.s,pt,nach?k*10:Math.max(15,k*10));if(nach&&h&&h.type!=='room')h=null;   // Nachzeichnen 2.3.0: nur Räume
+    else{const h=hit(sk.s,pt,Math.max(15,k*10));
       sk.sel=h;
       if(h?.type==='room')sk.drag={...base,kind:'move',room:{...sk.s.rooms.find(x=>x.id===h.id)!}};
       else if(h?.type==='wall')sk.drag={...base,kind:'move',wall:{...sk.s.walls.find(x=>x.id===h.id)!}};
@@ -161,28 +184,26 @@ svg.addEventListener('pointermove',e=>{
   if(d.kind==='pan'){const rect=svg.getBoundingClientRect();wirt.camera={...d.cam!,x:d.cam!.x-(e.clientX-d.screen.x)/rect.width*d.cam!.width,y:d.cam!.y-(e.clientY-d.screen.y)/rect.height*d.cam!.height};updateCamera();return;}
   const pt=point(e),dx=pt.x-d.start.x,dy=pt.y-d.start.y;
   const nach=sk.ziel==='nachzeichnung',plan=wirt.project.plan,tol=wirt.camera.width/Math.max(1,svg.clientWidth)*12;   // Nachzeichnen: Einrasten 12 px am Bildschirm
-  if(d.kind==='draw'){if(sk.tool==='wall')sk.draftWall=wallFrom(sk.s,d.start,pt);else sk.draft=nach?traceRoomFrom(sk.s,plan,d.start,pt,tol):roomFrom(sk.s,d.start,pt);renderSketch();return;}
-  if(nach){if(d.kind==='move'&&d.room)moveTraceRoom(sk.s,plan,d.room.id,dx,dy,d.room,tol);else if(d.kind==='resize'&&d.room)resizeTraceRoom(sk.s,plan,d.room.id,d.room.w+dx,d.room.h+dy,tol);renderSketch();return;}
+  if(nach){traceMove(sk,d,pt,plan,tol);return;}
+  if(d.kind==='draw'){if(sk.tool==='wall')sk.draftWall=wallFrom(sk.s,d.start,pt);else sk.draft=roomFrom(sk.s,d.start,pt);renderSketch();return;}
   if(d.kind==='move'){if(d.room)moveRoom(sk.s,d.room.id,dx,dy,d.room,quickSketchOn());else if(d.wall)moveWall(sk.s,d.wall.id,dx,dy,d.wall);else if(d.text)moveText(sk.s,d.text.id,dx,dy,d.text);}
   if(d.kind==='resize'&&d.room){try{resizeRoom(sk.s,d.room.id,d.room.w+dx,d.room.h+dy);}catch{/* weiterziehen */}}
   previewSketch();renderSketch();
 },{capture:true});
 const sketchDrop=(e:PointerEvent)=>{
   const sk=sketching;if(!sk?.drag||sk.drag.id!==e.pointerId)return;const d=sk.drag;sk.drag=null;
+  if(sk.ziel==='nachzeichnung'){traceDrop(sk,d);return;}
   if(d.kind==='draw'){
     if(sk.tool==='wall'){const w=sk.draftWall;sk.draftWall=null;if(w&&d.moved){sketchTry(()=>{addWall(sk.s,w);sk.sel={type:'wall',id:w.id};});}else renderSketch();return;}
     const r=sk.draft;sk.draft=null;
-    if(sk.ziel==='nachzeichnung'){   // Werkzeug „Raum“ bleibt gewählt (mehrere Räume nacheinander); Tipp auf einen vorhandenen Raum wählt ihn
-      if(r&&d.moved){sketchTry(()=>{addTraceRoom(sk.s,r);sk.sel={type:'room',id:r.id};});focusField('trace-name');}
-      else{const da=d.moved?null:rectAt(sk.s,d.start);sk.sel=da?{type:'room',id:da.id}:null;renderSketch();}
-      return;}
     if(r&&d.moved){sketchTry(()=>{addRoom(sk.s,r);sk.sel={type:'room',id:r.id};sk.tool='select';});focusField('sketch-name');}else renderSketch();return;}
   if((d.kind==='move'||d.kind==='resize')&&d.moved)sketchTry(()=>{});else renderSketch();
 };
-svg.addEventListener('pointerup',sketchDrop,{capture:true});svg.addEventListener('pointercancel',e=>{if(sketching?.drag?.id===e.pointerId){sketching.drag=null;sketching.draft=null;sketching.draftWall=null;neuLaden();previewSketch();renderSketch();}},{capture:true});
+svg.addEventListener('pointerup',sketchDrop,{capture:true});svg.addEventListener('pointercancel',e=>{if(sketching?.drag?.id===e.pointerId){sketching.drag=null;sketching.draft=null;sketching.draftWall=null;sketching.draftOpening=null;neuLaden();previewSketch();renderSketch();}},{capture:true});
 window.addEventListener('keydown',e=>{
   if(!sketching||e.ctrlKey||e.metaKey||e.altKey)return;const t=e.target;if(t instanceof Element&&t.closest('input,textarea,select'))return;
-  if(e.key==='Escape'){e.preventDefault();if(sketching.draft||sketching.draftWall||sketching.sel){sketching.draft=null;sketching.draftWall=null;sketching.sel=null;renderSketch();}
+  if(e.key==='Escape'){e.preventDefault();if(sketching.joining){sketching.joining=false;renderSketch();}
+    else if(sketching.draft||sketching.draftWall||sketching.sel){sketching.draft=null;sketching.draftWall=null;sketching.sel=null;renderSketch();}
     else if(sketching.ziel==='nachzeichnung')$(sketching.pruefen?'trace-change':'trace-done').click();else $('sketch-done').click();}
   else if((e.key==='Delete'||e.key==='Backspace')&&sketching.sel){e.preventDefault();removeSel();}
 });
@@ -190,49 +211,114 @@ window.addEventListener('keydown',e=>{
    Räume über dem geladenen Plan: Rechteck aufziehen, benennen, Brandraum. Plan darunter, Nachzeichnung halb durchsichtig in PlanKit-Blau,
    Anzeige umschaltbar. Keine Maße, keine Flächen, kein Raster – Kanten rasten an Nachbarräumen ein (12 px am Bildschirm).
    Am Ende der Prüfschritt: Plan in voller Stärke, Nachzeichnung als Umriss; „Ja, geprüft“ schreibt Datum und Kürzel in die Datei. */
-$('stage').insertAdjacentHTML('beforeend',`<div id="trace-actions" hidden><div class="align-row"><span class="sketch-tools" id="trace-tools" role="group" aria-label="Werkzeug"><button data-trace-tool="room" aria-pressed="true">▭ Raum</button><button data-trace-tool="select" aria-pressed="false">↖ Auswählen</button></span><span class="sketch-tools" role="group" aria-label="Anzeige"><button data-trace-view="beides" aria-pressed="true">Plan + Nachzeichnung</button><button data-trace-view="plan" aria-pressed="false">nur Plan</button><button data-trace-view="zeichnung" aria-pressed="false">nur Nachzeichnung</button></span><button id="trace-done" class="primary">Fertig – jetzt prüfen →</button></div>
+$('stage').insertAdjacentHTML('beforeend',`<div id="trace-actions" hidden><div class="align-row"><span class="sketch-tools" id="trace-tools" role="group" aria-label="Werkzeug"><button data-trace-tool="room" aria-pressed="true">▭ Raum</button><button data-trace-tool="wall" aria-pressed="false">╱ Wand</button><button data-trace-tool="door" aria-pressed="false">◠ Tür</button><button data-trace-tool="window" aria-pressed="false">▭▭ Fenster</button><button data-trace-tool="select" aria-pressed="false">↖ Auswählen</button></span><span class="sketch-tools" role="group" aria-label="Anzeige"><button data-trace-view="beides" aria-pressed="true">Plan + Nachzeichnung</button><button data-trace-view="plan" aria-pressed="false">nur Plan</button><button data-trace-view="zeichnung" aria-pressed="false">nur Nachzeichnung</button></span><button id="trace-done" class="primary">Fertig – jetzt prüfen →</button></div>
 <p id="trace-hint" class="tiny"></p>
-<div class="align-row" id="trace-room-fields" hidden><label>Name<input id="trace-name" maxlength="60"></label><label><input type="checkbox" id="trace-fire"> Brandraum</label><button id="trace-room-delete" class="danger">Raum löschen</button></div>
+<div class="align-row" id="trace-room-fields" hidden><label>Name<input id="trace-name" maxlength="60"></label><label><input type="checkbox" id="trace-fire"> Brandraum</label><button id="trace-join" title="Dieses Rechteck ist ein Teil eines anderen Raums (z. B. L-förmiger Raum) – danach den anderen Raum antippen">gehört zu Raum …</button><button id="trace-unjoin" hidden title="Dieses Rechteck wird wieder ein eigener Raum">Verbindung lösen</button><button id="trace-room-delete" class="danger">Raum löschen</button></div>
+<div class="align-row" id="trace-item-fields" hidden><span id="trace-item-name"></span><button id="trace-item-delete" class="danger">Löschen</button></div>
 <div class="align-row" id="trace-rest"><span class="tiny" id="trace-count"></span><button id="trace-clear" class="danger" hidden>Nachzeichnung löschen …</button></div>
-<div id="trace-check" hidden><p><b>Stimmen die nachgezeichneten Räume mit dem Plan überein?</b> Schau in Ruhe hin – verschieben und zoomen geht, ändern erst wieder mit „Noch ändern“.</p>
+<div id="trace-check" hidden><p><b>Stimmen Wände und Räume mit dem Plan überein?</b> Schau in Ruhe hin – verschieben und zoomen geht, ändern erst wieder mit „Noch ändern“.</p>
 <div class="align-row"><span id="trace-wer"></span><button id="trace-wer-aendern">ändern</button><label id="trace-wer-feld" hidden>Wer prüft? Dein Kürzel<input id="trace-kuerzel" maxlength="40" size="8" list="trace-kuerzel-liste" autocomplete="off"></label><datalist id="trace-kuerzel-liste"></datalist></div>
-<div class="align-row"><button id="trace-ok" class="primary">Ja, geprüft ✓</button><button id="trace-change">Noch ändern</button><button id="trace-later">Später prüfen</button></div></div></div>`);
+<div class="align-row"><button id="trace-ok" class="primary">Ja, geprüft ✓</button><button id="trace-change">Noch ändern</button><button id="trace-later">Später prüfen</button></div></div></div>
+<div id="trace-proben" hidden role="region" aria-label="Proben und nachgezeichnete Räume"><div id="trace-angebot"><p><b id="trace-angebot-titel"></b></p><ul id="trace-angebot-liste"></ul><div class="align-row"><button id="trace-uebernehmen" class="primary">Übernehmen</button><button id="trace-nicht-jetzt">Nicht jetzt</button></div></div>
+<div id="trace-abweichung"><p><b>Bitte nachsehen:</b> Hier steht an der Probe ein anderer Raum, als der Punkt liegt. PlanKit ändert daran nichts – ein Klick zeigt die Probe im Plan.</p><ul id="trace-abweichung-liste"></ul><div class="align-row"><button id="trace-proben-zu">Schließen</button></div></div></div>`);
 const kuerzelLesen=()=>{try{return (localStorage.getItem(KUERZEL_KEY)||'').replace(/\s+/g,' ').trim().slice(0,40);}catch{return '';}};
 const kuerzelMerken=(k:string)=>{try{localStorage.setItem(KUERZEL_KEY,k);}catch{/* ohne Speicher: beim nächsten Mal wieder fragen */}};
 /** „Wer prüft?“ offen: beim ersten Bestätigen (kein Kürzel gemerkt) oder nach „ändern“. */
 let werOffen=false;
-const TRACE_HINTS:Record<'room'|'select',string>={room:'Zieh ein Rechteck über einen Raum im Plan – von Ecke zu Ecke. Kanten rasten an Nachbarräumen ein. Tipp auf einen Raum wählt ihn.',select:'Antippen wählt einen Raum. Ziehen verschiebt ihn, die Ecke unten rechts ändert die Größe. Leere Fläche ziehen: Ansicht bewegen. Entf löscht.'};
+const TRACE_HINTS:Record<'room'|'wall'|'door'|'window'|'select',string>={room:'Zieh ein Rechteck über einen Raum im Plan, von Ecke zu Ecke – die Kanten rasten an Nachbarräumen ein.',
+  wall:'Zieh eine Wand von Punkt zu Punkt, auch schräg – die Enden rasten an Ecken und Kanten ein.',
+  door:'Zieh die Tür auf einer Wand von Kante zu Kante – ein Tipp setzt eine Tür, deren Enden du danach ziehen kannst.',
+  window:'Zieh das Fenster auf einer Wand von Kante zu Kante – ein Tipp setzt ein Fenster, dessen Enden du danach ziehen kannst.',
+  select:'Tipp wählt aus, Ziehen verschiebt – die weißen Griffe ändern Größe und Enden, Entf löscht.'};
 function renderTrace(){
   const sk=sketching!,s=sk.s,rooms=s.rooms as TraceRoom[],k=wirt.camera.width/Math.max(1,svg.clientWidth),pr=sk.pruefen;
   image.style.visibility=sk.ansicht==='zeichnung'?'hidden':'';
-  const BLAU='#4179b2',text=(x:number,y:number,t:string,size:number,color:string)=>`<text x="${x}" y="${y}" text-anchor="middle" font-family="Arial" font-weight="700" font-size="${k*size}" fill="${color}" stroke="#fff" stroke-width="${k*3}" paint-order="stroke">${escape(t)}</text>`;
-  let out='';
-  if(sk.ansicht!=='plan'){
-    for(const r of rooms)out+=`<rect data-trace-room="${r.id}" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="${pr?'none':r.fire?'rgba(232,145,45,.22)':'rgba(65,121,178,.12)'}" stroke="${r.fire?'#c2620c':BLAU}" stroke-opacity="${pr?1:.7}" stroke-width="${k*(pr?3.5:2.5)}"/>`;
-    for(const w of s.walls)out+=`<line x1="${w.x1}" y1="${w.y1}" x2="${w.x2}" y2="${w.y2}" stroke="${BLAU}" stroke-opacity="${pr?1:.7}" stroke-width="${k*4}" stroke-linecap="round"/>`;
-    for(const o of s.openings)out+=`<g transform="translate(${o.x} ${o.y}) rotate(${o.a})"><rect x="${-o.w/2}" y="${-k*4}" width="${o.w}" height="${k*8}" fill="#fff" stroke="${BLAU}" stroke-width="${k*1.5}"/></g>`;
-    for(const r of rooms)if(!r.joins){out+=text(r.x+r.w/2,r.y+r.h/2+k*4,r.name,13,r.fire?'#8a3f10':'#1f4f86');if(r.fire)out+=text(r.x+r.w/2,r.y+r.h/2+k*18,'Brandraum',10,'#8a3f10');}
-  }
-  const room=pr?undefined:selRoom();
-  if(room)out+=`<rect x="${room.x}" y="${room.y}" width="${room.w}" height="${room.h}" fill="rgba(65,121,178,.1)" stroke="#2c5a93" stroke-width="${k*3.5}"/>${sk.tool==='select'?`<rect x="${room.x+room.w-k*9}" y="${room.y+room.h-k*9}" width="${k*18}" height="${k*18}" fill="#fff" stroke="#2c5a93" stroke-width="${k*3}"/>`:''}`;
+  let out=sk.ansicht!=='plan'?traceBild({rooms,walls:s.walls,openings:s.openings},k,pr):'';
+  const room=pr?undefined:selRoom() as TraceRoom|undefined,wall=pr?undefined:selWall(),op=pr?undefined:selOpening(),griff=(x:number,y:number)=>`<rect data-trace-griff x="${x-k*7}" y="${y-k*7}" width="${k*14}" height="${k*14}" fill="#fff" stroke="#2c5a93" stroke-width="${k*3}"/>`,wahl=sk.tool==='select';
+  if(room)out+=`<rect x="${room.x}" y="${room.y}" width="${room.w}" height="${room.h}" fill="rgba(65,121,178,.1)" stroke="#2c5a93" stroke-width="${k*3.5}"/>${wahl?`<rect x="${room.x+room.w-k*9}" y="${room.y+room.h-k*9}" width="${k*18}" height="${k*18}" fill="#fff" stroke="#2c5a93" stroke-width="${k*3}"/>`:''}`;
+  if(wall)out+=`<line x1="${wall.x1}" y1="${wall.y1}" x2="${wall.x2}" y2="${wall.y2}" stroke="#2c5a93" stroke-opacity=".45" stroke-width="${k*11}" stroke-linecap="round"/>${wahl?griff(wall.x1,wall.y1)+griff(wall.x2,wall.y2):''}`;
+  if(op){const [a,b]=openingEnds(op);out+=`<g transform="translate(${op.x} ${op.y}) rotate(${op.a})"><rect x="${-op.w/2}" y="${-k*9}" width="${op.w}" height="${k*18}" fill="rgba(65,121,178,.18)" stroke="#2c5a93" stroke-width="${k*2.5}"/></g>${wahl?griff(a.x,a.y)+griff(b.x,b.y):''}`;}
   if(sk.draft)out+=`<rect x="${sk.draft.x}" y="${sk.draft.y}" width="${sk.draft.w}" height="${sk.draft.h}" fill="rgba(232,145,45,.1)" stroke="#e8912d" stroke-width="${k*3}" stroke-dasharray="${k*9} ${k*5}"/>`;
+  if(sk.draftWall){const w=sk.draftWall;out+=`<line x1="${w.x1}" y1="${w.y1}" x2="${w.x2}" y2="${w.y2}" stroke="#e8912d" stroke-width="${k*4}" stroke-linecap="round" stroke-opacity=".9"/>`;}
+  if(sk.draftOpening){const o=sk.draftOpening;out+=`<g transform="translate(${o.x} ${o.y}) rotate(${o.a})"><rect x="${-o.w/2}" y="${-k*6}" width="${o.w}" height="${k*12}" fill="#fff" stroke="#e8912d" stroke-width="${k*2.5}"/></g>`;}
   sketchLayer.innerHTML=out;
   document.querySelectorAll<HTMLButtonElement>('[data-trace-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.traceTool===sk.tool)));
   document.querySelectorAll<HTMLButtonElement>('[data-trace-view]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.traceView===sk.ansicht)));
-  $('trace-tools').hidden=pr;$('trace-done').hidden=pr;$('trace-hint').hidden=pr;$('trace-check').hidden=!pr;$('trace-room-fields').hidden=!room;$('trace-rest').hidden=pr||!!room;   // eine Zeile, entweder Raumfelder oder Zähler – die Leiste bleibt gleich hoch und verdeckt den Plan nicht nachträglich
-  $('trace-hint').textContent=room&&sk.tool==='room'?'Gib dem Raum seinen Namen aus dem Plan (z. B. „Küche“) – oder zieh gleich den nächsten Raum auf.':TRACE_HINTS[sk.tool==='select'?'select':'room'];
+  const ding=wall||op;
+  $('trace-tools').hidden=pr;$('trace-done').hidden=pr;$('trace-hint').hidden=pr;$('trace-check').hidden=!pr;$('trace-room-fields').hidden=!room;$('trace-item-fields').hidden=!ding;$('trace-rest').hidden=pr||!!room||!!ding;   // eine Zeile: Raumfelder, Wand/Tür/Fenster oder Zähler – die Leiste bleibt gleich hoch und verdeckt den Plan nicht nachträglich
+  const werkzeug=sk.tool==='text'?'select':sk.tool;
+  $('trace-hint').textContent=sk.joining?'Tipp jetzt den Raum an, zu dem dieses Rechteck gehört (er muss es berühren) – Esc bricht ab.'
+    :room&&sk.tool==='room'?'Gib dem Raum seinen Namen aus dem Plan (z. B. „Küche“) – oder zieh gleich den nächsten Raum auf.':TRACE_HINTS[werkzeug];
   const set=(id:string,v:string)=>{if(document.activeElement!==input(id))input(id).value=v;};
-  if(room){const m=mainRoom(s,room);set('trace-name',m.name);input('trace-fire').checked=!!m.fire;}
-  const n=rooms.filter(r=>!r.joins).length;$('trace-count').textContent=n?`${n} ${n===1?'Raum':'Räume'} nachgezeichnet`:'Noch nichts nachgezeichnet.';$('trace-clear').hidden=traceEmpty(s)||!!room;
+  if(room){const m=mainRoom(s,room);set('trace-name',m.name);input('trace-fire').checked=!!m.fire;$('trace-join').hidden=!!room.joins||rooms.length<2;$('trace-unjoin').hidden=!room.joins;$('trace-join').setAttribute('aria-pressed',String(!!sk.joining));}
+  if(ding)$('trace-item-name').textContent=wall?'Wand gewählt':op!.kind==='door'?'Tür gewählt':'Fenster gewählt';
+  const n=rooms.filter(r=>!r.joins).length,tueren=s.openings.filter(o=>o.kind==='door').length,fenster=s.openings.length-tueren;
+  $('trace-count').textContent=traceEmpty(s)?'Noch nichts nachgezeichnet.':[...(n?[`${n} ${n===1?'Raum':'Räume'}`]:[]),...(s.walls.length?[`${s.walls.length} ${s.walls.length===1?'Wand':'Wände'}`]:[]),...(tueren?[`${tueren} ${tueren===1?'Tür':'Türen'}`]:[]),...(fenster?[`${fenster} Fenster`]:[])].join(' · ')+' nachgezeichnet';
+  $('trace-clear').hidden=traceEmpty(s)||!!room||!!ding;
   if(pr){const by=kuerzelLesen(),frage=werOffen||!by;$('trace-wer').textContent=frage?'':`Geprüft von: ${by}`;$('trace-wer').hidden=frage;$('trace-wer-aendern').hidden=frage;$('trace-wer-feld').hidden=!frage;
     $('trace-kuerzel-liste').replaceChildren(...wirt.kuerzel().map(x=>{const o=document.createElement('option');o.value=x;return o;}));}
   $('mode-hint').textContent=pr?'Nachzeichnung prüfen':'Nachzeichnen';
 }
+/* Zeiger im Nachzeichnen (ab 2.4.0 eigene Zweige): Raum, Wand, Tür, Fenster, Auswählen – und „gehört zu Raum …“. */
+const standVon=(s:Sketch):Trace=>cloneTrace({rooms:s.rooms as TraceRoom[],walls:s.walls,openings:s.openings});
+/** „gehört zu Raum …“: ein Rückgängig-Schritt. Proben, deren Raum aus dem bisherigen Raum des Rechtecks stammt und die jetzt im Zielraum liegen,
+ *  gehen mit (wie beim Umbenennen) – LabelKit-Räume und Handeingaben bleiben. */
+function verbinden(sk:Arbeit,part:TraceRoom,ziel:TraceRoom){
+  const alt=mainRoom(sk.s,part),altId=alt.id,altName=alt.name,hauptId=mainRoom(sk.s,ziel).id;
+  sketchTry(()=>{joinTraceRoom(sk.s,part.id,ziel.id);},p=>{const t=p.plan.trace;if(!t)return;
+    for(const m of p.markers)if(m.raumSkizze===altId&&m.raum===altName){const r=traceRoomAt(t,m);if(r?.id===hauptId){m.raum=r.name;m.raumSkizze=r.id;}}});
+}
+function traceDown(e:PointerEvent,sk:Arbeit,pt:Point,k:number,base:{id:number;start:Point;screen:{x:number;y:number};moved:boolean}){
+  const t=sk.s,weit=(a:Point)=>Math.hypot(a.x-pt.x,a.y-pt.y);sk.drag=null;
+  if(sk.joining){sk.joining=false;const part=selRoom() as TraceRoom|undefined,ziel=rectAt(t,pt);
+    if(!part||!ziel){renderSketch();toast('Bitte den Raum antippen, zu dem das Rechteck gehört.',true);return;}
+    verbinden(sk,part,ziel);return;}
+  if(sk.tool==='room'||sk.tool==='wall')sk.drag={...base,kind:'draw'};
+  else if(sk.tool==='door'||sk.tool==='window'){const g=traceSegNear(t,pt,k*14);if(!g){toast('Bitte auf eine Wand oder eine Raumkante tippen.',true);return;}sk.drag={...base,kind:'opening',seg:g};}
+  else{const op=selOpening(),wall=selWall(),r=selRoom();
+    if(op){const [a,b]=openingEnds(op),end=Math.min(weit(a),weit(b))>k*14?0:weit(a)<=weit(b)?-1:1;if(end)sk.drag={...base,kind:'op-end',end,snap:standVon(t)};}
+    if(!sk.drag&&wall){const a={x:wall.x1,y:wall.y1},b={x:wall.x2,y:wall.y2},end=Math.min(weit(a),weit(b))>k*14?0:weit(a)<=weit(b)?1:2;if(end)sk.drag={...base,kind:'wall-end',end,snap:standVon(t)};}
+    if(!sk.drag&&r&&Math.abs(pt.x-(r.x+r.w))<k*14&&Math.abs(pt.y-(r.y+r.h))<k*14)sk.drag={...base,kind:'resize',room:{...r},snap:standVon(t)};
+    if(!sk.drag){const h=traceHit(t,pt,k*10);sk.sel=h;
+      if(h?.type==='room')sk.drag={...base,kind:'move',room:{...t.rooms.find(x=>x.id===h.id)!},snap:standVon(t)};
+      else if(h?.type==='wall')sk.drag={...base,kind:'move',wall:{...t.walls.find(x=>x.id===h.id)!},snap:standVon(t)};
+      else if(h?.type==='opening')sk.drag={...base,kind:'move',opening:{...t.openings.find(x=>x.id===h.id)!},snap:standVon(t)};
+      else sk.drag={...base,kind:'pan',cam:{...wirt.camera}};}
+    renderSketch();}
+  svg.setPointerCapture(e.pointerId);
+}
+function traceMove(sk:Arbeit,d:Zug,pt:Point,plan:Plan,tol:number){
+  const dx=pt.x-d.start.x,dy=pt.y-d.start.y;
+  if(d.kind==='draw'){if(sk.tool==='wall')sk.draftWall=traceWallFrom(sk.s,plan,d.start,pt,tol);else sk.draft=traceRoomFrom(sk.s,plan,d.start,pt,tol);}
+  else if(d.kind==='opening'){if(d.seg)sk.draftOpening=traceOpeningOn(plan,d.seg,sk.tool==='window'?'window':'door',d.start,pt);}
+  else{
+    if(d.snap){const c=cloneTrace(d.snap);sk.s.rooms=c.rooms;sk.s.walls=c.walls;sk.s.openings=c.openings;}   // immer vom Stand vor dem Ziehen aus – nichts geht unterwegs verloren
+    if(d.kind==='move'){if(d.room)moveTraceRoom(sk.s,plan,d.room.id,dx,dy,d.room,tol);else if(d.wall)moveTraceWall(sk.s,plan,d.wall.id,dx,dy,d.wall,tol);else if(d.opening)moveTraceOpening(sk.s,d.opening.id,dx,dy,d.opening);}
+    else if(d.kind==='resize'&&d.room)resizeTraceRoom(sk.s,plan,d.room.id,d.room.w+dx,d.room.h+dy,tol);
+    else if(d.kind==='wall-end'&&sk.sel)moveTraceWallEnd(sk.s,plan,sk.sel.id,d.end===1?1:2,pt,tol);
+    else if(d.kind==='op-end'&&sk.sel)moveTraceOpeningEnd(sk.s,plan,sk.sel.id,d.end===1?1:-1,pt);}
+  renderSketch();
+}
+function traceDrop(sk:Arbeit,d:Zug){
+  const plan=wirt.project?.plan;if(!plan)return;const k=wirt.camera.width/Math.max(1,svg.clientWidth);
+  if(d.kind==='draw'){
+    if(sk.tool==='wall'){const w=sk.draftWall;sk.draftWall=null;
+      if(w&&d.moved)sketchTry(()=>{addTraceWall(sk.s,w);sk.sel={type:'wall',id:w.id};});else{sk.sel=d.moved?null:traceHit(sk.s,d.start,k*10);renderSketch();}return;}
+    const r=sk.draft as TraceRoom|null;sk.draft=null;   // Werkzeug „Raum“ bleibt gewählt (mehrere Räume nacheinander); Tipp auf einen vorhandenen Raum wählt ihn
+    if(r&&d.moved){sketchTry(()=>{addTraceRoom(sk.s,r);sk.sel={type:'room',id:r.id};});focusField('trace-name');}
+    else{const da=d.moved?null:rectAt(sk.s,d.start);sk.sel=da?{type:'room',id:da.id}:null;renderSketch();}
+    return;}
+  if(d.kind==='opening'){const art=sk.tool==='window'?'window':'door',o=d.moved?sk.draftOpening:d.seg?traceOpeningOn(plan,d.seg,art,d.start,null):null;sk.draftOpening=null;
+    if(o)sketchTry(()=>{addTraceOpening(sk.s,o);sk.sel={type:'opening',id:o.id};});
+    else{renderSketch();toast(d.moved?'Zu klein – bitte von Kante zu Kante ziehen.':'Diese Wand ist dafür zu kurz.',true);}
+    return;}
+  if(d.kind!=='pan'&&d.moved)sketchTry(()=>{});else renderSketch();
+}
 function startTrace(){const p=wirt.project;if(!p||p.plan.sketch||wirt.busy||wirt.cropping||!requireFinished())return;
-  sketching={ziel:'nachzeichnung',ansicht:'beides',pruefen:false,s:traceAlsSkizze(p.plan),tool:'room',sel:null,drag:null,draft:null,draftWall:null};werOffen=false;
+  sketching={ziel:'nachzeichnung',ansicht:'beides',pruefen:false,s:traceAlsSkizze(p.plan),tool:'room',sel:null,drag:null,draft:null,draftWall:null,joining:false,draftOpening:null};werOffen=false;abgleich=null;renderAbgleich();
   wirt.cropping=true;wirt.clearSelection();$('toast').hidden=true;setMode('navigate');$('stage').dataset.mode='trace';render();renderSketch();fitBelow('trace-actions');renderSketch();}
 function endTrace(){if(!sketching)return;sketching=null;image.style.visibility='';wirt.cropping=false;setMode('navigate');renderSketch();render();fit();}
-document.querySelectorAll<HTMLButtonElement>('[data-trace-tool]').forEach(b=>b.onclick=()=>{if(!sketching||sketching.pruefen)return;sketching.tool=b.dataset.traceTool as SketchTool;sketching.draft=null;renderSketch();});
+document.querySelectorAll<HTMLButtonElement>('[data-trace-tool]').forEach(b=>b.onclick=()=>{if(!sketching||sketching.pruefen)return;sketching.tool=b.dataset.traceTool as SketchTool;sketching.draft=null;sketching.draftWall=null;sketching.draftOpening=null;sketching.joining=false;renderSketch();});
 document.querySelectorAll<HTMLButtonElement>('[data-trace-view]').forEach(b=>b.onclick=()=>{if(!sketching)return;sketching.ansicht=b.dataset.traceView as Ansicht;renderSketch();});
 input('trace-name').onchange=()=>{const sk=sketching,r=selRoom();if(!sk||!r)return;const m=mainRoom(sk.s,r),v=input('trace-name').value.replace(/\s+/g,' ').trim().slice(0,60);
   if(!v||v===m.name){renderSketch();return;}const old=m.name,id=m.id;
@@ -240,23 +326,45 @@ input('trace-name').onchange=()=>{const sk=sketching,r=selRoom();if(!sk||!r)retu
   sketchTry(()=>{renameTraceRoom(sk.s,r.id,v);},p=>{for(const x of p.markers)if(x.raumSkizze===id&&x.raum===old)x.raum=v;});};
 input('trace-name').onkeydown=e=>{if(e.key==='Enter')input('trace-name').blur();};
 input('trace-fire').onchange=()=>{const sk=sketching,r=selRoom(),on=input('trace-fire').checked;if(sk&&r)sketchTry(()=>setTraceFire(sk.s,r.id,on));};
-$('trace-room-delete').onclick=()=>removeSel();
+$('trace-room-delete').onclick=()=>removeSel();$('trace-item-delete').onclick=()=>removeSel();
+$('trace-join').onclick=()=>{const sk=sketching;if(!sk||sk.pruefen||!selRoom())return;sk.joining=!sk.joining;renderSketch();};
+$('trace-unjoin').onclick=()=>{const sk=sketching,r=selRoom();if(sk&&r)sketchTry(()=>unjoinTraceRoom(sk.s,r.id));};
 $('trace-clear').onclick=()=>{void wirt.ask('Nachzeichnung löschen?','Alle nachgezeichneten Räume dieses Plans werden entfernt. Die Raumangaben an den Proben bleiben stehen. „Rückgängig“ stellt die Nachzeichnung wieder her.',['Abbrechen','Löschen'],'Abbrechen').then(a=>{const sk=sketching;if(a!=='Löschen'||!sk||sk.ziel!=='nachzeichnung')return;sketchTry(()=>{sk.s.rooms=[];sk.s.walls=[];sk.s.openings=[];sk.sel=null;});});};
 $('trace-done').onclick=()=>{const sk=sketching;if(!sk||sk.ziel!=='nachzeichnung')return;
   if(traceEmpty(sk.s)){endTrace();toast('Noch nichts nachgezeichnet. „Räume nachzeichnen“ in Schritt ① öffnet es wieder.');return;}
-  sk.pruefen=true;sk.sel=null;sk.draft=null;sk.ansicht='beides';werOffen=false;renderSketch();fitBelow('trace-actions');renderSketch();if(!kuerzelLesen())focusField('trace-kuerzel');};
+  sk.pruefen=true;sk.sel=null;sk.draft=null;sk.draftWall=null;sk.draftOpening=null;sk.joining=false;sk.ansicht='beides';werOffen=false;renderSketch();fitBelow('trace-actions');renderSketch();if(!kuerzelLesen())focusField('trace-kuerzel');};
 $('trace-change').onclick=()=>{if(!sketching)return;sketching.pruefen=false;renderSketch();};
-$('trace-later').onclick=()=>{const offen=!wirt.project?.plan.trace?.checked;endTrace();toast(offen?'Nachzeichnung gespeichert – noch nicht geprüft. „Räume nachzeichnen“ in Schritt ① öffnet sie wieder.':'Nachzeichnung unverändert – sie ist geprüft.');};
+$('trace-later').onclick=()=>{const offen=!wirt.project?.plan.trace?.checked;endTrace();abgleichOeffnen();toast(offen?'Nachzeichnung gespeichert – noch nicht geprüft. „Räume nachzeichnen“ in Schritt ① öffnet sie wieder.':'Nachzeichnung unverändert – sie ist geprüft.');};
 $('trace-wer-aendern').onclick=()=>{werOffen=true;input('trace-kuerzel').value=kuerzelLesen();renderSketch();focusField('trace-kuerzel');};
 input('trace-kuerzel').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();$('trace-ok').click();}};
 $('trace-ok').onclick=()=>{const sk=sketching,t=wirt.project?.plan.trace;if(!sk?.pruefen||!t||traceEmpty(t))return;
   let by=kuerzelLesen();
   if(werOffen||!by){by=input('trace-kuerzel').value.replace(/\s+/g,' ').trim().slice(0,40);if(!by){werOffen=true;renderSketch();focusField('trace-kuerzel');toast('Bitte dein Kürzel eintragen – es steht mit dem Datum an der Nachzeichnung.',true);return;}kuerzelMerken(by);werOffen=false;}
-  const datum=heute();mutate(p=>{if(p.plan.trace)setChecked(p.plan.trace,datum,by);});endTrace();toast(`Nachzeichnung geprüft (${by}, ${datumDE(datum)}).`);};
+  const datum=heute();mutate(p=>{if(p.plan.trace)setChecked(p.plan.trace,datum,by);});endTrace();abgleichOeffnen();toast(`Nachzeichnung geprüft (${by}, ${datumDE(datum)}).`);};
+/* ---------- Schon gesetzte Proben (E22, ab 2.4.0) ----------
+   Nach „Fertig“ (geprüft oder „Später prüfen“) eine Karte: das Angebot für Proben OHNE Raum („Übernehmen“ = ein Rückgängig-Schritt) und getrennt
+   die Liste „Bitte nachsehen“ der Abweichungen. Die Liste ändert nie etwas; ein Klick zeigt die Probe im Plan. Die Karte sperrt nichts. */
+let abgleich:{angebot:boolean}|null=null;
+function renderAbgleich(){
+  const karte=$('trace-proben'),p=wirt.project,a=abgleich&&p&&!sketching?probenAbgleich(p.plan.trace,p.markers):null;
+  const zeigAngebot=!!a&&abgleich!.angebot&&a.ohne.length>0,zeigListe=!!a&&a.abweichend.length>0;
+  if(!zeigAngebot&&!zeigListe){if(!sketching)abgleich=null;karte.hidden=true;return;}
+  karte.hidden=false;$('trace-angebot').hidden=!zeigAngebot;$('trace-abweichung').hidden=!zeigListe;
+  const li=(text:string)=>{const x=document.createElement('li');x.textContent=text;return x;};
+  if(zeigAngebot){const n=a!.ohne.length;$('trace-angebot-titel').textContent=n===1?'1 Probe ohne Raum liegt in einem nachgezeichneten Raum – Raum übernehmen?':`${n} Proben ohne Raum liegen in einem nachgezeichneten Raum – Raum übernehmen?`;
+    $('trace-angebot-liste').replaceChildren(...a!.ohne.map(v=>li(`${v.label} → ${v.raum}`)));}
+  if(zeigListe)$('trace-abweichung-liste').replaceChildren(...a!.abweichend.map(v=>{const x=document.createElement('li'),b=document.createElement('button');b.type='button';b.dataset.probe=v.id;b.textContent=`${v.label}: an der Probe steht „${v.steht}“, der Punkt liegt in „${v.liegt}“`;x.append(b);return x;}));
+}
+function abgleichOeffnen(){abgleich={angebot:true};renderAbgleich();}
+$('trace-uebernehmen').onclick=()=>{const p=wirt.project;if(!p||!abgleich||wirt.busy)return;const liste=probenAbgleich(p.plan.trace,p.markers).ohne;if(!liste.length)return;let n=0;
+  abgleich.angebot=false;mutate(q=>{n=raeumeUebernehmen(q.markers,liste);});renderAbgleich();toast(`${n} ${n===1?'Probe hat':'Proben haben'} jetzt ihren Raum. „Rückgängig“ nimmt es zurück.`);};
+$('trace-nicht-jetzt').onclick=()=>{if(abgleich)abgleich.angebot=false;renderAbgleich();};
+$('trace-proben-zu').onclick=()=>{abgleich=null;renderAbgleich();};
+$('trace-abweichung-liste').onclick=e=>{const b=(e.target as HTMLElement).closest<HTMLElement>('[data-probe]');if(b?.dataset.probe)wirt.zeige(b.dataset.probe);};
 /** Arbeitskopie aus dem Projekt (nach Fehler, Abbruch, Rückgängig). false: das Ziel gibt es an diesem Plan nicht mehr. */
 function neuLaden(){const p=wirt.project?.plan;if(!sketching||!p)return false;
   if(sketching.ziel==='nachzeichnung'){if(p.sketch)return false;sketching.s=traceAlsSkizze(p);return true;}
   if(!p.sketch)return false;sketching.s=extendSketch(p.sketch);return true;}
 function resyncSketch(){if(!sketching)return;if(neuLaden()){sketching.sel=null;sketching.draft=null;sketching.draftWall=null;if(sketching.ziel==='nachzeichnung'&&sketching.pruefen&&traceEmpty(wirt.project?.plan.trace))sketching.pruefen=false;renderSketch();}else if(sketching.ziel==='nachzeichnung')endTrace();else endSketch();}
-return {get aktiv(){return !!sketching;},get zieht(){return !!sketching?.drag;},start:startSketch,nachzeichnen:startTrace,render:renderSketch,resync:resyncSketch};
+return {get aktiv(){return !!sketching;},get zieht(){return !!sketching?.drag;},start:startSketch,nachzeichnen:startTrace,render:renderSketch,resync:resyncSketch,nachRender:renderAbgleich};
 }

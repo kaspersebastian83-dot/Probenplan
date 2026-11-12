@@ -29,7 +29,7 @@ import {buildPdf,canvasRGB,type PdfPage} from './pdfwrite';
 import {ASPECT_NAMES,initialQuad,outsideCount,perspectiveProject,quadProblem,targetSize,warpImage,type Aspect,type Quad} from './perspective';
 import {PanelTabs} from './panel-tabs';
 import {emptySketch,sketchPlan,roomAt,quickSketchOn} from './sketch';
-import {skizzenEditor,traceStand,type SkizzenEditor} from './zeichnen';
+import {skizzenEditor,traceBild,traceStand,type SkizzenEditor} from './zeichnen';
 import {traceRoomAt,traceEmpty,LOCK_TRACE} from './trace';
 import {alignProject,cropProject,fineAngle,MAX_ANGLE,planMatrix,preparation,rotateProject} from './preparation';
 import type {LocalPDF} from './pdf';
@@ -67,7 +67,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML=`
 <div class="tb-doc"><span id="canvas-name">Kein Plan geladen</span><span id="file-type" class="tag">KEIN PLAN</span><span id="plan-name" hidden>Polycam-ZIP, SVG, PNG oder JPG</span></div>
 <div class="history"><button id="undo" class="tb" aria-label="Rückgängig" title="Rückgängig (Strg+Z)" disabled>↶</button><button id="redo" class="tb" aria-label="Wiederherstellen" title="Wiederherstellen (Strg+Umschalt+Z)" disabled>↷</button></div>
 <span class="tb-spacer"></span><span id="saved" role="status">Lokal. Vertraulich. Ohne Upload.</span><span id="offline" class="status">● Offline wird vorbereitet</span>
-<button id="help" class="tb" title="Bedienung, Tastenkürzel & Offlinebetrieb">?</button><button id="results-toggle" class="tb" title="Ergebniskarte: Proben nach Bewertung einfärben (K)" aria-pressed="false" data-key="k" disabled>Ergebnisse</button><button id="export-open" class="tb export-btn" title="Bild für das Gutachten exportieren" disabled>↓ Export …</button><button id="panel-toggle" class="tb" title="Liste mit Markierungen, Laborproben und Flächen ein-/ausblenden (L)" aria-pressed="false" aria-controls="side-panel">☰ Liste</button></header>
+<button id="help" class="tb" title="Bedienung, Tastenkürzel & Offlinebetrieb">?</button><button id="results-toggle" class="tb" title="Ergebniskarte: Proben nach Bewertung einfärben (K)" aria-pressed="false" data-key="k" disabled>Ergebnisse</button><button id="trace-toggle" class="tb" title="Die nachgezeichneten Räume, Wände, Türen und Fenster über dem Plan einblenden – nur am Bildschirm, nie in einer Ausgabe" aria-pressed="false" hidden>Nachgezeichnete Räume zeigen</button><button id="export-open" class="tb export-btn" title="Bild für das Gutachten exportieren" disabled>↓ Export …</button><button id="panel-toggle" class="tb" title="Liste mit Markierungen, Laborproben und Flächen ein-/ausblenden (L)" aria-pressed="false" aria-controls="side-panel">☰ Liste</button></header>
 <div id="zwei-orte" class="zwei-orte" role="status" hidden></div>
 <main class="kit-workspace">
 <nav class="rail" aria-label="Werkzeuge"><div class="modes" role="group" aria-label="Werkzeug"><button data-mode="navigate" data-key="v" class="mode active" title="Ansicht bewegen – verschieben & zoomen (V)"><span class="tool-icon">↔</span><span>Ansicht<small>Verschieben & zoomen</small></span></button><button data-mode="sample" data-key="p" class="mode" title="Probe setzen – fortlaufend nummeriert (P)" disabled><span class="tool-icon sample-icon">P</span><span>Probe<small>Fortlaufend nummeriert</small></span></button><button data-mode="fire" data-key="b" class="mode" title="Brandherd setzen (B)" disabled><span class="tool-icon fire-icon">★</span><span>Brandherd<small>Roter Stern</small></span></button><button data-mode="edit" data-key="e" class="mode" title="Markierung bearbeiten – Punkt oder Beschriftung ziehen (E)" disabled><span class="tool-icon">↖</span><span>Bearbeiten<small>Punkt oder Beschriftung ziehen</small></span></button></div></nav>
@@ -117,6 +117,8 @@ clip.id='plan-clip';clip.append(clipRect);svg.prepend(clip);image.before(planGro
 // Weißer Grund hinter fein gedrehten Plänen: die Ecken außerhalb des Originals erscheinen weiß wie im Export.
 const planBack=document.createElementNS(ns,'rect');planBack.id='plan-back';planBack.setAttribute('fill','#fff');planGroup.prepend(planBack);
 const cropLayer=document.createElementNS(ns,'g');cropLayer.id='crop-overlay';cropLayer.setAttribute('pointer-events','none');svg.append(cropLayer);
+// „Nachgezeichnete Räume zeigen“ (Schritt ②, ab 2.4.0): eigene Ebene über dem Planbild, unter Flächen und Punkten. Nur Anzeige – kommt in keiner Ausgabe vor.
+const traceView=document.createElementNS(ns,'g');traceView.id='trace-view';traceView.setAttribute('pointer-events','none');planGroup.after(traceView);
 const sketchLayer=document.createElementNS(ns,'g');sketchLayer.id='sketch-overlay';sketchLayer.setAttribute('pointer-events','none');svg.append(sketchLayer);
 const warpLayer=document.createElementNS(ns,'g');warpLayer.id='warp-overlay';svg.append(warpLayer);planGroup.id='plan-view';
 const alignLayer=document.createElementNS(ns,'g');alignLayer.id='align-overlay';alignLayer.setAttribute('pointer-events','none');svg.append(alignLayer);
@@ -138,6 +140,11 @@ let aligning:{start:number;delta:number;drag:{id:number;prev:number}|null;edge:P
 let warping:{q:Quad;drag:{id:number;i:number}|null;busy:boolean}|null=null;
 /** Skizze: Zeichen-Werkzeug in zeichnen.ts (Arbeitskopie, je Aktion ein Rückgängig-Schritt). Auch hier ist cropping gesetzt. */
 let zeichner:SkizzenEditor|null=null;
+/** Schalter „Nachgezeichnete Räume zeigen“: Standard aus; ausgeschaltet sieht die Karte aus wie ohne Nachzeichnung. */
+let showTrace=false;
+function renderTraceView(){const t=project?.plan.trace,on=showTrace&&!!t&&!traceEmpty(t)&&!zeichner?.aktiv;if(on)traceView.innerHTML=traceBild(t!,camera.width/Math.max(1,svg.clientWidth),false);else if(traceView.firstChild)traceView.replaceChildren();}
+/** Probe im Plan zeigen (aus der Liste „Bitte nachsehen“): auswählen, in die Mitte holen. Ändert nichts am Projekt. */
+function zeigeProbe(id:string){const m=project?.markers.find(x=>x.id===id);if(!m||busy||cropping)return;selectedArea=null;selected=id;setMode('edit');camera={...camera,x:m.x-camera.width/2,y:m.y-camera.height/2};updateCamera();render();}
 let camera={x:0,y:0,width:1000,height:1000},fitWidth=1000,saveRevision=0,exportURL='';
 let saveQueue:Promise<void>=Promise.resolve();
 let toastTimer=0,savedToastRevision:number|null=null;
@@ -172,7 +179,7 @@ function markerWert(m:Marker){if(!showResults||!project?.results)return '';const
 /** Plan → Liste: Zeile des Punkts unter der Maus hervorheben. */
 marks.addEventListener('pointerover',e=>{if((e as PointerEvent).pointerType==='touch')return;labUI?.listeHover((e.target as Element).closest('[data-id]')?.getAttribute('data-id')||null);});
 marks.addEventListener('pointerleave',()=>labUI?.listeHover(null));
-function updateCamera(){svg.setAttribute('viewBox',`${camera.x} ${camera.y} ${camera.width} ${camera.height}`);$('zoom-value').textContent=`${Math.round(fitWidth/camera.width*100)} %`;renderMarkers();renderCrop();if(aligning)renderAlign();if(warping)renderWarp();if(zeichner?.aktiv)zeichner.render();if(cropping&&!aligning&&!warping&&!zeichner?.aktiv)renderCrop();}
+function updateCamera(){svg.setAttribute('viewBox',`${camera.x} ${camera.y} ${camera.width} ${camera.height}`);$('zoom-value').textContent=`${Math.round(fitWidth/camera.width*100)} %`;renderMarkers();renderTraceView();renderCrop();if(aligning)renderAlign();if(warping)renderWarp();if(zeichner?.aktiv)zeichner.render();if(cropping&&!aligning&&!warping&&!zeichner?.aktiv)renderCrop();}
 function fit(){if(!project)return;const b=bounds(labeledView(project)),rect=svg.getBoundingClientRect(),ratio=rect.width/rect.height||1;let w=b.width*1.14,h=b.height*1.14;if(w/h<ratio)w=h*ratio;else h=w/ratio;camera={x:b.x+(b.width-w)/2,y:b.y+(b.height-h)/2,width:w,height:h};
   // 2.0: Schritte/Plan-Chips oben und Hinweiskarte/Zoom unten schweben auf der Karte – „Einpassen“ legt den Plan in den freien Teil.
   const r=pk?.rand();if(r&&(r.top||r.bottom)&&rect.width>0&&rect.height>0){const aw=rect.width,ah=Math.max(80,rect.height-r.top-r.bottom),k=Math.max(b.width*1.08/aw,b.height*1.08/ah);camera={x:b.x+b.width/2-aw/2*k,y:b.y+b.height/2-(r.top+ah/2)*k,width:rect.width*k,height:rect.height*k};}
@@ -421,7 +428,7 @@ window.addEventListener('keydown',e=>{
 function fitBelow(panel:string){if(!project)return;const r=svg.getBoundingClientRect(),top=$(panel).offsetHeight+70,availH=Math.max(120,r.height-top-24),W=project.plan.width,H=project.plan.height;
   const k=Math.max(W/(r.width*.92),H/(availH*.92));camera={x:W/2-r.width*k/2,y:-(top*k)-(availH*k-H)/2,width:r.width*k,height:r.height*k};updateCamera();}
 /* Skizze (ab 1.21): das Zeichen-Werkzeug liegt ab 2.3.0 in zeichnen.ts; hier nur Anlegen und Öffnen. */
-zeichner=skizzenEditor({get project(){return project;},get camera(){return camera;},set camera(c){camera=c;},get busy(){return busy;},get cropping(){return cropping;},set cropping(v){cropping=v;},svg,image,layer:sketchLayer,$,input,updateCamera,point,mutate,toast,setMode,render:()=>render(),fit:()=>fit(),fitBelow,requireFinished,clearSelection(){selected=null;selectedArea=null;},ask:(t,x,c,p)=>ask(t,x,c,p),kuerzel:kuerzelListe});
+zeichner=skizzenEditor({get project(){return project;},get camera(){return camera;},set camera(c){camera=c;},get busy(){return busy;},get cropping(){return cropping;},set cropping(v){cropping=v;},svg,image,layer:sketchLayer,$,input,updateCamera,point,mutate,toast,setMode,render:()=>render(),fit:()=>fit(),fitBelow,requireFinished,clearSelection(){selected=null;selectedArea=null;},ask:(t,x,c,p)=>ask(t,x,c,p),kuerzel:kuerzelListe,zeige:zeigeProbe});
 const startSketch=()=>zeichner!.start();
 $('trace-edit').onclick=()=>zeichner!.nachzeichnen();
 async function newSketch(asSheet:boolean){
@@ -436,7 +443,7 @@ $('sketch-edit').onclick=startSketch;
 // „✎ Skizze“ in der Werkzeugleiste, immer erreichbar: ohne Plan eine neue Skizze, sonst eine Skizze als weiteren Plan
 // (auf einer Skizze übernimmt „✎ Skizze“ aus „Plan vorbereiten“ das Bearbeiten).
 $('sketch-tb').onclick=()=>{if(!project)void newSketch(false);else if(project.plan.sketch)startSketch();else void newSketch(true);};
-function render(){renderAlt();pk?.nachRender();}
+function render(){renderAlt();renderTraceView();zeichner?.nachRender();pk?.nachRender();}
 function renderAlt(){
   if(project&&!showResults&&!resultsManual&&!busy&&hasValues(project)){showResults=true;if(resultsVorbereiten(project))queueMicrotask(()=>persist(false));}
   const p=project;labUI?.render(p);resultkitHinweisZeigen();stornoHinweisZeigen(); $('welcome').hidden=!!p;ladeKnopf(!!p);
@@ -469,7 +476,7 @@ function renderAlt(){
   const m=selectedMarker();$('inspector').hidden=!m;if(m){input('label').value=m.label;input('note').value=m.note;$('shape-row').hidden=m.kind!=='sample';$<HTMLSelectElement>('shape').value=shapeOf(m);$('surface-row').hidden=m.kind!=='sample';$<HTMLSelectElement>('surface').value=m.surface||'';$('raum-row').hidden=false;if(document.activeElement!==input('raum'))input('raum').value=m.raum||'';}let labFields=document.getElementById('marker-lab');if(!labFields){labFields=document.createElement('p');labFields.id='marker-lab';labFields.className='lab-fields';$('inspector').append(labFields);}labFields.textContent=m?.lab?['Referenz: '+m.lab.ref,'Probenart: '+(m.lab.art||'—'),'Labor-Nr.: '+(m.lab.labNr||'—'),'Probenahme: '+(m.lab.datum||'—'),'Bericht: '+(m.lab.bericht||'—')].join(' · '):'';
   renderMarkers();dimensions();renderSheets();renderResults();updateSizeUI();updateLabelUI();updateTrialUI();updateRaumbuchUI();updateScaleUI();
 }
-async function install(p:Project,fromFolder=false,transition?:()=>void){await preserveUnsavedProject();transition?.();if(folder&&!fromFolder){folderDirty=true;if(!p.report)p.report=folder.name;}labUI?.reset();if(!folder)stornoStand=null;project=p;resultsManual=false;showResults=false;selected=null;selectedArea=null;draftPoints=[];history.clear();cropping=false;cropRect=null;aligning=null;renderAlign();setMode('navigate');pk?.geladen(p);render();fit();persist(!fromFolder);$('export-result').hidden=true;}
+async function install(p:Project,fromFolder=false,transition?:()=>void){await preserveUnsavedProject();transition?.();if(folder&&!fromFolder){folderDirty=true;if(!p.report)p.report=folder.name;}labUI?.reset();if(!folder)stornoStand=null;project=p;resultsManual=false;showResults=false;showTrace=false;selected=null;selectedArea=null;draftPoints=[];history.clear();cropping=false;cropRect=null;aligning=null;renderAlign();setMode('navigate');pk?.geladen(p);render();fit();persist(!fromFolder);$('export-result').hidden=true;}
 function saveProject(){if(project&&requireFinished()&&folder){void saveToFolder(true);return;}if(project&&requireFinished())void download(new Blob([JSON.stringify(project)],{type:'application/json'}),`${project.report||'Probenplan'}.probenplan`);}
 /** Vor dem Ersetzen des Plans im Projektordner: dauerhafte Kopie der bisherigen Fassung („(Kopie vor dem Ersetzen …)“) –
  *  die automatische Bereinigung entfernt nur „(vorher …)“- und „(Speicherkandidat …)“-Kopien, diese nie. */
@@ -1024,6 +1031,7 @@ let autoUsageFor='';
 function renderResults(){
   const p=project,available=!!p&&hasValues(p);$<HTMLButtonElement>('results-toggle').disabled=!available||busy;
   if(!available&&showResults)showResults=false;
+  {const tt=$<HTMLButtonElement>('trace-toggle'),da=!!p?.plan.trace&&!traceEmpty(p.plan.trace);tt.hidden=!da;tt.disabled=busy;tt.setAttribute('aria-pressed',String(da&&showTrace));}
   $('results-toggle').setAttribute('aria-pressed',String(showResults));$('results-section').hidden=!showResults;
   $('view-field').hidden=!p;const opt=$<HTMLOptionElement>('view-results');opt.disabled=!available;opt.textContent=available?'Ergebniskarte':'Ergebniskarte (erst nach Import der Laborwerte)';if(!available)input('view').value='plan';
   const legend=$('result-legend');legend.hidden=!showResults;
@@ -1063,6 +1071,7 @@ function currentScale(key:string){const [parameter,unit]=keyParts(key);return sc
 function recolor(scale:Scale):Scale{const colors=autoColors(scale.cats.length);return {...scale,cats:scale.cats.map((c,i)=>({...c,color:colors[i]}))};}
 /** Einstellungen der Ergebniskarte ergänzen (Parameter, Skalen, Nutzung nachwählen). true = Projekt geändert. */
 function resultsVorbereiten(p:Project){const fresh=!p.results,changed=prepare(p);if(fresh&&p.results&&!p.results.usage&&!getNutzung()&&folder)autoUsageFor=folder.name;return changed;}
+$('trace-toggle').onclick=()=>{if(!project?.plan.trace||busy)return;showTrace=!showTrace;render();};
 $('results-toggle').onclick=()=>{if(!project||!hasValues(project))return;resultsManual=true;showResults=!showResults;if(showResults&&resultsVorbereiten(project))persist();render();if(showResults)reveal('results-section');};
 (input('result-param') as unknown as HTMLSelectElement).onchange=()=>{const value=input('result-param').value;mutate(p=>{p.results={...p.results,parameter:value,scales:p.results?.scales||{}};prepare(p);});};
 (input('result-usage') as unknown as HTMLSelectElement).onchange=()=>{autoUsageFor='';const usage=input('result-usage').value;mutate(p=>{if(!p.results)return;if(usage==='residential'||usage==='industrial')p.results.usage=usage;else delete p.results.usage;});};
