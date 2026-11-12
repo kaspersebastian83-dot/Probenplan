@@ -141,6 +141,7 @@ export class Oberflaeche{
   this.anzeigen('1');
  }
 
+ private traceHinweis=false;
  /** Schritt zeigen (Klick auf einen Kreis, Hauptaktion, Kürzel). Gesperrt, solange eine Vollbild-Leiste (Zuschnitt, Skizze …) offen ist. */
  zeige(s:Schritt){
   if(this.hooks.cropping())return;
@@ -155,6 +156,9 @@ export class Oberflaeche{
   if(mode==='lab-place')lab?.fertig();else if(mode!=='navigate'&&!(s==='1'&&mode==='measure'))this.hooks.setMode('navigate');
   if(s==='2')this.autoStart=true;
   this.anzeigen(s);this.hooks.render();requestAnimationFrame(()=>this.hooks.refit());
+  // 2.3.0: einmal je Sitzung beim Wechsel nach ③ – nur Hinweis, sperrt nichts (die Nachzeichnung erscheint in keiner Ausgabe)
+  const p=this.hooks.project();
+  if(s==='3'&&p&&!this.traceHinweis&&[p.plan,...(p.sheets||[]).map(x=>x.plan)].some(x=>!!x?.trace&&!x.trace.checked&&x.trace.rooms.length+x.trace.walls.length+x.trace.openings.length>0)){this.traceHinweis=true;this.hooks.toast('Nachzeichnung noch nicht geprüft – in Schritt ① „Räume nachzeichnen“ öffnen und bestätigen. Die Ausgabe ist davon nicht betroffen.');}
  }
  private anzeigen(s:Schritt){
   this.schritt=s;document.body.dataset.pkSchritt=s;

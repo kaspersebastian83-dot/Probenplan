@@ -1,5 +1,20 @@
 # Änderungen
 
+## 2.3.0 – 12. November 2026 · Räume nachzeichnen (Stufe 1 von „Nachzeichnen“)
+
+Plan: `claude/plankit-nachzeichnen-plan.md` im Spektron-Projekt (Entscheidungen vom 12.11.2026).
+
+- **Räume über einem geladenen Plan nachzeichnen:** Schritt ① „Plan vorbereiten“ › „Räume nachzeichnen“ (bei PDF-, Bild- und SVG-Plänen; bei Skizzen weiter „Skizze bearbeiten“). Rechteck über einen Raum ziehen, Namen geben, „Brandraum“. Plan darunter, Nachzeichnung halb durchsichtig in PlanKit-Blau; Schalter „Plan + Nachzeichnung · nur Plan · nur Nachzeichnung“. Kanten rasten an Nachbarräumen ein (12 px am Bildschirm), kein Raster. Jede Aktion ein Rückgängig-Schritt. **Keine Maße, keine Flächen; die Nachzeichnung liest und schreibt nie einen Maßstab.**
+- **Prüfen:** „Fertig – jetzt prüfen →“ zeigt den Plan in voller Stärke und die Nachzeichnung als Umriss; „Ja, geprüft ✓“ schreibt Datum und Kürzel (`checked: {date, by}`). Das Kürzel wird beim ersten Bestätigen einmal erfragt (Vorschläge aus der Mitarbeiterliste) und je Browser gemerkt (`plankit-kuerzel`). Jede Änderung an der Geometrie nimmt „geprüft“ weg, Umbenennen und Brandraum nicht. Stand in ①: „Nachzeichnung: geprüft am … (Kürzel)“ bzw. gelb „noch nicht geprüft“; einmal je Sitzung ein Hinweis beim Wechsel nach ③.
+- **Raum an der Probe:** Eine Probe, die in einen nachgezeichneten Raum gesetzt wird, bekommt `raum` und `raumSkizze` wie bei der Skizze (Raum aus LabelKit hat Vorrang; unabhängig vom Schalter „Schnellskizze“). Umbenennen des Raums zieht genau diese Proben nach. Schon gesetzte Proben werden nicht angefasst (Angebot und Prüfliste folgen in 2.4.0).
+- **Daten:** neues Feld `plan.trace` (`src/trace.ts`): `rooms` (mit `joins` für ausdrücklich verbundene Rechtecke – Bedienung dazu in 2.4.0), `walls`, `openings`, `checked`. Planeinheiten wie die Probenpunkte. Nie zusammen mit `plan.sketch`. Strenge Prüfung beim Öffnen; höchstens 200 Räume, 1 000 Wände, 400 Öffnungen.
+- **Projektformat 7:** nur, sobald ein Plan eine Nachzeichnung hat; alle anderen Dateien bleiben in ihrem Format und öffnen unverändert. PlanKit bis 2.2.0 öffnet Format 7 nicht („… stammt von einer neueren PlanKit-Version. Bitte PlanKit aktualisieren“). `alignProject` setzt das Format nicht mehr herab.
+- **Plan vorbereiten:** Drehen um 90° und Zuschneiden nehmen die Nachzeichnung exakt mit („geprüft“ bleibt; ein Zuschnitt, der sie abschneiden würde, wird abgelehnt). **Ausrichten und Entzerren sind gesperrt, solange es eine Nachzeichnung gibt** („Erst ausrichten, dann nachzeichnen – oder die Nachzeichnung löschen“). „Diesen Plan ersetzen …“ nennt die Nachzeichnung in der Rückfrage.
+- **Ausgaben unverändert:** Die Nachzeichnung ist eine eigene Ebene und steht in keiner Ausgabe (Probenplan, Anlage Probenahme, Ergebniskarte, Wandansichten, Raumbuch, CSV).
+- **Projektordner:** Eine Projektdatei aus einer neueren PlanKit-Fassung gilt beim Öffnen des Ordners nicht mehr als „beschädigt“ – PlanKit meldet „bitte aktualisieren“ und bietet keine älteren Fassungen an.
+- **Umbau ohne Verhaltensänderung:** Der Skizzen-Editor liegt in `src/zeichnen.ts` (eigener Commit, Editorblock zeichengleich); Skizze und Nachzeichnung teilen sich Zeiger, Auswahl, Tasten und Rückgängig.
+- Tests: neu `nachzeichnen.mjs` (Node) und `nachzeichnen-browser.mjs`; angepasst nur `align.mjs` (Format 8 statt 7 ist „zu neu“; Modulliste), `areas.mjs` (Modulliste), `folder.mjs` (ein Prüfpunkt dazu).
+
 ## 2.2.0 – 11. November 2026 · Chlorid genau 10 µg/cm² „im Bereich“ (Audit m7, Entscheidung 4)
 
 - **`KORROSION-CHLORID v2`** (gleich in ResultKit, PlanKit, FotoKit, BerichtKit): Die Stufe „oberhalb“ trägt `ueber: true` und zählt erst über 10 µg/cm² (100 mg/m² usw.); genau 10 liegt „im Bereich“, genau 5 bleibt „im Bereich“. Keine neue Zahl, keine Rundung. `rate`/`rangeText` → Ergebniskarte, Legende (Bildschirm, PDF/PNG-Export), Anlage Probenahme, Raumbuch, Wandansichten, Skalen-Editor („5 – 10 µg/cm²“ · „> 10 µg/cm²“).
