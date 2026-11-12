@@ -366,6 +366,6 @@ $('trace-abweichung-liste').onclick=e=>{const b=(e.target as HTMLElement).closes
 function neuLaden(){const p=wirt.project?.plan;if(!sketching||!p)return false;
   if(sketching.ziel==='nachzeichnung'){if(p.sketch)return false;sketching.s=traceAlsSkizze(p);return true;}
   if(!p.sketch)return false;sketching.s=extendSketch(p.sketch);return true;}
-function resyncSketch(){if(!sketching)return;if(neuLaden()){sketching.sel=null;sketching.draft=null;sketching.draftWall=null;if(sketching.ziel==='nachzeichnung'&&sketching.pruefen&&traceEmpty(wirt.project?.plan.trace))sketching.pruefen=false;renderSketch();}else if(sketching.ziel==='nachzeichnung')endTrace();else endSketch();}
+function resyncSketch(){if(!sketching)return;if(neuLaden()){sketching.sel=null;sketching.draft=null;sketching.draftWall=null;sketching.draftOpening=null;sketching.joining=false;if(sketching.ziel==='nachzeichnung'&&sketching.pruefen&&traceEmpty(wirt.project?.plan.trace))sketching.pruefen=false;renderSketch();}else if(sketching.ziel==='nachzeichnung')endTrace();else endSketch();}
 return {get aktiv(){return !!sketching;},get zieht(){return !!sketching?.drag;},start:startSketch,nachzeichnen:startTrace,render:renderSketch,resync:resyncSketch,nachRender:renderAbgleich};
 }
