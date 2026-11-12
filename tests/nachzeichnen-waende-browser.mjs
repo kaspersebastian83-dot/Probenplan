@@ -48,6 +48,7 @@ for(const engine of engines){
   await pk.modus(page,'sample');await tap(page,1000,800);await pk.modus(page,'navigate');
   const start=await savedProject(page),bild=start.plan.data;
   assert.deepEqual(start.markers.map(m=>m.raum),[undefined,'Küche',undefined]);assert.equal(start.version<7,true);
+  await pk.schritt(page,2);assert.equal(await page.locator('#trace-vergleich').isVisible(),false,'ohne Nachzeichnung kein Eintrag „Proben mit Räumen vergleichen …“');
   let kueche,flur;
 
   await check(`${engine}: Leiste – fünf Werkzeuge mit Wort, ein Satz Anleitung, nirgends ein Maß`,async()=>{
@@ -169,11 +170,32 @@ for(const engine of engines){
    assert.deepEqual(await page.locator('#trace-angebot button').allTextContents(),['Übernehmen','Nicht jetzt']);
    assert.deepEqual(await page.locator('#trace-abweichung-liste li').allTextContents(),['P2: an der Probe steht „Küche“, der Punkt liegt in „Flur“']);
    assert.match(await page.locator('#trace-abweichung').textContent(),/Bitte nachsehen/);assert.match(await page.locator('#trace-abweichung').textContent(),/PlanKit ändert daran nichts/);
-   assert.equal(await page.locator('#trace-abweichung button').count(),2,'je Abweichung ein Knopf zum Zeigen und „Schließen“ – kein Sammelknopf zum Ändern');
+   assert.equal(await page.locator('#trace-abweichung button').count(),1,'je Abweichung nur ein Knopf zum Zeigen – kein Sammelknopf zum Ändern');
    assert.deepEqual((await savedProject(page)).markers,start.markers,'das Angebot allein ändert nichts');
    await page.locator('#trace-nicht-jetzt').click();assert.equal(await page.locator('#trace-angebot').isVisible(),false);assert.equal(await page.locator('#trace-abweichung').isVisible(),true);
    assert.deepEqual((await savedProject(page)).markers,start.markers,'„Nicht jetzt“ ändert nichts');
    await page.locator('#trace-proben-zu').click();await page.locator('#trace-proben').waitFor({state:'hidden'});
+  });
+  await check(`${engine}: „Proben mit Räumen vergleichen …“ in ② öffnet die Liste jederzeit – ohne die Nachzeichnung zu öffnen, Stand neu berechnet`,async()=>{
+   await pk.schritt(page,2);const e=page.locator('#trace-vergleich');
+   assert.equal(await e.isVisible(),true);assert.equal(await e.textContent(),'Proben mit Räumen vergleichen …');
+   assert.equal(await e.evaluate(el=>el.parentElement===document.getElementById('trace-toggle').parentElement),true,'bei „Nachgezeichnete Räume zeigen“');
+   const vor=await savedProject(page);
+   await e.click();await page.locator('#trace-proben').waitFor();
+   assert.equal(await page.locator('#trace-actions').isVisible(),false,'die Nachzeichnung wird nicht geöffnet');assert.equal(await pk.aktuell(page),'2','bleibt in Schritt ②');
+   assert.deepEqual(await page.locator('#trace-angebot-liste li').allTextContents(),['P1 → Küche'],'eine Probe ohne Raum');
+   assert.deepEqual(await page.locator('#trace-angebot button').allTextContents(),['Übernehmen','Nicht jetzt']);
+   assert.deepEqual(await page.locator('#trace-abweichung-liste li').allTextContents(),['P2: an der Probe steht „Küche“, der Punkt liegt in „Flur“'],'eine Abweichung');
+   assert.equal(await page.locator('#trace-proben-leer').isVisible(),false);
+   assert.deepEqual(await savedProject(page),vor,'Öffnen ändert nichts – auch nicht „geprüft“ oder das Format');
+   // Stand wird neu berechnet: P3 (bisher außerhalb, ohne Raum) in den Flur ziehen → nach erneutem Öffnen steht sie im Angebot
+   await page.locator('#trace-proben-zu').click();await page.locator('#trace-proben').waitFor({state:'hidden'});
+   await pk.modus(page,'edit');await drag(page,[1000,800],[520,180]);await pk.modus(page,'navigate');
+   await e.click();await page.locator('#trace-proben').waitFor();
+   assert.deepEqual(await page.locator('#trace-angebot-liste li').allTextContents(),['P1 → Küche','P3 → Flur']);
+   assert.match(await page.locator('#trace-angebot-titel').textContent(),/^2 Proben ohne Raum liegen/);
+   await page.locator('#trace-nicht-jetzt').click();await page.locator('#trace-proben-zu').click();await page.locator('#trace-proben').waitFor({state:'hidden'});
+   await page.keyboard.press('Control+z');assert.deepEqual((await savedProject(page)).markers,start.markers,'P3 wieder an ihrem Platz, sonst nichts geändert');
   });
   await check(`${engine}: „Übernehmen“ – nur die Probe ohne Raum, ein Rückgängig-Schritt; Abweichung nur gezeigt`,async()=>{
    await oeffnen();await pruefen();await page.locator('#trace-proben').waitFor();
@@ -214,6 +236,26 @@ for(const engine of engines){
    await fertig();await page.locator('#trace-later').click();await kartezu();
    const d=heute().split('-');assert.equal(await page.locator('#trace-status').textContent(),`Nachzeichnung: geprüft am ${d[2]}.${d[1]}.${d[0]} (Ben)`);
   });
+  await check(`${engine}: nichts zu zeigen – ein Satz statt einer leeren Liste; „Übernehmen“ geht auch von dort`,async()=>{
+   // P2 bekommt von Hand den Raum, in dem sie liegt (das tut der Sachverständige, nie PlanKit) – danach gibt es keine Abweichung mehr
+   await pk.schritt(page,2);await page.locator('#trace-vergleich').click();await page.locator('#trace-abweichung-liste button').click();
+   await page.locator('#raum').fill('Flur');await page.locator('#raum').press('Enter');await page.locator('#raum').blur();
+   await page.locator('#trace-proben-leer').waitFor();   // die offene Karte rechnet neu
+   assert.equal(await page.locator('#trace-proben-leer').textContent(),'Nichts nachzusehen: Keine Probe ohne Raum liegt in einem nachgezeichneten Raum, und keine Raumangabe weicht ab.');
+   assert.equal(await page.locator('#trace-angebot').isVisible(),false);assert.equal(await page.locator('#trace-abweichung').isVisible(),false);assert.equal(await page.locator('#trace-proben li').count()>=0&&await page.locator('#trace-proben li:visible').count(),0,'keine leere Liste');
+   await page.locator('#trace-proben-zu').click();await page.locator('#trace-proben').waitFor({state:'hidden'});
+   await pk.modus(page,'navigate');await page.locator('#trace-vergleich').click();await page.locator('#trace-proben-leer').waitFor();
+   assert.equal(await page.locator('#trace-proben button:visible').count(),1,'nur „Schließen“');
+   await page.locator('#trace-proben-zu').click();await page.locator('#trace-proben').waitFor({state:'hidden'});
+   // eine neue Probe ohne Raum außerhalb setzen und in die Wohnküche ziehen → Angebot über den Eintrag, ein Rückgängig-Schritt
+   const r=(await trace(page)).rooms[0];await pk.modus(page,'sample');await tap(page,1100,820);await pk.modus(page,'edit');await drag(page,[1100,820],[r.x+60,r.y+150]);await pk.modus(page,'navigate');
+   const vor=await savedProject(page),neu=vor.markers[3];assert.equal(neu.raum,undefined);
+   await page.locator('#trace-vergleich').click();assert.deepEqual(await page.locator('#trace-angebot-liste li').allTextContents(),[`${neu.label} → Wohnküche`]);
+   await page.locator('#trace-uebernehmen').click();let p=await savedProject(page);
+   assert.deepEqual(p.markers[3],{...neu,raum:'Wohnküche',raumSkizze:kueche},'nur raum und raumSkizze');assert.deepEqual(p.markers.slice(0,3),vor.markers.slice(0,3));assert.deepEqual(p.plan.trace,vor.plan.trace);assert.equal(p.version,vor.version);
+   await page.locator('#trace-proben-leer').waitFor();await page.locator('#trace-proben-zu').click();
+   await page.keyboard.press('Control+z');assert.deepEqual((await savedProject(page)).markers,vor.markers,'ein Schritt zurück');await page.keyboard.press('Control+y');
+  });
   let pngMit,pdfMit,mitNachzeichnung;
   await check(`${engine}: Schalter „Nachgezeichnete Räume zeigen“ in ② – Standard aus, aus = Karte wie bisher`,async()=>{
    await pk.schritt(page,2);const s=page.locator('#trace-toggle');
@@ -242,7 +284,7 @@ for(const engine of engines){
    await oeffnen();await page.locator('#trace-clear').click();await page.locator('#ask-dialog button',{hasText:'Löschen'}).click();
    await fertig();await page.locator('#trace-actions').waitFor({state:'hidden'});
    const ohne=await savedProject(page);assert.equal(ohne.plan.trace,undefined,'Nachzeichnung gelöscht');assert.deepEqual(ohne.markers,mitNachzeichnung.markers,'Proben wie vorher');
-   assert.equal(await page.locator('#trace-toggle').isVisible(),false,'ohne Nachzeichnung kein Schalter');
+   assert.equal(await page.locator('#trace-toggle').isVisible(),false,'ohne Nachzeichnung kein Schalter');assert.equal(await page.locator('#trace-vergleich').isVisible(),false,'und kein Eintrag zum Vergleichen');
    const pngOhne=await ausgabe('png'),pdfOhne=await ausgabe('pdf-a4');
    assert.equal(Buffer.compare(pngMit,pngOhne),0,'PNG gleich');assert.equal(Buffer.compare(pdfMit,pdfOhne),0,'PDF gleich');
    assert.ok(pngMit.length>1000&&pdfMit.length>1000);

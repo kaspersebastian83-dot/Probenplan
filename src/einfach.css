@@ -255,3 +255,5 @@ body.pk2 dialog:modal{font-family:var(--sp-font)}
   body.pk2 .zoom-controls button{padding:0 9px}
 }
 @media print{#pk-fuss,#pk-oben,#pk-plaene,#pk-hinweis{display:none!important}}
+.pk-vergleich{flex-basis:100%;text-align:left;justify-self:start;width:max-content;max-width:100%}
+.pk-vergleich[hidden]{display:none}

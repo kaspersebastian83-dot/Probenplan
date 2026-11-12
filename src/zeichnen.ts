@@ -19,7 +19,7 @@ export interface Wirt {
   /** Kürzel der Mitarbeiterliste (falls geladen) – Vorschläge für „Wer prüft?“. */ kuerzel():string[];
   /** Probe im Plan zeigen: auswählen und in die Mitte holen. */ zeige(markerId:string):void;
 }
-export interface SkizzenEditor {readonly aktiv:boolean; readonly zieht:boolean; /** Skizze bearbeiten */start():void; /** Räume über dem geladenen Plan nachzeichnen */nachzeichnen():void; render():void; resync():void; /** nach jedem Neuzeichnen der Karte: Liste „Proben und Räume“ aktuell halten */nachRender():void}
+export interface SkizzenEditor {readonly aktiv:boolean; readonly zieht:boolean; /** Skizze bearbeiten */start():void; /** Räume über dem geladenen Plan nachzeichnen */nachzeichnen():void; render():void; resync():void; /** Karte „Proben und Räume“ von Hand öffnen (Schritt ②) – aktueller Stand, auch wenn es nichts zu zeigen gibt */vergleich():void; /** nach jedem Neuzeichnen der Karte: Liste „Proben und Räume“ aktuell halten */nachRender():void}
 /** Wohin gezeichnet wird. */
 type Ziel='skizze'|'nachzeichnung';
 /** Was im Nachzeichnen zu sehen ist: Plan und Nachzeichnung, nur der Plan, nur die Nachzeichnung. */
@@ -220,7 +220,7 @@ $('stage').insertAdjacentHTML('beforeend',`<div id="trace-actions" hidden><div c
 <div class="align-row"><span id="trace-wer"></span><button id="trace-wer-aendern">ändern</button><label id="trace-wer-feld" hidden>Wer prüft? Dein Kürzel<input id="trace-kuerzel" maxlength="40" size="8" list="trace-kuerzel-liste" autocomplete="off"></label><datalist id="trace-kuerzel-liste"></datalist></div>
 <div class="align-row"><button id="trace-ok" class="primary">Ja, geprüft ✓</button><button id="trace-change">Noch ändern</button><button id="trace-later">Später prüfen</button></div></div></div>
 <div id="trace-proben" hidden role="region" aria-label="Proben und nachgezeichnete Räume"><div id="trace-angebot"><p><b id="trace-angebot-titel"></b></p><ul id="trace-angebot-liste"></ul><div class="align-row"><button id="trace-uebernehmen" class="primary">Übernehmen</button><button id="trace-nicht-jetzt">Nicht jetzt</button></div></div>
-<div id="trace-abweichung"><p><b>Bitte nachsehen:</b> Hier steht an der Probe ein anderer Raum, als der Punkt liegt. PlanKit ändert daran nichts – ein Klick zeigt die Probe im Plan.</p><ul id="trace-abweichung-liste"></ul><div class="align-row"><button id="trace-proben-zu">Schließen</button></div></div></div>`);
+<div id="trace-abweichung"><p><b>Bitte nachsehen:</b> Hier steht an der Probe ein anderer Raum, als der Punkt liegt. PlanKit ändert daran nichts – ein Klick zeigt die Probe im Plan.</p><ul id="trace-abweichung-liste"></ul></div><p id="trace-proben-leer" hidden>Nichts nachzusehen: Keine Probe ohne Raum liegt in einem nachgezeichneten Raum, und keine Raumangabe weicht ab.</p><div class="align-row"><button id="trace-proben-zu">Schließen</button></div></div>`);
 const kuerzelLesen=()=>{try{return (localStorage.getItem(KUERZEL_KEY)||'').replace(/\s+/g,' ').trim().slice(0,40);}catch{return '';}};
 const kuerzelMerken=(k:string)=>{try{localStorage.setItem(KUERZEL_KEY,k);}catch{/* ohne Speicher: beim nächsten Mal wieder fragen */}};
 /** „Wer prüft?“ offen: beim ersten Bestätigen (kein Kürzel gemerkt) oder nach „ändern“. */
@@ -348,10 +348,13 @@ $('trace-ok').onclick=()=>{const sk=sketching,t=wirt.project?.plan.trace;if(!sk?
 /* ---------- Schon gesetzte Proben (E22, ab 2.4.0) ----------
    Nach „Fertig“ (geprüft oder „Später prüfen“) eine Karte: das Angebot für Proben OHNE Raum („Übernehmen“ = ein Rückgängig-Schritt) und getrennt
    die Liste „Bitte nachsehen“ der Abweichungen. Die Liste ändert nie etwas; ein Klick zeigt die Probe im Plan. Die Karte sperrt nichts. */
-let abgleich:{angebot:boolean}|null=null;
+/** hand: über „Proben mit Räumen vergleichen …“ geöffnet – die Karte bleibt dann auch stehen, wenn es nichts (mehr) zu zeigen gibt, mit einem Satz. */
+let abgleich:{angebot:boolean;hand:boolean}|null=null;
 function renderAbgleich(){
   const karte=$('trace-proben'),p=wirt.project,a=abgleich&&p&&!sketching?probenAbgleich(p.plan.trace,p.markers):null;
   const zeigAngebot=!!a&&abgleich!.angebot&&a.ohne.length>0,zeigListe=!!a&&a.abweichend.length>0;
+  const leer=!zeigAngebot&&!zeigListe&&!!a&&abgleich!.hand&&!!p&&!traceEmpty(p.plan.trace);$('trace-proben-leer').hidden=!leer;
+  if(leer){karte.hidden=false;$('trace-angebot').hidden=true;$('trace-abweichung').hidden=true;return;}
   if(!zeigAngebot&&!zeigListe){if(!sketching)abgleich=null;if(!karte.hidden){karte.hidden=true;if(!sketching&&!wirt.busy)fit();}return;}   // Karte weg: Plan wieder ganz einpassen
   karte.hidden=false;$('trace-angebot').hidden=!zeigAngebot;$('trace-abweichung').hidden=!zeigListe;
   const li=(text:string)=>{const x=document.createElement('li');x.textContent=text;return x;};
@@ -360,7 +363,7 @@ function renderAbgleich(){
   if(zeigListe)$('trace-abweichung-liste').replaceChildren(...a!.abweichend.map(v=>{const x=document.createElement('li'),b=document.createElement('button');b.type='button';b.dataset.probe=v.id;b.textContent=`${v.label}: an der Probe steht „${v.steht}“, der Punkt liegt in „${v.liegt}“`;x.append(b);return x;}));
 }
 /** Karte zeigen, falls es etwas zu zeigen gibt (true). Der Plan wird darunter eingepasst; der Stand steht ohnehin in Schritt ①. */
-function abgleichOeffnen(){abgleich={angebot:true};renderAbgleich();if($('trace-proben').hidden)return false;fitBelow('trace-proben');return true;}
+function abgleichOeffnen(hand=false){abgleich={angebot:true,hand};renderAbgleich();if($('trace-proben').hidden)return false;fitBelow('trace-proben');return true;}
 $('trace-uebernehmen').onclick=()=>{const p=wirt.project;if(!p||!abgleich||wirt.busy)return;const liste=probenAbgleich(p.plan.trace,p.markers).ohne;if(!liste.length)return;let n=0;
   abgleich.angebot=false;mutate(q=>{n=raeumeUebernehmen(q.markers,liste);});renderAbgleich();toast(`${n} ${n===1?'Probe hat':'Proben haben'} jetzt ihren Raum. „Rückgängig“ nimmt es zurück.`);};
 $('trace-nicht-jetzt').onclick=()=>{if(abgleich)abgleich.angebot=false;renderAbgleich();};
@@ -371,5 +374,5 @@ function neuLaden(){const p=wirt.project?.plan;if(!sketching||!p)return false;
   if(sketching.ziel==='nachzeichnung'){if(p.sketch)return false;sketching.s=traceAlsSkizze(p);return true;}
   if(!p.sketch)return false;sketching.s=extendSketch(p.sketch);return true;}
 function resyncSketch(){if(!sketching)return;if(neuLaden()){sketching.sel=null;sketching.draft=null;sketching.draftWall=null;sketching.draftOpening=null;sketching.joining=false;if(sketching.ziel==='nachzeichnung'&&sketching.pruefen&&traceEmpty(wirt.project?.plan.trace))sketching.pruefen=false;renderSketch();}else if(sketching.ziel==='nachzeichnung')endTrace();else endSketch();}
-return {get aktiv(){return !!sketching;},get zieht(){return !!sketching?.drag;},start:startSketch,nachzeichnen:startTrace,render:renderSketch,resync:resyncSketch,nachRender:renderAbgleich};
+return {get aktiv(){return !!sketching;},get zieht(){return !!sketching?.drag;},start:startSketch,nachzeichnen:startTrace,render:renderSketch,resync:resyncSketch,nachRender:renderAbgleich,vergleich(){const p=wirt.project;if(!p||sketching||wirt.busy||wirt.cropping||traceEmpty(p.plan.trace))return;abgleichOeffnen(true);}};
 }
