@@ -6,6 +6,7 @@
 import type {Plan,Point,Project} from './model';
 import {loadImage} from './import';
 import {planMatrix,preparation} from './preparation';
+import {LOCK_TRACE} from './trace';
 
 export type Quad=[Point,Point,Point,Point];   // oben links, oben rechts, unten rechts, unten links
 export type Aspect='photo'|'din-landscape'|'din-portrait';
@@ -92,6 +93,7 @@ export async function warpImage(plan:Plan,q:Quad,size:{width:number;height:numbe
 
 /** Projekt auf den entzerrten Plan umstellen: Plan ersetzen, Markierungen/Flächen umrechnen, Maßstab und Norden entfernen. */
 export function perspectiveProject(project:Project,q:Quad,image:{data:string;width:number;height:number}){
+  if(project.plan.trace)throw Error(LOCK_TRACE);   // Entzerren würde die Nachzeichnung verlieren – gesperrt, solange es sie gibt
   const h=homography(q,rect(image.width,image.height)),clamp=(v:number,max:number)=>Math.min(max,Math.max(0,v));
   const old=project.plan,plan:Plan={name:old.name,width:image.width,height:image.height,data:image.data,vector:false,...(old.markerScale!==undefined?{markerScale:old.markerScale}:{}),...(old.autoLabels!==undefined?{autoLabels:old.autoLabels}:{}),...(old.valueLabels!==undefined?{valueLabels:old.valueLabels}:{}),...(old.surfaceBars!==undefined?{surfaceBars:old.surfaceBars}:{})};
   const lost={calibration:!!old.calibration,north:old.north!==undefined};

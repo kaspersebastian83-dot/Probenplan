@@ -11,7 +11,7 @@ import {resolve} from 'node:path';
 import ts from 'typescript';
 const out=resolve('.test-output/align'),base=process.env.TEST_URL||'http://localhost:4173';await mkdir(out,{recursive:true});
 async function check(name,fn){await fn();console.log(`OK ${name}`);}
-for(const name of ['model','areas','preparation']){const source=await readFile(`src/${name}.ts`,'utf8');let code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;code=code.replace(/from '\.\/(\w+)'/g,"from './$1.mjs'");await writeFile(resolve(out,`${name}.mjs`),code);}
+for(const name of ['model','areas','preparation','trace']){const source=await readFile(`src/${name}.ts`,'utf8');let code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;code=code.replace(/from '\.\/(\w+)'/g,"from './$1.mjs'");await writeFile(resolve(out,`${name}.mjs`),code);}
 const {createProject,clone,addMarker,addSheet}=await import(`file:///${resolve(out,'model.mjs').replaceAll('\\','/')}`);
 const {addArea,PALETTE,polygonError}=await import(`file:///${resolve(out,'areas.mjs').replaceAll('\\','/')}`);
 const {alignProject,rotateProject,cropProject,planMatrix,invert,applyMatrix,wholeSize,MAX_ANGLE}=await import(`file:///${resolve(out,'preparation.mjs').replaceAll('\\','/')}`);
@@ -141,7 +141,7 @@ for(const engine of ['chromium','webkit']){
     });
     await check(`${engine}: Projektdateien mit Winkel in altem Format, zu großem Winkel oder neuerem Format werden abgelehnt`,async()=>{
       const saved=await downloadedProject(page);
-      for(const [change,text] of [[p=>{p.version=4;},/Projektformat 6/],[p=>{p.plan.preparation.angle=50;},/Ungültige Feinausrichtung/],[p=>{p.version=7;},/neueren PlanKit-Version/]]){
+      for(const [change,text] of [[p=>{p.version=4;},/Projektformat 6/],[p=>{p.plan.preparation.angle=50;},/Ungültige Feinausrichtung/],[p=>{p.version=8;},/neueren PlanKit-Version/]]){
         const bad=structuredClone(saved);change(bad);await importJSON(page,bad);
         await page.waitForFunction(()=>document.getElementById('toast').classList.contains('error')&&!document.getElementById('toast').hidden);
         assert.match(await page.locator('#toast').textContent(),text);await page.evaluate(()=>{const t=document.getElementById('toast');t.hidden=true;t.className='';});

@@ -168,5 +168,12 @@ try{
   await page.evaluate(async name=>{window.failRecovery=false;localStorage.removeItem('synthetic:failRecovery');const root=await navigator.storage.getDirectory(),archive=await root.getDirectoryHandle('Mosaik Archivordner'),dir=await(await archive.getDirectoryHandle(name)).getDirectoryHandle('Pläne');for await(const h of dir.values())if(h.name.includes('(Wiederherstellung ')&&(await h.getFile()).size===0)await dir.removeEntry(h.name);},NAME);await page.reload();await page.locator('#ask-title',{hasText:'Ungespeicherte Browser-Fassung'}).waitFor();await page.locator('#ask-actions button',{hasText:'Datei verwenden'}).click();await page.locator('#welcome').waitFor({state:'hidden'});
   assert.equal(await page.locator('#report').inputValue(),'Snapshot B');assert.ok((await recoveryProjects(page)).some(r=>JSON.stringify(r.project)===JSON.stringify(draft.project)));
  });
+ await check('Projektdatei aus einer neueren PlanKit-Fassung: Meldung „aktualisieren“, keine Fassungs-Auswahl, Datei unverändert (2.3.0)',async()=>{
+  const neuer=JSON.stringify({...JSON.parse(await fs(page,'read',[NAME,'Pläne'],FILE)),version:99});
+  await fs(page,'write',[NAME,'Pläne'],FILE,neuer);
+  page.once('dialog',dialog=>dialog.accept());await page.reload();await page.locator('#toast.error',{hasText:'neueren PlanKit-Version'}).waitFor();
+  assert.equal(await page.locator('#ask-dialog[open]').count(),0,'keine Auswahl älterer Fassungen');assert.equal(await fs(page,'read',[NAME,'Pläne'],FILE),neuer,'Datei unverändert');
+  assert.equal(await page.locator('#welcome').isVisible(),true,'kein Plan geöffnet');
+ });
  assert.deepEqual(errors,[]);
 }finally{await browser.close();}

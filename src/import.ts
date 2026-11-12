@@ -1,4 +1,5 @@
 import {validateSketch} from './sketch';
+import {validateTrace} from './trace';
 import {validDate} from './labreport';
 import type {LabData} from './model';
 import {copyOrigin,validOrigin} from './lab-provenance';
@@ -72,18 +73,19 @@ export async function candidates(file:File):Promise<Candidate[]>{
 }
 export async function validateProject(value:unknown):Promise<Project>{
   const raw=value as Project;
-  if(raw&&raw.format==='probenplan'&&typeof raw.version==='number'&&raw.version>6)throw Error('Diese Projektdatei stammt von einer neueren PlanKit-Version. Bitte PlanKit aktualisieren (Seite neu laden).');
+  if(raw&&raw.format==='probenplan'&&typeof raw.version==='number'&&raw.version>7)throw Error('Diese Projektdatei stammt von einer neueren PlanKit-Version. Bitte PlanKit aktualisieren (Seite neu laden).');
   // Format 6 = Format 5 bzw. Einzelplan plus Feinausrichtung: wie diese prüfen, Feinwinkel erlauben, Format 6 behalten.
-  const fine=!!raw&&raw.format==='probenplan'&&raw.version===6;
+  // Format 7 = Format 6 plus Nachzeichnung (Plan.trace): ebenso, Nachzeichnung erlauben, Format 7 behalten.
+  const neu=!!raw&&raw.format==='probenplan'&&(raw.version===6||raw.version===7)?raw.version:0,fine=neu>0,tracing=neu===7;
   const p=(fine?{...raw,version:raw.sheets!==undefined?5:4}:raw) as Project;
-  const result=await validateFormat(p,fine);
-  if(fine)result.version=6;
+  const result=await validateFormat(p,fine,tracing);
+  if(neu)result.version=neu;
   if(raw.raumbuch!==undefined){const rb=validRaumbuch(raw.raumbuch);if(rb.rooms.length||rb.alias)result.raumbuch=rb;}
   if(raw.trials!==undefined){const t=raw.trials;if(!t||typeof t!=='object'||Array.isArray(t)||Object.entries(t).some(([k,v])=>!TRIALS.includes(k as keyof Trials)||v!==true))throw Error('Ungültige Testfunktionen in der Projektdatei.');if(Object.keys(t).length)result.trials={...t};}
   return result;
 }
-async function validateFormat(p:Project,fine:boolean):Promise<Project>{
-  if(!p||p.format!=='probenplan'||p.version!==5)return validateSingle(p,fine);
+async function validateFormat(p:Project,fine:boolean,tracing:boolean):Promise<Project>{
+  if(!p||p.format!=='probenplan'||p.version!==5)return validateSingle(p,fine,tracing);
   // Format 5: mehrere Pläne. Jeder Plan wird wie ein Projekt des Formats 4 geprüft,
   // danach Kennungen und IDs über alle Pläne hinweg auf Eindeutigkeit.
   const sheets=p.sheets,active=p.active;
@@ -91,11 +93,11 @@ async function validateFormat(p:Project,fine:boolean):Promise<Project>{
   const sheetIds=new Set<string>();
   for(const [i,sh] of sheets.entries()){if(!sh||typeof sh.id!=='string'||!/^[\w-]{1,80}$/.test(sh.id)||sheetIds.has(sh.id)||typeof sh.name!=='string'||!cleanSheetName(sh.name)||sh.name.length>40||(i===active)!==(sh.plan===undefined))throw Error('Ungültiger oder doppelter Plan in der Projektdatei.');sheetIds.add(sh.id);}
   const base={format:'probenplan' as const,version:4 as const,nextSample:p.nextSample,nextFire:p.nextFire,report:p.report,date:p.date,...(p.labReports!==undefined?{labReports:p.labReports}:{})};
-  const own=await validateSingle({...base,plan:p.plan,markers:p.markers,...(p.areas!==undefined||p.nextArea!==undefined?{areas:p.areas??[],nextArea:p.nextArea}:{}),...(p.pending!==undefined?{pending:p.pending}:{}),...(p.results!==undefined?{results:p.results}:{})} as Project,fine);
+  const own=await validateSingle({...base,plan:p.plan,markers:p.markers,...(p.areas!==undefined||p.nextArea!==undefined?{areas:p.areas??[],nextArea:p.nextArea}:{}),...(p.pending!==undefined?{pending:p.pending}:{}),...(p.results!==undefined?{results:p.results}:{})} as Project,fine,tracing);
   const out:Sheet[]=[];
   for(const [i,sh] of sheets.entries()){
     if(i===active){out.push({id:sh.id,name:cleanSheetName(sh.name)});continue;}
-    const v=await validateSingle({...base,plan:sh.plan,markers:sh.markers,...(sh.areas!==undefined||p.nextArea!==undefined?{areas:sh.areas??[],nextArea:p.nextArea}:{})} as Project,fine);
+    const v=await validateSingle({...base,plan:sh.plan,markers:sh.markers,...(sh.areas!==undefined||p.nextArea!==undefined?{areas:sh.areas??[],nextArea:p.nextArea}:{})} as Project,fine,tracing);
     out.push({id:sh.id,name:cleanSheetName(sh.name),plan:v.plan,markers:v.markers,...(v.areas?{areas:v.areas}:{})});
   }
   const result:Project={...own,version:5,sheets:out,active};
@@ -105,7 +107,7 @@ async function validateFormat(p:Project,fine:boolean):Promise<Project>{
   if(allMarkers(result).length>3000)throw Error('Zu viele Markierungen in der Projektdatei.');
   return result;
 }
-async function validateSingle(p:Project,fine=false):Promise<Project>{
+async function validateSingle(p:Project,fine=false,tracing=false):Promise<Project>{
   if(!p||p.format!=='probenplan'||![1,2,3,4].includes(p.version)||!p.plan||typeof p.plan.data!=='string'||!Array.isArray(p.markers)||p.markers.length>3000)throw Error('Ungültige oder nicht unterstützte Projektdatei.');
   if(typeof p.plan.name!=='string'||typeof p.report!=='string'||p.report.length>100||typeof p.date!=='string'||(p.date!==''&&!/^\d{4}-\d{2}-\d{2}$/.test(p.date)))throw Error('Ungültige Projektdaten.');
   if(p.plan.data.length>MAX*1.5)throw Error('Die Projektdatei enthält einen zu großen Plan.');
@@ -129,6 +131,7 @@ async function validateSingle(p:Project,fine=false):Promise<Project>{
   }
   if(p.plan.markerScale!==undefined){const s=p.plan.markerScale;if(typeof s!=='number'||!Number.isFinite(s)||s<MARKER_SCALE.min||s>MARKER_SCALE.max)throw Error('Ungültige Punktgröße in der Projektdatei.');if(s!==1)plan.markerScale=s;}
   if(p.plan.sketch!==undefined){if(!plan.vector)throw Error('Ungültige Skizze in der Projektdatei.');plan.sketch=validateSketch(p.plan.sketch);}
+  if(p.plan.trace!==undefined){if(!tracing)throw Error('Nachzeichnung benötigt Projektformat 7.');if(p.plan.sketch!==undefined)throw Error('Ungültige Nachzeichnung in der Projektdatei.');plan.trace=validateTrace(p.plan.trace,plan);}
   if(p.plan.autoLabels!==undefined){if(p.plan.autoLabels!==false)throw Error('Ungültige Beschriftungseinstellung in der Projektdatei.');plan.autoLabels=false;}
   if(p.plan.surfaceBars!==undefined){if(p.plan.surfaceBars!==false)throw Error('Ungültige Beschriftungseinstellung in der Projektdatei.');plan.surfaceBars=false;}
   if(p.plan.valueLabels!==undefined){if(p.plan.valueLabels!==true)throw Error('Ungültige Beschriftungseinstellung in der Projektdatei.');plan.valueLabels=true;}

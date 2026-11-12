@@ -415,3 +415,24 @@ label.pflicht-offen>input,label.pflicht-offen>select{border-color:#d9a400!import
 .pl-menu button{width:100%;margin:0;padding:7px 10px;border:0;border-radius:0;font-size:12px;text-align:left}
 .pl-menu button[hidden]{display:none}
 #marks .pl-hl{filter:drop-shadow(0 0 3px #e0ae42) drop-shadow(0 0 6px #e0ae42)}
+
+/* Nachzeichnen (ab 2.3.0) – Leiste wie die Skizze, ohne Maße */
+#trace-actions{position:absolute;top:56px;left:50%;transform:translateX(-50%);margin:0;z-index:3;background:#fff;border:1px solid var(--kit-line2);border-radius:8px;box-shadow:0 2px 8px rgba(40,72,116,.15);padding:6px 10px;display:flex;flex-direction:column;gap:5px;width:min(860px,calc(100% - 24px))}
+#trace-actions[hidden],#trace-actions [hidden]{display:none!important}
+#trace-actions .align-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#trace-actions label{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600}
+#trace-actions input{min-height:30px;padding:3px 6px}
+#trace-actions input[type=checkbox]{min-height:0;width:auto;margin:0;accent-color:var(--kit-accent)}
+#trace-actions #trace-name{width:180px}
+#trace-actions .sketch-tools{display:flex;gap:4px}
+#trace-actions .sketch-tools button[aria-pressed=true]{background:var(--kit-accent);color:#fff;border-color:var(--kit-accent)}
+#trace-actions #trace-done{margin-left:auto}
+#trace-actions button{min-height:30px;padding:3px 10px;font-size:12px}
+#trace-actions p{margin:0;font-size:13px}
+#trace-actions #trace-hint{color:var(--kit-muted)}
+#trace-check{display:flex;flex-direction:column;gap:6px}
+#trace-wer{font-size:12px;font-weight:600}
+.trace-status{margin:8px 0 0;font-size:13px;color:var(--kit-muted)}
+.trace-status.offen{color:#8a5a00;font-weight:600}
+#trace-room-fields,#trace-rest{min-height:34px}
+#trace-edit{grid-column:1/-1}

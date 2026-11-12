@@ -29,6 +29,8 @@ export interface Person{ordnerKuerzel:string;appKuerzel?:string;name?:string;akt
 const maNorm=(s:unknown)=>String(s??'').normalize('NFC').toLowerCase().replace(/[\s.]+/g,'');
 let personen:Person[]|null=null;
 export function setPersonen(p:Person[]|null){personen=p;}
+/** Kürzel der aktiven Mitarbeiter (App-Kürzel, sonst das aus dem Ordnernamen) – Vorschläge für „Wer prüft?“ beim Nachzeichnen. */
+export function kuerzelListe():string[]{return [...new Set((personen||[]).filter(p=>p&&p.aktiv!==false).map(p=>String(p.appKuerzel||p.ordnerKuerzel||'').trim()).filter(Boolean))];}
 export function leseProjektordner(name:string,liste:Person[]|null=personen){
  const m=/^(\d{2})\.(\d{2,6})(?:[\s_-]+(.*))?$/.exec(String(name).normalize('NFC').trim());if(!m)return null;
  const rest=(m[3]||'').trim(),r={nr:`${m[1]}.${m[2]}`,ort:rest,kuerzel:'',hinweis:''};

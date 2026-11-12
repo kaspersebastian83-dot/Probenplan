@@ -8,7 +8,7 @@ import {syntheticPDF} from './fixtures.mjs';
 const out=resolve('.test-output/v1.2'),base=process.env.TEST_URL||'http://localhost:4173';await mkdir(out,{recursive:true});
 const results=[];async function check(name,fn){await fn();results.push(name);console.log(`OK ${name}`);}
 // Exercise the same geometry and transforms shipped to the browser, without a test API in the app.
-for(const name of ['model','areas','preparation']){const source=await readFile(`src/${name}.ts`,'utf8');let code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;code=code.replace(/from '\.\/(\w+)'/g,"from './$1.mjs'");await writeFile(resolve(out,`${name}.mjs`),code);}
+for(const name of ['model','areas','preparation','trace']){const source=await readFile(`src/${name}.ts`,'utf8');let code=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;code=code.replace(/from '\.\/(\w+)'/g,"from './$1.mjs'");await writeFile(resolve(out,`${name}.mjs`),code);}
 const {createProject,clone,History,addMarker,validLabel}=await import(`file:///${resolve(out,'model.mjs').replaceAll('\\','/')}`);
 const {addArea,polygonError,areaCategories,areaAnchor,contains,PALETTE}=await import(`file:///${resolve(out,'areas.mjs').replaceAll('\\','/')}`);
 const {rotateProject,cropProject}=await import(`file:///${resolve(out,'preparation.mjs').replaceAll('\\','/')}`);
