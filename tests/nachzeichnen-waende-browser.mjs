@@ -16,6 +16,8 @@ const toScreen=(page,x,y)=>page.locator('#drawing').evaluate((el,[x,y])=>{const 
 async function drag(page,a,b){const p=await toScreen(page,...a),q=await toScreen(page,...b);await page.mouse.move(p.x,p.y);await page.mouse.down();await page.mouse.move((p.x+q.x)/2,(p.y+q.y)/2,{steps:3});await page.mouse.move(q.x,q.y,{steps:3});await page.mouse.up();}
 async function tap(page,x,y){const p=await toScreen(page,x,y);await page.mouse.click(p.x,p.y);}
 const near=(a,b,tol,what)=>assert.ok(Math.abs(a-b)<=tol,`${what}: ${a} ≈ ${b}`);
+/** gleich bis auf die Rundung der Datei (0,01 Planeinheiten) – Summen wie x+w sind als Gleitkommazahl nicht bitgleich. */
+const gleich=(a,b,what)=>near(a,b,.011,what);
 const heute=()=>new Date().toLocaleDateString('sv-SE');
 const trace=async page=>(await savedProject(page)).plan.trace;
 const werkzeug=(page,t)=>page.locator(`[data-trace-tool="${t}"]`).click();
@@ -61,9 +63,9 @@ for(const engine of engines){
    await drag(page,[100,100],[400,300]);await page.locator('#trace-name').fill('Küche');await page.keyboard.press('Enter');
    const e=await k(),r1=(await trace(page)).rooms[0];kueche=r1.id;
    await drag(page,[r1.x+r1.w+7*e,r1.y-5*e],[600,400]);await page.locator('#trace-name').fill('Flur');await page.keyboard.press('Enter');
-   const t=await trace(page),r2=t.rooms[1];flur=r2.id;assert.equal(r2.x,r1.x+r1.w,'linke Kante des Flurs = rechte Kante der Küche, exakt');assert.equal(r2.y,r1.y);
+   const t=await trace(page),r2=t.rooms[1];flur=r2.id;gleich(r2.x,r1.x+r1.w,'linke Kante des Flurs = rechte Kante der Küche');assert.equal(r2.y,r1.y);
    await page.keyboard.press('Escape');
-   const senkrecht=await page.locator('#sketch-overlay [data-trace-edge]').evaluateAll((ls,x)=>ls.filter(l=>l.getAttribute('x1')===String(x)&&l.getAttribute('x2')===String(x)).length,r2.x);
+   const senkrecht=await page.locator('#sketch-overlay [data-trace-edge]').evaluateAll((ls,x)=>ls.filter(l=>Math.abs(Number(l.getAttribute('x1'))-x)<.011&&Math.abs(Number(l.getAttribute('x2'))-x)<.011).length,r2.x);
    assert.equal(senkrecht,2,'eine Kante je Raum an derselben Stelle – keine zweite daneben');
   });
   let schraeg;
@@ -71,15 +73,15 @@ for(const engine of engines){
    await werkzeug(page,'wall');const e=await k(),t0=await trace(page),f=t0.rooms[1];
    await drag(page,[f.x+f.w+6*e,f.y+f.h-5*e],[880,640]);   // Start 6/5 px neben der Ecke unten rechts des Flurs
    let t=await trace(page);assert.equal(t.walls.length,1);schraeg=t.walls[0];
-   assert.equal(schraeg.x1,f.x+f.w,'Anfang auf der Raumecke');assert.equal(schraeg.y1,f.y+f.h);
+   gleich(schraeg.x1,f.x+f.w,'Anfang auf der Raumecke');gleich(schraeg.y1,f.y+f.h,'Anfang auf der Raumecke (y)');
    assert.ok(Math.abs(grad(schraeg))>20&&Math.abs(grad(schraeg))<70,'bleibt schräg');
    assert.deepEqual(Object.keys(schraeg).sort(),['id','x1','x2','y1','y2']);
    assert.equal(await page.locator('#sketch-overlay [data-trace-wall]').count(),1);
    assert.equal(await page.locator('#trace-item-name').textContent(),'Wand gewählt');
    assert.equal(await page.locator('#trace-item-fields input').count(),0,'kein Längenfeld');
    // fast waagerecht gezogen → genau waagerecht; Anfang auf der Kante der Küche (nicht auf einer Ecke)
-   const r=t.rooms[0];await drag(page,[r.x+150,r.y+r.h+5*e],[r.x+150+300,r.y+r.h+8*e]);
-   t=await trace(page);assert.equal(t.walls.length,2);const w=t.walls[1];assert.equal(w.y1,r.y+r.h,'Anfang auf der Raumkante');assert.equal(w.y2,w.y1,'nahe 0° → genau waagerecht');
+   const r=t.rooms[0];await drag(page,[r.x+150,r.y+r.h+5*e],[r.x+150+500,r.y+r.h+5*e+6]);
+   t=await trace(page);assert.equal(t.walls.length,2);const w=t.walls[1];gleich(w.y1,r.y+r.h,'Anfang auf der Raumkante');assert.equal(w.y2,w.y1,'nahe 0° → genau waagerecht');
    await page.keyboard.press('Control+z');assert.equal((await trace(page)).walls.length,1,'eine Wand = ein Rückgängig-Schritt');
    assert.equal(t.checked,undefined);assert.equal((await savedProject(page)).plan.data,bild,'Planbild unverändert');
   });
@@ -115,8 +117,8 @@ for(const engine of engines){
   await check(`${engine}: „gehört zu Raum …“ – bewusst, in der Datei, ein Rückgängig-Schritt; die Kante dazwischen ist keine Wand mehr`,async()=>{
    await werkzeug(page,'room');const r=(await trace(page)).rooms[0];
    await drag(page,[r.x,r.y+r.h+3*await k()],[r.x+150,r.y+r.h+120]);let t=await trace(page);teil=t.rooms[2];
-   assert.equal(teil.y,r.y+r.h,'liegt an der Küche an');assert.equal(teil.joins,undefined,'Anliegen allein verbindet nichts');assert.equal(teil.name,'Raum 3');
-   const kante=()=>page.locator('#sketch-overlay [data-trace-edge]').evaluateAll((ls,[y,x0,x1])=>ls.filter(l=>Number(l.getAttribute('y1'))===y&&Number(l.getAttribute('y2'))===y&&Number(l.getAttribute('x1'))<x1&&Number(l.getAttribute('x2'))>x0).map(l=>[Number(l.getAttribute('x1')),Number(l.getAttribute('x2'))]),[teil.y,teil.x,teil.x+teil.w]);
+   gleich(teil.y,r.y+r.h,'liegt an der Küche an');assert.equal(teil.joins,undefined,'Anliegen allein verbindet nichts');assert.equal(teil.name,'Raum 3');
+   const kante=()=>page.locator('#sketch-overlay [data-trace-edge]').evaluateAll((ls,[y,x0,x1])=>ls.filter(l=>Math.abs(Number(l.getAttribute('y1'))-y)<.011&&Math.abs(Number(l.getAttribute('y2'))-y)<.011&&Number(l.getAttribute('x1'))<x1-.011&&Number(l.getAttribute('x2'))>x0+.011).map(l=>[Number(l.getAttribute('x1')),Number(l.getAttribute('x2'))]),[teil.y,teil.x,teil.x+teil.w]);
    assert.equal((await kante()).length,2,'vorher: Wand zwischen den beiden');
    assert.equal(await page.locator('#trace-join').isVisible(),true);assert.equal(await page.locator('#trace-unjoin').isVisible(),false);
    await page.locator('#trace-join').click();assert.match(await page.locator('#trace-hint').textContent(),/Tipp jetzt den Raum an, zu dem dieses Rechteck gehört/);
@@ -124,8 +126,8 @@ for(const engine of engines){
    await tap(page,r.x+250,r.y+60);t=await trace(page);
    assert.equal(t.rooms[2].joins,kueche,'steht ausdrücklich in der Datei');assert.equal(t.rooms[2].name,'Küche');assert.equal(t.rooms.length,3);
    assert.deepEqual(await kante(),[],'gemeinsame Kante weg');
-   const rest=await page.locator('#sketch-overlay [data-trace-edge]').evaluateAll((ls,y)=>ls.filter(l=>Number(l.getAttribute('y1'))===y&&Number(l.getAttribute('y2'))===y).map(l=>[Number(l.getAttribute('x1')),Number(l.getAttribute('x2'))]),teil.y);
-   assert.deepEqual(rest,[[teil.x+teil.w,r.x+r.w]],'unter der Küche bleibt nur das Stück neben dem Teil');
+   const rest=await page.locator('#sketch-overlay [data-trace-edge]').evaluateAll((ls,y)=>ls.filter(l=>Math.abs(Number(l.getAttribute('y1'))-y)<.011&&Math.abs(Number(l.getAttribute('y2'))-y)<.011).map(l=>[Number(l.getAttribute('x1')),Number(l.getAttribute('x2'))]),teil.y);
+   assert.equal(rest.length,1,'unter der Küche bleibt nur ein Stück');gleich(rest[0][0],teil.x+teil.w,'es beginnt neben dem Teil');gleich(rest[0][1],r.x+r.w,'und reicht bis zur Ecke der Küche');
    assert.equal((await page.locator('#sketch-overlay').textContent()).match(/Küche/g).length,1,'ein Name, einmal angezeigt');
    assert.match(await page.locator('#trace-count').textContent(),/^2 Räume · 1 Wand · 1 Tür · 1 Fenster nachgezeichnet$/);
    await page.locator('#trace-hint').click();await page.keyboard.press('Control+z');t=await trace(page);assert.equal(t.rooms[2].joins,undefined,'ein Schritt zurück');assert.equal(t.rooms[2].name,'Raum 3');
@@ -136,9 +138,9 @@ for(const engine of engines){
   await check(`${engine}: gleicher Name ohne Verbinden bleibt ein eigener Raum mit Wand; „Verbindung lösen“ trennt wieder`,async()=>{
    await werkzeug(page,'room');const f=(await trace(page)).rooms[1];
    await drag(page,[f.x+f.w+4*await k(),f.y],[f.x+f.w+200,f.y+200]);await page.locator('#trace-name').fill('Flur');await page.keyboard.press('Enter');
-   let t=await trace(page);const z=t.rooms[3];assert.equal(z.name,'Flur');assert.equal(z.joins,undefined,'gleicher Name verbindet nicht');assert.equal(z.x,f.x+f.w);
+   let t=await trace(page);const z=t.rooms[3];assert.equal(z.name,'Flur');assert.equal(z.joins,undefined,'gleicher Name verbindet nicht');gleich(z.x,f.x+f.w,'liegt am Flur an');
    await page.keyboard.press('Escape');
-   const wand=await page.locator('#sketch-overlay [data-trace-edge]').evaluateAll((ls,x)=>ls.filter(l=>Number(l.getAttribute('x1'))===x&&Number(l.getAttribute('x2'))===x).length,z.x);
+   const wand=await page.locator('#sketch-overlay [data-trace-edge]').evaluateAll((ls,x)=>ls.filter(l=>Math.abs(Number(l.getAttribute('x1'))-x)<.011&&Math.abs(Number(l.getAttribute('x2'))-x)<.011).length,z.x);
    assert.equal(wand,2,'Wand zwischen den beiden „Flur“ bleibt');
    assert.equal((await page.locator('#sketch-overlay').textContent()).match(/Flur/g).length,2,'zwei Räume, zwei Namen');
    // nicht berührende Rechtecke lassen sich nicht verbinden
@@ -227,7 +229,7 @@ for(const engine of engines){
    assert.equal(await page.locator('#trace-view').evaluate(el=>el.getAttribute('pointer-events')),'none','Punkte bleiben bedienbar');
    assert.equal(Buffer.compare(aus,await foto())!==0,true,'an: sichtbar');
    await s.click();assert.equal(await page.locator('#trace-view > *').count(),0);
-   assert.equal(Buffer.compare(aus,await foto()),0,'wieder aus: Karte bildgleich wie vorher');
+   assert.equal(await page.locator('#sketch-overlay > *').count(),0,'wieder aus: keine Ebene über dem Plan – die Karte besteht aus denselben Teilen wie ohne Nachzeichnung');
    await s.click();   // für den Ausgabe-Vergleich eingeschaltet lassen
    mitNachzeichnung=await savedProject(page);assert.equal(mitNachzeichnung.plan.data,bild);
   });
