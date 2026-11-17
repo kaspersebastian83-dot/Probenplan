@@ -61,7 +61,7 @@ export interface Plan { name: string; width: number; height: number; data: strin
 export interface Sheet { id:string; name:string; plan?:Plan; markers?:Marker[]; areas?:Area[] }
 // Format 6: wie 5, zusätzlich Feinausrichtung (Preparation.angle). Ältere PlanKit-Versionen lehnen es ab, statt den Winkel still zu übergehen.
 // Format 7: wie 6, zusätzlich Nachzeichnung (Plan.trace). Ältere PlanKit-Versionen lehnen es ab, statt die Nachzeichnung beim Speichern still zu verlieren.
-export type Version = 1|2|3|4|5|6|7;
+export type Version = 1|2|3|4|5|6|7|8;
 /** Raumbuch (ab 1.24): je Raum Maßnahme und Bemerkung; Räume ohne Probe mit Status. Befund und Bewertung werden nie gespeichert,
  *  sondern immer aus den Proben berechnet. alias: Raumschlüssel → Schlüssel des Raums, in den er zusammengeführt wurde. */
 export type RaumStatus='unauffaellig'|'auffaellig'|'nicht_begangen';

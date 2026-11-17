@@ -1,5 +1,14 @@
 # Änderungen
 
+## 2.5.0 – 17. November 2026 · Skizze: Schrift der Raumnamen einstellbar
+
+Rückmeldung R-20261116-124630-SK: Auf einer Skizze waren die Raumnamen zu klein zum Lesen, und die Schriftgröße ließ sich nicht ändern.
+
+- **„Schrift“ je Raum** (Skizze › „↖ Auswählen“ › Raum antippen, neben „Name“): *automatisch* · *klein* (20 cm) · *mittel* (30 cm) · *groß* (45 cm) · *sehr groß* (70 cm). *Automatisch* ist wie bisher (nach Raumgröße, 14–40 cm) und ist für alle bestehenden Räume eingestellt. Die Zeile darunter (Fläche bzw. BRANDRAUM) wächst mit (70 %). Jede Änderung ist ein Rückgängig-Schritt.
+- **Daten:** neues Feld `fs` am Skizzenraum (`plan.sketch.rooms[].fs`, nur die vier Werte). **Projektformat 8** – aber nur, sobald ein Raum eine eigene Schrift hat; alle anderen Dateien bleiben in ihrem Format und öffnen unverändert. Ältere PlanKit-Fassungen (bis 2.4.0) öffnen Format 8 nicht („… stammt von einer neueren PlanKit-Version. Bitte PlanKit aktualisieren“), statt die Angabe beim Speichern still zu verlieren. „automatisch“ entfernt die Angabe wieder; das Format wird nie herabgesetzt. Eine eigene Schrift in einer Datei mit Format bis 7 wird abgewiesen („… benötigt Projektformat 8“).
+- Andere Apps lesen von der PlanKit-Datei nur Name, Datum und Prüfsumme – für sie ändert sich nichts. Nachzeichnung (Format 7) unverändert; ihre Raumnamen stehen in keiner Ausgabe.
+- Tests: `skizze.mjs` (Auswahl, Planbild, Format 8, „automatisch“, Abweisen); in `align.mjs` und `nachzeichnen-browser.mjs` gilt jetzt Format 9 als „zu neu“.
+
 ## 2.4.0 – 12. November 2026 · Nachzeichnen vollständig: Wände, Türen, Fenster, Verbinden (Stufe 2 von „Nachzeichnen“)
 
 Plan: `claude/plankit-nachzeichnen-plan.md` im Spektron-Projekt (Entscheidungen vom 12.11.2026), Stand: `claude/plankit-nachzeichnen-stand.md`. **Kein neues Dateiformat** – Wände, Öffnungen und `joins` trug schon Format 7 aus 2.3.0.

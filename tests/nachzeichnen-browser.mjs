@@ -144,7 +144,7 @@ for(const engine of engines){
   await check(`${engine}: Projektdatei – Format 7, wieder öffnen; ohne Format 7 abgelehnt; noch neuere Fassung abgelehnt`,async()=>{
    await page.keyboard.press('Escape');await page.locator('#trace-done').click();await page.locator('#trace-ok').click();await page.locator('#trace-actions').waitFor({state:'hidden'});
    datei=await downloadedProject(page);assert.equal(datei.version,7);assert.equal(datei.plan.trace.rooms.length,2);assert.deepEqual(datei.plan.trace.checked,{date:heute(),by:'Ben'});
-   for(const [change,text] of [[p=>{p.version=6;},/Nachzeichnung benötigt Projektformat 7/],[p=>{p.version=8;},/neueren PlanKit-Version/],[p=>{p.plan.trace.rooms[0].x=5000;},/Ungültige Nachzeichnung/],[p=>{p.plan.trace.rooms[1].joins='gibt-es-nicht';},/Ungültige Nachzeichnung/]]){
+   for(const [change,text] of [[p=>{p.version=6;},/Nachzeichnung benötigt Projektformat 7/],[p=>{p.version=9;},/neueren PlanKit-Version/],[p=>{p.plan.trace.rooms[0].x=5000;},/Ungültige Nachzeichnung/],[p=>{p.plan.trace.rooms[1].joins='gibt-es-nicht';},/Ungültige Nachzeichnung/]]){
     const bad=structuredClone(datei);change(bad);await page.locator('#project-file').setInputFiles({name:'kaputt.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(bad))});
     await page.locator('#toast.error').waitFor();assert.match(await page.locator('#toast').textContent(),text);await page.evaluate(()=>{document.getElementById('toast').hidden=true;document.getElementById('toast').classList.remove('error');});
    }
