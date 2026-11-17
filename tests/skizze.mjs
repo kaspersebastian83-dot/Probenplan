@@ -39,6 +39,20 @@ for(const engine of engines){
    await page.locator('#sketch-h').fill('3,00');await page.locator('#sketch-h').press('Enter');await page.locator('#sketch-name').fill('Küche');await page.locator('#sketch-name').press('Enter');
    const s=(await savedProject(page)).plan.sketch;assert.deepEqual(s.rooms[1],{...s.rooms[1],name:'Küche',h:300});
   });
+  await check(`${engine}: Schrift des Raumnamens (2.5.0): eigene Größe nur für diesen Raum, Format 8; „automatisch“ entfernt sie`,async()=>{
+   const svgVon=p=>page.evaluate(d=>new TextDecoder().decode(Uint8Array.from(atob(d.split(',')[1]),c=>c.charCodeAt(0))),p.plan.data);
+   assert.equal(await page.locator('#sketch-room-size').inputValue(),'','zuerst automatisch');
+   const vorher=await savedProject(page);assert.ok(vorher.version<8,'ohne eigene Schrift: bisheriges Format');
+   assert.match(await svgVon(vorher),/font-size="37" text-anchor="middle" fill="#2b2b2b">Küche</,'automatisch: nach Raumgröße (2,60 m breit → 37 cm)');
+   await page.locator('#sketch-room-size').selectOption('70');
+   let s=await savedProject(page);assert.equal(s.plan.sketch.rooms[1].fs,70);assert.equal(s.plan.sketch.rooms[0].fs,undefined,'nur der gewählte Raum');assert.equal(s.version,8,'Projektformat 8');
+   assert.match(await svgVon(s),/font-size="70" text-anchor="middle" fill="#2b2b2b">Küche</,'Planbild: Raumname 70 cm hoch');
+   assert.match(await svgVon(s),/font-size="49" text-anchor="middle" fill="#666666">7,8 m²</,'Zeile darunter wächst mit (70 %)');
+   await page.locator('#sketch-room-size').selectOption('');
+   s=await savedProject(page);assert.equal(s.plan.sketch.rooms[1].fs,undefined,'automatisch = keine Angabe');assert.equal(s.version,8,'Format wird nie herabgesetzt');
+   assert.match(await svgVon(s),/font-size="37" text-anchor="middle" fill="#2b2b2b">Küche</);
+   await page.locator('#sketch-room-size').selectOption('45');assert.equal((await savedProject(page)).plan.sketch.rooms[1].fs,45);
+  });
   await check(`${engine}: Tür auf die gemeinsame Wand, Aufschlag wechseln, löschen und Rückgängig`,async()=>{
    await blur(page);await page.locator('[data-sketch-tool="door"]').click();await tapPlan(page,515,300);
    let s=(await savedProject(page)).plan.sketch;assert.equal(s.openings.length,1);assert.deepEqual([s.openings[0].kind,s.openings[0].x,s.openings[0].a,s.openings[0].w],['door',520,90,90]);
@@ -92,6 +106,12 @@ for(const engine of engines){
    const file=await downloadedProject(page);assert.equal(file.plan.sketch.rooms.length,2);
    await page.locator('#project-file').setInputFiles({name:'x.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(file))});await page.locator('#replace-yes').click();
    await page.locator('#welcome').waitFor({state:'hidden'});await pk.schritt(page,1);assert.equal(await page.locator('#sketch-edit').isVisible(),true);assert.equal((await savedProject(page)).plan.sketch.rooms[0].name,'Wohnen');
+   assert.equal((await savedProject(page)).plan.sketch.rooms[1].fs,45,'eigene Schrift bleibt in der Projektdatei');assert.equal(file.version,8);
+   for(const [change,text] of [[f=>{f.version=7;},'Projektformat 8'],[f=>{f.plan.sketch.rooms[1].fs=33;},'Skizze']]){
+    const f=structuredClone(file);change(f);
+    await page.locator('#project-file').setInputFiles({name:'f.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(f))});
+    await page.locator('#toast.error',{hasText:text}).waitFor();
+   }
    const bad=structuredClone(file);bad.plan.sketch.rooms[0].w=-5;
    await page.locator('#project-file').setInputFiles({name:'bad.probenplan',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(bad))});
    await page.locator('#toast.error',{hasText:'Skizze'}).waitFor();

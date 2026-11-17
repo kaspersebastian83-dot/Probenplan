@@ -5,8 +5,9 @@
    weil der Ursprung der Zeichenfläche beim Bearbeiten fest bleibt. */
 import type {Plan,Point} from './model';
 
-/** fire: Brandraum (ab 1.41, Schnellskizze) – hell orange hinterlegt, „Brandraum“ unter dem Namen. */
-export interface SketchRoom {id:string;name:string;x:number;y:number;w:number;h:number;fire?:true}
+/** fire: Brandraum (ab 1.41, Schnellskizze) – hell orange hinterlegt, „Brandraum“ unter dem Namen.
+ *  fs: eigene Schrifthöhe des Raumnamens in cm (ab 2.5.0, Projektformat 8; eine der ROOM_SIZES) – fehlt sie, rechnet PlanKit wie bisher. */
+export interface SketchRoom {id:string;name:string;x:number;y:number;w:number;h:number;fire?:true;fs?:number}
 /** Freie Wand von (x1,y1) nach (x2,y2), auch schräg. */
 export interface SketchWall {id:string;x1:number;y1:number;x2:number;y2:number}
 /** Tür oder Fenster mittig bei (x,y) auf einer Wand mit Richtung a (Grad); w = Breite; side = Aufschlagseite der Tür (+1/-1). */
@@ -17,6 +18,10 @@ export interface SketchText {id:string;x:number;y:number;text:string;size:number
 export interface Sketch {width:number;height:number;rooms:SketchRoom[];walls:SketchWall[];openings:SketchOpening[];texts:SketchText[];schematic?:true}
 export const GRID=10,WALL=12,MIN_ROOM=50,MIN_WALL=30,DEFAULT_DOOR=90,DEFAULT_WINDOW=120,MAX_ROOMS=200,MAX_WALLS=400,MAX_OPENINGS=400,MAX_TEXTS=200,MAX_SIZE=20000;   // cm; 200 m
 export const TEXT_SIZES:[number,string][]=[[20,'klein'],[30,'mittel'],[45,'groß']];
+/** Schrift der Raumnamen (ab 2.5.0): „automatisch“ = keine Angabe (wie bisher nach Raumgröße, höchstens 40 cm), sonst fest in cm. */
+export const ROOM_SIZES:[number,string][]=[[20,'klein'],[30,'mittel'],[45,'groß'],[70,'sehr groß']];
+/** Schrifthöhe des Raumnamens: eigene Größe oder wie bisher nach Raumgröße (14–40 cm). */
+export const roomFont=(r:SketchRoom)=>r.fs??Math.round(Math.max(14,Math.min(40,r.w/7,r.h/4)));
 export const snap=(v:number)=>Math.round(v/GRID)*GRID;
 const uid=()=>crypto.randomUUID();
 export function emptySketch(widthM=25,heightM=18):Sketch{return {width:Math.round(widthM*100),height:Math.round(heightM*100),rooms:[],walls:[],openings:[],texts:[]};}
@@ -57,7 +62,7 @@ export function sketchSVG(s:Sketch){
     const body=o.kind==='door'?`<path d="M${-h} 0 L${-h} ${o.side*o.w} A${o.w} ${o.w} 0 0 ${o.side>0?0:1} ${h} 0" fill="none" stroke="#6b6b6b" stroke-width="3"/>`
       :`<rect x="${-h}" y="${-WALL/2}" width="${o.w}" height="${WALL}" fill="#ffffff" stroke="#1f1f1f" stroke-width="2"/><line x1="${-h}" y1="0" x2="${h}" y2="0" stroke="#1f1f1f" stroke-width="2"/>`;
     return `<g transform="translate(${r2(o.x)} ${r2(o.y)}) rotate(${r2(o.a)})">${gap}${body}</g>`;}).join('');
-  const names=s.rooms.map(r=>{const fs=Math.round(Math.max(14,Math.min(40,r.w/7,r.h/4))),sub=Math.round(fs*.7);
+  const names=s.rooms.map(r=>{const fs=roomFont(r),sub=Math.round(fs*.7);
     const second=r.fire?`<text x="${r.x+r.w/2}" y="${r.y+r.h/2+fs*1.05}" font-family="${FONT}" font-size="${sub}" font-weight="700" text-anchor="middle" fill="${FIRE_TEXT}">BRANDRAUM</text>`
       :s.schematic?'':`<text x="${r.x+r.w/2}" y="${r.y+r.h/2+fs*1.05}" font-family="${FONT}" font-size="${sub}" text-anchor="middle" fill="#666666">${area(r)} m²</text>`;
     return `<text x="${r.x+r.w/2}" y="${r.y+r.h/2}" font-family="${FONT}" font-size="${fs}" text-anchor="middle" fill="#2b2b2b">${esc(r.name)}</text>${second}`;}).join('');
@@ -203,15 +208,17 @@ export function trimSketch(s:Sketch,margin=100):{sketch:Sketch;dx:number;dy:numb
 export function extendSketch(s:Sketch,extra=800){const t=cloneSketch(s),e=extent(t);if(e){t.width=Math.min(MAX_SIZE,Math.max(t.width,Math.ceil(e.x1+extra)));t.height=Math.min(MAX_SIZE,Math.max(t.height,Math.ceil(e.y1+extra)));}return t;}
 
 /* ---------- Projektdatei ---------- */
-/** Skizze aus einer Projektdatei prüfen (Zahlen, Grenzen, Kennungen, Texte). */
-export function validateSketch(raw:unknown):Sketch{
+/** Skizze aus einer Projektdatei prüfen (Zahlen, Grenzen, Kennungen, Texte). schrift: Projektformat 8 – eigene Schrift der Raumnamen erlaubt. */
+export function validateSketch(raw:unknown,schrift=false):Sketch{
   const bad=():never=>{throw Error('Ungültige Skizze in der Projektdatei.');};
   const o=raw as Sketch;if(!o||typeof o!=='object')bad();
   for(const k of ['rooms','walls','openings','texts'] as const)if(!Array.isArray(o[k]))bad();
   const num=(v:unknown,min:number,max:number)=>typeof v==='number'&&Number.isFinite(v)&&v>=min&&v<=max;
   if(!num(o.width,MIN_ROOM,MAX_SIZE)||!num(o.height,MIN_ROOM,MAX_SIZE)||o.rooms.length>MAX_ROOMS||o.walls.length>MAX_WALLS||o.openings.length>MAX_OPENINGS||o.texts.length>MAX_TEXTS)bad();
   const id=(v:unknown)=>typeof v==='string'&&/^[\w-]{1,80}$/.test(v),W=o.width,H=o.height;
-  const rooms=o.rooms.map(r=>{if(!r||!id(r.id)||typeof r.name!=='string'||r.name.length>60||!num(r.x,0,W)||!num(r.y,0,H)||!num(r.w,1,W)||!num(r.h,1,H)||r.x+r.w>W+.01||r.y+r.h>H+.01||(r.fire!==undefined&&r.fire!==true))bad();return {id:r.id,name:r.name,x:r.x,y:r.y,w:r.w,h:r.h,...(r.fire?{fire:true as const}:{})};});
+  const rooms=o.rooms.map(r=>{if(!r||!id(r.id)||typeof r.name!=='string'||r.name.length>60||!num(r.x,0,W)||!num(r.y,0,H)||!num(r.w,1,W)||!num(r.h,1,H)||r.x+r.w>W+.01||r.y+r.h>H+.01||(r.fire!==undefined&&r.fire!==true))bad();
+    if(r.fs!==undefined){if(!schrift)throw Error('Eigene Schriftgröße für Raumnamen benötigt Projektformat 8.');if(!ROOM_SIZES.some(([v])=>v===r.fs))bad();}
+    return {id:r.id,name:r.name,x:r.x,y:r.y,w:r.w,h:r.h,...(r.fire?{fire:true as const}:{}),...(r.fs!==undefined?{fs:r.fs}:{})};});
   const walls=o.walls.map(w=>{if(!w||!id(w.id)||!num(w.x1,0,W)||!num(w.x2,0,W)||!num(w.y1,0,H)||!num(w.y2,0,H))bad();return {id:w.id,x1:w.x1,y1:w.y1,x2:w.x2,y2:w.y2};});
   const openings=o.openings.map(x=>{if(!x||!id(x.id)||(x.kind!=='door'&&x.kind!=='window')||(x.side!==1&&x.side!==-1)||!num(x.x,0,W)||!num(x.y,0,H)||!num(x.a,-360,360)||!num(x.w,10,1000))bad();return {id:x.id,kind:x.kind,x:x.x,y:x.y,a:x.a,w:x.w,side:x.side};});
   const texts=o.texts.map(t=>{if(!t||!id(t.id)||typeof t.text!=='string'||!t.text.trim()||t.text.length>80||!num(t.x,0,W)||!num(t.y,0,H)||!num(t.size,8,200))bad();return {id:t.id,x:t.x,y:t.y,text:t.text,size:t.size};});

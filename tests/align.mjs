@@ -141,7 +141,7 @@ for(const engine of ['chromium','webkit']){
     });
     await check(`${engine}: Projektdateien mit Winkel in altem Format, zu großem Winkel oder neuerem Format werden abgelehnt`,async()=>{
       const saved=await downloadedProject(page);
-      for(const [change,text] of [[p=>{p.version=4;},/Projektformat 6/],[p=>{p.plan.preparation.angle=50;},/Ungültige Feinausrichtung/],[p=>{p.version=8;},/neueren PlanKit-Version/]]){
+      for(const [change,text] of [[p=>{p.version=4;},/Projektformat 6/],[p=>{p.plan.preparation.angle=50;},/Ungültige Feinausrichtung/],[p=>{p.version=9;},/neueren PlanKit-Version/]]){
         const bad=structuredClone(saved);change(bad);await importJSON(page,bad);
         await page.waitForFunction(()=>document.getElementById('toast').classList.contains('error')&&!document.getElementById('toast').hidden);
         assert.match(await page.locator('#toast').textContent(),text);await page.evaluate(()=>{const t=document.getElementById('toast');t.hidden=true;t.className='';});
