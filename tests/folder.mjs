@@ -3,7 +3,11 @@
 // Der Archivordner wird im privaten Dateisystem des Browsers (OPFS) nachgebildet; nur Chromium kennt die Ordner-API.
 import * as pk from './pk-ui.mjs';
 import {chromium,openExport,closeExport} from './runtime.mjs';
-import {labXML,labErgebnisse} from './lab-fixtures.mjs';
+import {labXML,labErgebnisse as labErgebnisseRoh,labRows} from './lab-fixtures.mjs';
+// Prüfbericht mit denselben Beschreibungen wie die LabelKit-Datei (Eurofins übernimmt sie wörtlich) – sonst lässt
+// „Alle Konflikte: Aktualisieren“ die Zeilen aus (B4, PlanKit 2.6.0)
+const WIE_LABELKIT={P1:'Küche, Fensterbank, 400 cm²',P2:'Flur, Wand, 100 cm²'};
+const labErgebnisse=(rows=labRows.map(r=>WIE_LABELKIT[r.label]?{...r,desc:WIE_LABELKIT[r.label]}:r),o)=>labErgebnisseRoh(rows,o);
 import assert from 'node:assert/strict';
 const base=process.env.TEST_URL||'http://localhost:4173';
 const NAME='26.0123 Köln',FILE=`Probenplan ${NAME}.probenplan`;

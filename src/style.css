@@ -23,3 +23,5 @@
 .lab-resultkit{font-size:12px;margin:14px 0 4px;padding:8px 10px;border-radius:6px;background:#f3f1f8;color:#4a3f63}
 .lab-resultkit.warn{background:#fff4dc;color:#6b4d00}
 .lab-resultkit-link{margin:12px 0 0}
+/* B4 (Audit Lauf 2): Beschreibung am Punkt weicht ab – Zeile gelb, nicht im Sammelknopf */
+#lab-review tr.lab-desc-anders td{background:#fff4dc}
