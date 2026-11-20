@@ -1,5 +1,14 @@
 # Änderungen
 
+## 2.6.0 – 20. November 2026 · Ersetzen mit anderer Beschreibung, Projektnummer neben einem Datum (Audit Lauf 2)
+
+Plan: `claude/spektron-audit-2026-11-2-bericht-plan.md` im Spektron-Projekt (PR 5; Befunde B3, B4, B14).
+
+- **B4 – andere Beschreibung beim Ersetzen:** In „Laborproben prüfen“ vergleicht PlanKit je Zeile mit Konflikt die Beschreibung am schon gesetzten Punkt (bzw. in „Noch zu platzieren“) mit der neuen Zeile – gleich wie ResultKit (`beschreibungWeichtAb`: Leerraum, Groß/Klein, Striche, Anführungszeichen, Leerraum um Kommas; „Tiefe: …“ am Ende und Bohrkerne zählen nicht). Weicht sie ab, ist die Zeile gelb, die Warnung nennt beide Texte („P4: Beschreibung am Punkt: „…“ – im Prüfbericht: „…“. Gehört der Wert zu dieser Stelle?“), und **„Alle Konflikte: Aktualisieren“ lässt sie aus** – sie wird einzeln gewählt. Hintergrund: Hat LabelKit vor der ersten festen Nummer umnummeriert, übertrug „Notiz, Labordaten und Herkunft ersetzen“ still Beschreibung und Werte einer anderen Probe auf den Punkt. `applyLabImport` ist unverändert; kein neues Feld, kein neues Format.
+- **B3 – Projektnummer in der Auftragsreferenz:** Der Hinweis „Auftragsreferenz … passt möglicherweise nicht zur Gutachtennummer …“ liest Nummern nach `PROJEKTNUMMER v1` (zeichengleich mit ResultKit und dem Datenarchiv der Projektzentrale): Ein Datum wie „18.11.2026“ ist nie eine Projektnummer, und stehen mehrere Nummern da, zählt die der Gutachtennummer. „Ortstermin 18.11.2026 / 26.0604“ im Projekt 26.0604 warnt nicht mehr. Ohne Nummer in der Referenz bleibt der Hinweis wie bisher.
+- **B14 – Tests:** Die Testsuite läuft jetzt auch nach jedem Merge auf `main` und jede Nacht (wie ResultKit). ResultKit wird daneben geholt; `tests/audit2.mjs` prüft den Block `PROJEKTNUMMER v1` zeichengleich und den Beschreibungsvergleich gegen ResultKit (in der CI Pflicht).
+- Tests: neu `tests/audit2.mjs` (Node), in `labreport.mjs` ein Browserfall je Engine (gelbe Zeile, Warnung, Sammelknopf lässt die Zeile aus, „Abbrechen“ ändert nichts).
+
 ## 2.5.0 – 17. November 2026 · Skizze: Schrift der Raumnamen einstellbar
 
 Rückmeldung R-20261116-124630-SK: Auf einer Skizze waren die Raumnamen zu klein zum Lesen, und die Schriftgröße ließ sich nicht ändern.

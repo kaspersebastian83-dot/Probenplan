@@ -4,6 +4,20 @@ import type {LabReport} from './labreport';
 const idPattern=/^[\w-]{1,80}$/;
 const text=(value:unknown,max:number):value is string=>typeof value==='string'&&value.length<=max&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value);
 export function sourceFilename(value:string){return value.split(/[\\/]/).at(-1)||'';}
+/* ===== BESCHREIBUNG – wie ResultKit (src/ergebnisse.ts: beschreibungKey, beschreibungVergleichbar, beschreibungWeichtAb) gleich halten =====
+   B4 (Audit Lauf 2): Beschreibung am vorhandenen Punkt gegen die neue Zeile, bevor „ersetzen“ Notiz und Werte überträgt. Nur zum Vergleichen. */
+const tidyB=(s:unknown)=>String(s??'').normalize('NFC').replace(/\s+/g,' ').trim();
+export const beschreibungKey=(s:unknown)=>tidyB(s).toLowerCase().replace(/[\u2010-\u2015\u2212]/g,'-').replace(/[\u201E\u201C\u201D\u201A\u2018\u2019\u00AB\u00BB"']/g,'"')
+ // m6 (2.2): LabelKit übergibt die Felder ungetrimmt („EG Küche , Wand“), ResultKit baut sie getrimmt nach – Leerraum um die Kommas
+ // und leere Abschnitte zählen nicht. Verglichen wird nur; gespeichert und angezeigt wird der Text unverändert.
+ .split(',').map(t=>t.trim()).filter(Boolean).join(', ');
+export const beschreibungVergleichbar=(auftrag:unknown,bericht:unknown,art='')=>!!tidyB(auftrag)&&!!tidyB(bericht)&&!/bohrkern/i.test(art);
+export function beschreibungWeichtAb(auftrag:unknown,bericht:unknown,art=''){
+ if(!beschreibungVergleichbar(auftrag,bericht,art))return false;
+ const a=beschreibungKey(auftrag),b=beschreibungKey(bericht);
+ return a!==b&&a.replace(/, tiefe: [^,]*$/,'')!==b;
+}
+/* ===== Ende BESCHREIBUNG ===== */
 export function sourceText(sources:LabSources){return [sources.xml,sources.pdf].filter(Boolean).join(' + ');}
 export function copyOrigin(r:LabOrigin):LabOrigin{return {id:r.id,bericht:r.bericht,labor:r.labor,auftragsreferenz:r.auftragsreferenz,...(r.batch!==undefined?{batch:r.batch}:{}),...(r.vorlaeufig===true?{vorlaeufig:true as const}:{}),sources:{...(r.sources.xml!==undefined?{xml:r.sources.xml}:{}),...(r.sources.pdf!==undefined?{pdf:r.sources.pdf}:{})}};}
 /** Prüfberichte, auf die Proben im Projekt verweisen (Marker und „Noch zu platzieren“). Ersetzte Berichte zählen nicht. */

@@ -2,7 +2,7 @@
 // LabelKit-Probenerfassung auch über „Andere Datei …“ (JSON), Legende „Probenarten“ im Export.
 import * as pk from './pk-ui.mjs';
 import {chromium,webkit,savedProject,openExport,closeExport} from './runtime.mjs';
-import {labXML} from './lab-fixtures.mjs';
+import {labXML,labRows} from './lab-fixtures.mjs';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
@@ -47,7 +47,10 @@ for(const engine of ['chromium','webkit']){
    assert.match(await page.locator('.marker-row',{hasText:'P2'}).textContent(),/Probenahmestelle · Chlorid/);
   });
   await check(`${engine}: Laborbericht ergänzt die Proben – Probenart/Form aus LabelKit bleibt (platziert und offen)`,async()=>{
-   await page.locator('#lab-files').setInputFiles({name:'AR-999.xml',mimeType:'application/xml',buffer:Buffer.from(labXML())});await page.locator('#lab-review').waitFor();
+   // Prüfbericht mit denselben Beschreibungen wie LabelKit (wie Eurofins sie übernimmt) – sonst lässt der Sammelknopf die Zeilen aus (B4, 2.6.0)
+   const vorher=await savedProject(page),descVon=l=>{const m=vorher.markers.find(x=>x.label===l);return m?m.lab.desc:vorher.pending.find(r=>r.label===l).desc;};
+   await page.locator('#lab-files').setInputFiles({name:'AR-999.xml',mimeType:'application/xml',buffer:Buffer.from(labXML(labRows.map(r=>['P1','P2','P3'].includes(r.label)?{...r,desc:descVon(r.label)}:r)))});await page.locator('#lab-review').waitFor();
+   assert.equal(await page.locator('[data-lab-row].lab-desc-anders').count(),0,'gleiche Beschreibung: keine gelbe Zeile');
    await page.locator('#lab-update-all:visible').click();await page.locator('#lab-confirm:enabled').click();await page.locator('#lab-review').waitFor({state:'hidden'});
    let p=await savedProject(page);assert.ok(byLabel(p,'P2').lab.labNr,'P2 hat Labordaten');assert.equal(byLabel(p,'P2').shape,'square');assert.equal(p.pending.find(r=>r.label==='P3').typ,'Asbest');
    await page.locator('[data-plabel]',{hasText:'P3'}).click();await tap(page,.6,.3);await page.waitForTimeout(150);
