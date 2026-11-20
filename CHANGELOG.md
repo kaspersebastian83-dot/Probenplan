@@ -1,5 +1,13 @@
 # Änderungen
 
+## 2.6.1 – 20. November 2026 · Raumkürzel KIZ/TRH in Bohrkern-IDs (Audit Lauf 4, D14)
+
+Plan: `claude/spektron-audit-2026-11-4-text-plan.md` im Spektron-Projekt (PR 6, Schritt 2 von 5). Folgt AidKit-Handbuch 0.31.0 (`konventionen.js`).
+
+- **Wandansichten:** Die Raumliste für den Raumnamen über einer Wand (wenn LabelKit keinen Raum/Ort hat) kennt jetzt **KIZ** (Kinderzimmer) und **TRH** (Treppenhaus). Die früheren **KZ** und **TH** bleiben gültig (`RAEUME_ALT`) – alte LabelKit-Dateien zeigen weiter „Kinderzimmer“ bzw. „Treppenhaus“, nichts wird umgeschrieben. Kern-IDs bleiben in Großbuchstaben (`EG-KiZ-…` ist weiter keine gültige ID).
+- Kein Dateiformat geändert; der `.probenplan` speichert keine Wandansichten.
+- Tests: `wandansicht.mjs` – Wände aus alten IDs mit KZ und TH und aus neuen mit KIZ und TRH zeigen den Raumnamen.
+
 ## 2.6.0 – 20. November 2026 · Ersetzen mit anderer Beschreibung, Projektnummer neben einem Datum (Audit Lauf 2)
 
 Plan: `claude/spektron-audit-2026-11-2-bericht-plan.md` im Spektron-Projekt (PR 5; Befunde B3, B4, B14).

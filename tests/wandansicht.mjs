@@ -31,6 +31,13 @@ check('Gruppierung: Wände, Boden, Freimessung getrennt, Referenz, ohne ID gemel
  assert.deepEqual(st.waende[0].kerne[0].segmente[2].werte,[],'Rückstellprobe ohne Werte, auch wenn der Plan welche hätte');
  assert.deepEqual(st.parameter,[C40,C22]);
 });
+check('Raumkürzel: KIZ/TRH neu, alte IDs mit KZ und TH zeigen weiter den Raumnamen (Audit Lauf 4, D14)',()=>{
+ const ohneOrt=(nr,id)=>({_nr:nr,matrix:'Bohrkern',bkId:id});
+ const st=W.wandStand({sonstigeProben:[ohneOrt(1,'EG-KZ2-B-7-T1'),ohneOrt(2,'EG-TH-A-3-T1'),ohneOrt(3,'1OG-KIZ-C-1-T1'),ohneOrt(4,'1OG-TRH-D-5-T1'),ohneOrt(5,'EG-KiZ-B-7-T1')]},projekt(false));
+ assert.deepEqual(st.waende.map(w=>[w.key,w.raum]),[['EG-KZ2-B','Kinderzimmer 2'],['EG-TH-A','Treppenhaus'],['1OG-KIZ-C','Kinderzimmer'],['1OG-TRH-D','Treppenhaus']]);
+ assert.deepEqual(st.ohneId,['P5'],'Kern-IDs nur in Großbuchstaben');
+ assert.equal(W.raumName('KZ'),'Kinderzimmer');assert.equal(W.raumName('KIZ'),'Kinderzimmer');assert.equal(W.raumName('TH'),'Treppenhaus');assert.equal(W.raumName('TRH'),'Treppenhaus');
+});
 check('Lage: gemessen, Raster, außerhalb, Boden',()=>{
  const st=W.wandStand(daten,projekt(true)),[b,bo,kz]=st.waende;
  assert.equal(W.lageText(b,b.kerne[0]),'0,60 m von links, 0,30 m über OKFF');
