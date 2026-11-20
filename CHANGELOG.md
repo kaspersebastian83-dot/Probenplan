@@ -5,8 +5,9 @@
 Plan: `claude/spektron-audit-2026-11-4-text-plan.md` im Spektron-Projekt (PR 6, Schritt 2 von 5). Folgt AidKit-Handbuch 0.31.0 (`konventionen.js`).
 
 - **Wandansichten:** Die Raumliste für den Raumnamen über einer Wand (wenn LabelKit keinen Raum/Ort hat) kennt jetzt **KIZ** (Kinderzimmer) und **TRH** (Treppenhaus). Die früheren **KZ** und **TH** bleiben gültig (`RAEUME_ALT`) – alte LabelKit-Dateien zeigen weiter „Kinderzimmer“ bzw. „Treppenhaus“, nichts wird umgeschrieben. Kern-IDs bleiben in Großbuchstaben (`EG-KiZ-…` ist weiter keine gültige ID).
+- **Alte und neue Kerne derselben Wand** (z. B. `EG-KZ-B-7` und `EG-KIZ-B-8` in einer Datei) stehen in **einer** Wandansicht: gruppiert wird nach der neuen Schreibweise. Die Kern-IDs in Zeichnung, Tabelle und CSV bleiben, wie LabelKit sie hat; die Wandkennung (z. B. im Word-Bildtext) kommt vom ersten Kern – reine Altdateien sehen genau aus wie bisher.
 - Kein Dateiformat geändert; der `.probenplan` speichert keine Wandansichten.
-- Tests: `wandansicht.mjs` – Wände aus alten IDs mit KZ und TH und aus neuen mit KIZ und TRH zeigen den Raumnamen.
+- Tests: `wandansicht.mjs` – Wände aus alten IDs mit KZ und TH und aus neuen mit KIZ und TRH zeigen den Raumnamen; gemischt alt/neu ergibt eine Wand je Raum und Fläche.
 
 ## 2.6.0 – 20. November 2026 · Ersetzen mit anderer Beschreibung, Projektnummer neben einem Datum (Audit Lauf 2)
 

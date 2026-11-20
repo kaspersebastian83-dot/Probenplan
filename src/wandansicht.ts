@@ -11,9 +11,11 @@ import {fromShared,labQualifier,labNumber,rangeText,rate,scaleFor,scaleKey,short
 const MUSTER=/^(F-)?(?:(REF)-(\d{1,2})|(KG|UG|EG|[1-9]OG|DG)-([A-Z]{2,3})([1-9]?)-([A-H]|BO|DE)-([1-9]\d?)([a-z]?))(?:-T([1-9]))?$/;
 const GESCHOSSE:[string,string][]=[['KG','Kellergeschoss'],['UG','Untergeschoss'],['EG','Erdgeschoss'],['1OG','1. Obergeschoss'],['2OG','2. Obergeschoss'],['3OG','3. Obergeschoss'],['DG','Dachgeschoss']];
 const RAEUME:[string,string][]=[['WZ','Wohnzimmer'],['SZ','Schlafzimmer'],['KIZ','Kinderzimmer'],['AZ','Arbeitszimmer'],['GZ','Gästezimmer'],['EZ','Esszimmer'],['KUE','Küche'],['BA','Bad'],['WC','Gäste-WC'],['FL','Flur, Diele'],['TRH','Treppenhaus'],['HWR','Hauswirtschaftsraum'],['HK','Heizungskeller, Heizraum'],['TR','Tankraum'],['KE','Kellerraum'],['AR','Abstellraum'],['GA','Garage'],['BU','Büro'],['LA','Lager'],['WS','Werkstatt']];
-/** Frühere Schreibweisen wie AidKit `RAEUME_ALT` (Audit Lauf 4, D14): Kern-IDs mit KZ/TH bleiben gültig und zeigen weiter den Raumnamen. */
-const RAEUME_ALT:[string,string][]=[['KZ','Kinderzimmer'],['TH','Treppenhaus']];
+/** Frühere Schreibweisen wie AidKit `RAEUME_ALT` [alt, Raum, neu] (Audit Lauf 4, D14): Kern-IDs mit KZ/TH bleiben gültig und zeigen weiter den Raumnamen.
+    Gruppiert wird nach der neuen Schreibweise – alte und neue Kerne derselben Wand landen in einer Wandansicht; Kern-IDs und Wandkennung (`key`, wie beim ersten Kern) bleiben, wie sie sind. */
+const RAEUME_ALT:[string,string,string][]=[['KZ','Kinderzimmer','KIZ'],['TH','Treppenhaus','TRH']];
 export const raumName=(k:string)=>(RAEUME.find(r=>r[0]===k)||RAEUME_ALT.find(r=>r[0]===k)||[])[1];
+export const raumNeu=(k:string)=>RAEUME_ALT.find(r=>r[0]===k)?.[2]||k;
 const FLAECHEN=['A','B','C','D','E','F','G','H','BO','DE'];
 const RASTER:Record<number,string>={1:'deckennah links',2:'deckennah Mitte',3:'deckennah rechts',4:'Mitte links',5:'Mitte',6:'Mitte rechts',7:'bodennah links',8:'bodennah Mitte',9:'bodennah rechts'};
 const RASTER_BODEN:Record<number,string>={1:'Ecke A/D',2:'an Wand A, Mitte',3:'Ecke A/B',4:'an Wand D, Mitte',5:'Raummitte',6:'an Wand B, Mitte',7:'Ecke C/D',8:'an Wand C, Mitte',9:'Ecke B/C'};
@@ -50,8 +52,8 @@ export function wandStand(daten:unknown,p:Project):WandStand{
     let kern:WandKern|undefined;
     if(m[2]){kern=referenz.get(kernId)||neuKern(m[3],Number(m[3]));referenz.set(kernId,kern);}
     else{
-      const key=`${m[1]||''}${m[4]}-${m[5]}${m[6]}-${m[7]}`;let wand=waende.get(key);
-      if(!wand){const z2=t(s.z2).replace(new RegExp(`^${m[4]}\\s+`),'');wand={key,frei:!!m[1],geschoss:m[4],raumCode:`${m[5]}${m[6]}`,raum:z2||[raumName(m[5])||m[5],m[6]].filter(Boolean).join(' '),flaeche:m[7],laenge:null,hoehe:null,kerne:[]};waende.set(key,wand);}
+      const code=`${m[5]}${m[6]}`,key=`${m[1]||''}${m[4]}-${code}-${m[7]}`,gruppe=`${m[1]||''}${m[4]}-${raumNeu(m[5])}${m[6]}-${m[7]}`;let wand=waende.get(gruppe);
+      if(!wand){const z2=t(s.z2).replace(new RegExp(`^${m[4]}\\s+`),'');wand={key,frei:!!m[1],geschoss:m[4],raumCode:code,raum:z2||[raumName(m[5])||m[5],m[6]].filter(Boolean).join(' '),flaeche:m[7],laenge:null,hoehe:null,kerne:[]};waende.set(gruppe,wand);}
       wand.laenge??=zahl(s.bkWandL);wand.hoehe??=zahl(s.bkWandH);
       const punkt=`${m[8]}${m[9]}`;kern=wand.kerne.find(k=>k.kern===kernId);if(!kern){kern=neuKern(punkt,Number(m[8]));wand.kerne.push(kern);}
     }
