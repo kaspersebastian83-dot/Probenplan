@@ -1,9 +1,10 @@
-// Kopien in PlanKit gegen ihre Originale (Audit 2026-11 Lauf 5, E4 #7/#8/#9/#11/#13/#15/#16). Vorher prüfte das niemand –
+// Kopien in PlanKit gegen ihre Originale (Audit 2026-11 Lauf 5, E4 #7/#8/#9/#11/#13/#14/#15/#16). Vorher prüfte das niemand –
 // eine Änderung am Original fiel in PlanKit nicht auf.
 //   #7/#8  Bewertungskern (labNumber, labQualifier, vdsScale, KORROSION-CHLORID v2)  src/results.ts  ↔ ResultKit src/bewertung.ts (wörtlich)
 //   #9     SPEKTRON-SKALEN                                                          src/skalen-archiv.js ↔ ResultKit src/skalen-archiv.js (Byte für Byte)
 //   #11    Beschreibungsvergleich (BESCHREIBUNG)                                    src/lab-provenance.ts ↔ ResultKit src/ergebnisse.ts (gleiche Ergebnisse)
 //   #13    Raumkürzel und Kern-ID (RAEUME, RAEUME_ALT, MUSTER)                       src/wandansicht.ts ↔ AidKit konventionen.js
+//   #14    SPEKTRON-ORDNERNAME v1 (leseProjektordner)                               src/folder.ts ↔ Projektzentrale index.html (gleiche Ergebnisse)
 //   #15    Word-Schreiber DOCX                                                      src/docx.ts ↔ Projektzentrale index.html DOCX-START…DOCX-ENDE (gleiche Bytes)
 //   #16    F7-READER (_Projekt.json lesen)                                           src/project-data.js ↔ LabelKit index.html (wörtlich)
 // Die Originale liegen daneben (../resultkit, ../aidkit, ../projektzentrale, ../labelkit). In der CI Pflicht (KOPIEN_PFLICHT=1), sonst SKIP je Original.
@@ -54,6 +55,26 @@ await ok('#13 Raumkürzel und Kern-ID wie AidKit (konventionen.js)',neben('aidki
  const muster=/const MUSTER=(\/.*\/[a-z]*);\n/.exec(t);assert.ok(muster,'MUSTER in wandansicht.ts');
  const ak=/const MUSTER = (\/.*\/[a-z]*);\n/.exec(lies(neben('aidkit','konventionen.js')));assert.ok(ak,'MUSTER in konventionen.js');
  assert.equal(muster[1],ak[1],'MUSTER');
+});
+await ok('#14 SPEKTRON-ORDNERNAME gleich wie die Projektzentrale',neben('projektzentrale','index.html'),async()=>{
+ const html=lies(neben('projektzentrale','index.html')),i=html.indexOf('const PROJ_RE'),j=html.indexOf('/* SPEKTRON-ORDNERNAME-ENDE */');
+ assert.ok(i>0&&j>i&&html.indexOf('/* SPEKTRON-ORDNERNAME v1',i)<j,'Projektzentrale index.html: Block SPEKTRON-ORDNERNAME');
+ const ctx={};vm.runInNewContext(html.slice(i,j)+'\nthis.lese=leseProjektordner;',ctx);
+ const {leseProjektordner}=await import('../src/folder.ts');
+ const teil=r=>json(r?{nr:r.nr,ort:r.ort,kuerzel:r.kuerzel,hinweis:r.hinweis}:null);  // PlanKit gibt keinen Sortierschlüssel zurück
+ const ON_PERSONEN=[
+  [{ordnerKuerzel:'Abc',name:'Anna Beispiel'},{ordnerKuerzel:'Dr. Te',name:'Dr. Tea Test'},{ordnerKuerzel:'Xy',name:'Xaver Ypsilon',aktiv:false},{ordnerKuerzel:'Van der Ab'}],
+  [{ordnerKuerzel:'ABC'}],[null,{ordnerKuerzel:'  Abc  '}],[{name:'ohne Kürzel'}],[],null];
+ const ON_NAMEN=['26.0123 Musterstadt Abc','26.0123 Musterstadt abc','26.0123 Musterstadt ABC','26.0123 Musterstraße 5 Musterstadt Abc','26.0123_Musterstadt_Abc','26.0123-Musterstadt-Abc',
+  '26.0123 Musterstadt Dr. Te','26.0123 Musterstadt Dr.Te','26.0123 Musterstadt dr te','26.0123 Musterstadt Dr Te','26.0123 Musterstadt Te','26.0123 Musterstadt Xy',
+  '26.0123 Musterstadt Van der Ab','26.0123 Musterstadt van der ab','26.0123 Musterstadt der Ab','26.0123 Abc','26.0123 Dr. Te','26.0123','26.0123 ','  26.0123 Musterstadt Abc  ',
+  '26.0123 Musterstadt','26.0123 Musterstadt Abcd','26.0123 Musterstadt Abc.','26.0123 Musterstadt .','26.0123 Musterstadt - Abc','26.0123 Musterstadt Abc -','26.0123 Musterstadt\tAbc',
+  '26.0123 Münster Abc','26.0123 Münster Abc','26.12 Ort Abc','26.123456 Ort Abc','26.1234567 Ort Abc','2026.0123 Ort Abc','26.0123Ort Abc','26,0123 Ort Abc','6.0123 Ort',
+  'Mosaik Archivordner','_Rückmeldungen','Fotos','2026 Altprojekte','',' ','26.0123 Ort Abc','26.0001 A','25.9999 B Abc'];
+ let m=0;
+ for(const liste of ON_PERSONEN)for(const name of ON_NAMEN){assert.deepEqual(teil(leseProjektordner(name,liste)),teil(ctx.lese(name,liste)),`leseProjektordner(${JSON.stringify(name)}, ${JSON.stringify(liste)})`);m++;}
+ assert.equal(teil(ctx.lese('26.0123 Musterstadt Dr. Te',ON_PERSONEN[0])).kuerzel,'Dr. Te','Gegenprobe: die Fälle treffen auch Kürzel');
+ console.log(`   ${m} Fälle`);
 });
 await ok('#15 Word-Schreiber: gleiche Bytes wie die Projektzentrale (DOCX)',neben('projektzentrale','index.html'),async()=>{
  const html=lies(neben('projektzentrale','index.html')),code=block(html,'/* DOCX-START */','/* DOCX-ENDE */','Projektzentrale DOCX');
