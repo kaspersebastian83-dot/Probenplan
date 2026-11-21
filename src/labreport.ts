@@ -103,7 +103,8 @@ export function reportWarnings(report:LabReport,p?:Project){
  const warnings=[...report.warnings];if(report.vorlaeufig)warnings.push(`Vorläufiger Prüfbericht${report.bericht?` ${report.bericht}`:''}: Die Werte können sich mit dem endgültigen Bericht noch ändern. Sie werden in Ergebniskarte, Raumbuch und Anlagen als vorläufig gekennzeichnet.`);if(report.expected!==null&&report.rows.length!==report.expected)warnings.push(`${report.rows.length} Proben erkannt/bearbeitet; laut Bericht ${report.expected}.`);
  const duplicate=(values:string[])=>values.filter((v,i)=>v&&values.indexOf(v)!==i);for(const ref of new Set(duplicate(report.rows.map(r=>norm(r.ref)))))warnings.push(`Doppelte Probenreferenz: ${report.rows.find(r=>norm(r.ref)===ref)!.ref}.`);for(const label of new Set(duplicate(report.rows.map(r=>r.label.toUpperCase()))))warnings.push(`Doppelte P-Nummer: ${label}.`);
  // B3 (Audit Lauf 2): PROJEKTNUMMER v1 – ein Datum („18.11.2026“) ist nie eine Nummer; stehen mehrere da, gilt die der Gutachtennummer
- const eigene=projektnummerIn(p?.report||''),inRef=projektnummerIn(report.auftragsreferenz,eigene);if(p?.report&&report.auftragsreferenz&&eigene!==inRef&&p.report!==report.auftragsreferenz)warnings.push(`Auftragsreferenz „${report.auftragsreferenz}“ passt möglicherweise nicht zur Gutachtennummer „${p.report}“.`);
+ // E11 (Audit Lauf 5): Referenz ganz ohne Projektnummer → kein Hinweis mehr hier; den zeigt ResultKit, wo die Berichte geprüft werden (ResultKit 2.6.1)
+ const eigene=projektnummerIn(p?.report||''),inRef=projektnummerIn(report.auftragsreferenz,eigene);if(p?.report&&report.auftragsreferenz&&inRef&&eigene!==inRef&&p.report!==report.auftragsreferenz)warnings.push(`Auftragsreferenz „${report.auftragsreferenz}“ passt möglicherweise nicht zur Gutachtennummer „${p.report}“.`);
  return [...new Set(warnings)];
 }
 // Ignore layout whitespace / Unicode hyphens, but retain ID punctuation and leading zeros.

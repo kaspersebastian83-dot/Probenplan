@@ -24,7 +24,8 @@ ok('B3: Datum ist keine Projektnummer, bei mehreren gilt die des Projekts',()=>{
  assert.equal(warnt('25.0100','26.0604'),true,'fremde Nummer');
  assert.equal(warnt('Ortstermin 18.11.2026 / 25.0100','26.0604'),true);
  assert.equal(warnt('26.0604','26.0604'),false);
- assert.equal(warnt('Ortstermin 18.11.2026','26.0604'),true,'ohne Nummer wie bisher ein Hinweis');
+ assert.equal(warnt('Ortstermin 18.11.2026','26.0604'),false,'ohne Nummer kein Hinweis mehr – den zeigt ResultKit (Audit Lauf 5, E11)');
+ assert.equal(warnt('Brandschaden Musterort','26.0604'),false,'E11');
  assert.equal(warnt('18.11.2026',''),false,'ohne Gutachtennummer kein Hinweis');
  assert.equal(projektnummerIn('Ortstermin 18.11.2026 / 26.0604'),'26.0604');assert.equal(projektnummerIn('18.11.26'),'');assert.equal(projektnummerIn('1.2026'),'');
 });

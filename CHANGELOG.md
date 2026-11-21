@@ -1,5 +1,13 @@
 # Änderungen
 
+## 2.6.2 – 21. November 2026 · Hinweis ohne Projektnummer nur noch in ResultKit, Veröffentlichen nach den Tests, Kopien geprüft (Audit Lauf 5)
+
+Plan: `claude/spektron-audit-2026-11-5-gesamt-plan.md` im Spektron-Projekt (PR 5). Nach ResultKit 2.6.1 (resultkit#38).
+
+- **E11 (Entscheidung 5):** Nennt die Auftragsreferenz eines Prüfberichts **gar keine** Projektnummer, zeigt PlanKit keinen Hinweis „passt möglicherweise nicht zur Gutachtennummer“ mehr – ResultKit 2.6.1 zeigt ihn dort, wo die Berichte geprüft werden (in Projekten kommen PlanKits Berichte nur noch aus ResultKit). Eine **fremde** Projektnummer meldet PlanKit weiter.
+- **Veröffentlichen nach den Tests:** `pages.yml` startet erst, wenn „Automated tests“ für genau diesen Stand von `main` grün ist (`workflow_run`, Checkout `head_sha`; wie ResultKit 2.6.1). Von Hand weiter jederzeit. Die Tests liefen schon seit B14 auch auf `main`, aber die Seite ging trotzdem sofort live.
+- **Kopien (E4 #7/#8/#9/#11/#13/#15/#16):** neu `tests/kopien.mjs` – Bewertungskern (`results.ts`) wörtlich wie ResultKit `bewertung.ts`; `skalen-archiv.js` Byte für Byte wie ResultKit; Beschreibungsvergleich mit 1 296 Fällen wie ResultKit (`audit2.mjs` verglich nur `beschreibungWeichtAb` an wenigen Paaren); `RAEUME`, `RAEUME_ALT`, `MUSTER` wie AidKit `konventionen.js`; Word-Schreiber `docx.ts` erzeugt für drei Dokumente dieselben Bytes wie die Projektzentrale; F7-READER wörtlich wie LabelKit. Die CI holt dafür auch AidKit und LabelKit daneben (`KOPIEN_PFLICHT`).
+
 ## 2.6.1 – 20. November 2026 · Raumkürzel KIZ/TRH in Bohrkern-IDs (Audit Lauf 4, D14)
 
 Plan: `claude/spektron-audit-2026-11-4-text-plan.md` im Spektron-Projekt (PR 6, Schritt 2 von 5). Folgt AidKit-Handbuch 0.31.0 (`konventionen.js`).
