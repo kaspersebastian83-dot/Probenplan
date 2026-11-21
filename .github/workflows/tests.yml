@@ -38,6 +38,18 @@ jobs:
         env:
           ZWEIG: ${{ github.head_ref }}
         run: git clone --quiet --depth 1 --branch "$ZWEIG" https://github.com/kaspersebastian83-dot/resultkit.git ../resultkit 2>/dev/null || git clone --quiet --depth 1 https://github.com/kaspersebastian83-dot/resultkit.git ../resultkit
+      - name: AidKit und LabelKit daneben holen (Raumkürzel/Kern-ID und F7-READER gleich halten)
+        env:
+          ZWEIG: ${{ github.head_ref }}
+        run: |
+          for repo in aidkit labelkit; do
+            git clone --quiet --depth 1 --branch "$ZWEIG" "https://github.com/kaspersebastian83-dot/$repo.git" "../$repo" 2>/dev/null \
+              || git clone --quiet --depth 1 "https://github.com/kaspersebastian83-dot/$repo.git" "../$repo"
+          done
+      - name: Kopien gegen ResultKit, AidKit, Projektzentrale und LabelKit (E4)
+        run: node tests/kopien.mjs
+        env:
+          KOPIEN_PFLICHT: '1'
       - run: node tests/export-name.mjs
       - run: node tests/spektron-ordner.cjs
         env:
