@@ -1,5 +1,15 @@
 # Änderungen
 
+## 2.6.3 – 26. November 2026 · Anlage Probenahme: Fotos in Unterordnern von „Fotos“ (vor FotoKit 2.7.0)
+
+Plan: `claude/fotokit-ortstermine-plan.md` (4.3) und `claude/fotokit-ortstermine-entscheidungen.md` (O2, O3, O10) im Spektron-Projekt, Schritt 2.
+
+- **Foto über den Weg:** FotoKit 2.7.0 wird Fotos in Unterordnern von `Fotos/` unter dem Schlüssel „Unterordner/Datei“ führen (`bilder["Bilder A/IMG_0001.jpg"]`, eine Ebene, „/“ als Trenner). PlanKit liest ein solches Foto jetzt erst im Unterordner, dann die Datei (`annex-run.ts`, `fotoDatei`). Ein Schlüssel ohne „/“ ist wie bisher eine Datei direkt in `Fotos/`. In der Anlage steht als Dateiname der Schlüssel (z. B. „Bilder A/IMG_0001.jpg“), gleiche Dateinamen in zwei Ordnern sind zwei Fotos.
+- **Nur eine Ebene:** Ein Ordnerteil, der leer ist, „..“ heißt oder mit „_“ oder „.“ beginnt, und tiefere Wege werden nicht gelesen – das Foto gilt als „fehlt“.
+- **Kein Abbruch mehr:** Bisher brach die ganze Anlage mit „Failed to execute 'getFileHandle' … Name is not allowed.“ ab, sobald ein Schlüssel mit „/“ eine Probe trug (nachgestellt auf 2.6.2). Jetzt wird jeder Fehler beim Lesen eines Fotos (Unterordner fehlt, Name nicht erlaubt, Datei nicht lesbar) je Foto abgefangen: das Foto steht im Prüfprotokoll unter „Fotos in FotoKit erfasst, aber nicht im Ordner „Fotos““, die Anlage wird erstellt.
+- Ohne Unterordner-Fotos ändert sich nichts. Kein Dateiformat geändert, `_Bildumbenenner.json` wird nur gelesen.
+- Tests: neu `tests/anlage-unterordner.mjs` (Chromium, erfundene Daten) – Foto direkt, in „Bilder A“ und gleichnamig in „Bilder B“ (zwei Prüfsummen), dazu ein fehlendes Foto und sechs Wege, die nicht gelesen werden dürfen, obwohl dort eine Datei liegt (`_aussortiert/…`, `.versteckt/…`, `../…`, `Bilder A/Tiefer/…`, `/…`, `Bilder A/`).
+
 ## 2.6.2 – 21. November 2026 · Hinweis ohne Projektnummer nur noch in ResultKit, Veröffentlichen nach den Tests, Kopien geprüft (Audit Lauf 5)
 
 Plan: `claude/spektron-audit-2026-11-5-gesamt-plan.md` im Spektron-Projekt (PR 5). Nach ResultKit 2.6.1 (resultkit#38).

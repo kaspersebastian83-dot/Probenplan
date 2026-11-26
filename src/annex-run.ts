@@ -53,6 +53,14 @@ async function excerpts(p:Project,o:AnnexOptions,samples:AnnexSample[]){
 }
 
 interface FotoKitImage {beschreibung?:string;abschnitt?:string;probe?:string;drehung?:number;aussortiert?:boolean;original?:{name?:string;aufnahme?:string};sha256?:{wert?:string}}
+/** Foto über seinen FotoKit-Schlüssel lesen (FotoKit ab 2.7.0, O2/O3): „Datei“ direkt in „Fotos“ oder „Unterordner/Datei“ –
+ *  genau eine Ebene, „/“ als Trenner. Ein Ordnerteil, der leer ist, „..“ heißt oder mit „_“ oder „.“ beginnt, wird nicht gelesen
+ *  (null = fehlt). Ein nicht gefundener Unterordner wirft NotFoundError wie getFileHandle. */
+async function fotoDatei(fotos:Dir,schluessel:string):Promise<File|null>{
+  const teile=schluessel.split('/');if(teile.length===1)return fileInfo(fotos,schluessel);
+  const [ordner,datei]=teile;if(teile.length!==2||!ordner||ordner==='..'||/^[_.]/.test(ordner))return null;
+  return fileInfo(await fotos.getDirectoryHandle(ordner) as Dir,datei);
+}
 /** Fotos mit Probe-Nr. aus FotoKit: Datei lesen, Prüfsumme neu berechnen und mit FotoKit vergleichen, für die Anlage verkleinern. */
 async function photos(f:ProjectFolder,o:AnnexOptions,samples:AnnexSample[],sources:AnnexSource[],bk?:Map<string,string[]>):Promise<AnnexPhoto[]|null>{
   const dir=await findSubdir(f.dir,FOTOS);if(!dir)return null;
@@ -66,9 +74,11 @@ async function photos(f:ProjectFolder,o:AnnexOptions,samples:AnnexSample[],sourc
   const labels=new Set(samples.map(s=>s.label)),shownPer=new Map<string,number>(),out:AnnexPhoto[]=[];
   for(const [i,[name,v]] of entries.entries()){
     o.progress?.(`Foto ${i+1} von ${entries.length} wird geprüft …`);
-    const ls=photoLabels(String(v.probe),bk),file=await fileInfo(dir,name),stored=String(v.sha256?.wert||'').toLowerCase();
+    const ls=photoLabels(String(v.probe),bk),stored=String(v.sha256?.wert||'').toLowerCase();
+    // Fehler je Foto (Unterordner fehlt, Name nicht erlaubt, Datei nicht lesbar): das Foto gilt als „fehlt“, die Anlage läuft weiter
+    let file:File|null=null,digest='';try{file=await fotoDatei(dir,name);if(file)digest=(await fileRevision(file))||'';}catch{file=null;}
     const photo:AnnexPhoto={file:name,desc:String(v.beschreibung||'').trim(),section:String(v.abschnitt||'').trim(),taken:String(v.original?.aufnahme||'').trim(),sha:'',status:'missing',labels:ls,probe:String(v.probe).trim()};
-    if(file){photo.sha=(await fileRevision(file))||'';photo.status=!stored?'nohash':stored===photo.sha?'ok':'changed';
+    if(file){photo.sha=digest;photo.status=!stored?'nohash':stored===photo.sha?'ok':'changed';
       const wanted=ls.some(l=>labels.has(l)&&(shownPer.get(l)||0)<o.maxPhotos);
       if(wanted&&o.maxPhotos>0){try{photo.image=await shrink(file,Number(v.drehung)||0);ls.forEach(l=>shownPer.set(l,(shownPer.get(l)||0)+1));}catch{/* nicht lesbares Bildformat (z. B. HEIC): nur in der Liste */}}}
     out.push(photo);
