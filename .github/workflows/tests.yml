@@ -51,6 +51,8 @@ jobs:
         env:
           KOPIEN_PFLICHT: '1'
       - run: node tests/export-name.mjs
+      - name: Ortstermin je Probe (Regel, 2.7.0)
+        run: node tests/termine.mjs
       - run: node tests/spektron-ordner.cjs
         env:
           SPEKTRON_ORDNER_PFLICHT: '1'
@@ -70,6 +72,7 @@ jobs:
         run: pnpm test
         env:
           RESULTKIT_PFLICHT: '1'
+          PROJEKTZENTRALE_PFLICHT: '1'
       - name: Upload failure reports, screenshots and Playwright traces
         if: failure()
         uses: actions/upload-artifact@v4

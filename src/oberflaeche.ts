@@ -16,6 +16,7 @@ export interface PkHooks{
  showSheet(i:number):void; openSheetMenu(i:number):void; deselect(still?:boolean):void; selectedId():string|null;
  exportCard:HTMLDialogElement; dimensions():void; folderSupported():boolean;
  toast(text:string,error?:boolean):void;
+ /** 2.7.0: Termin-Wahl und gerechnete Zuordnung ('' bei einem Termin) – gehört zum „erledigt“ in ③ */terminStand?():string;
 }
 const $=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
 const h=<K extends keyof HTMLElementTagNameMap>(tag:K,attrs:Record<string,string>={},text=''):HTMLElementTagNameMap[K]=>{const e=document.createElement(tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);if(text)e.textContent=text;return e;};
@@ -254,7 +255,7 @@ export class Oberflaeche{
   const felder=['format','view','scope','quality','framed','values-export','annex-title','annex-photos','report','date'].map(id=>{const e=document.getElementById(id) as HTMLInputElement|null;return e?(e.type==='checkbox'?String(e.checked):e.value):'';});
   // je Plan in fester Reihenfolge (der aktive Plan steht in plan/markers/areas, die anderen in sheets) – ein Planwechsel ist keine Änderung
   const {plan,markers,areas,sheets,active,...rest}=p,ai=active??0,blaetter=(sheets||[{id:'',name:''}]).map((sh,i)=>i===ai?{...sh,plan,markers,areas}:sh);
-  return JSON.stringify([felder,this.hooks.folder(),JSON.stringify([rest,blaetter],(k,v)=>k==='data'&&typeof v==='string'?`${v.length}:${v.slice(-24)}`:v)]);
+  return JSON.stringify([felder,this.hooks.folder(),JSON.stringify([rest,blaetter],(k,v)=>k==='data'&&typeof v==='string'?`${v.length}:${v.slice(-24)}`:v),this.hooks.terminStand?.()||'']);
  }
 
  // ---- „Mehr …“ ----

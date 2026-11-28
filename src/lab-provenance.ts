@@ -1,4 +1,4 @@
-import {AUTO_PARAM,allAreas,allMarkers,clone,typeFromArt,shapeForType,type LabData,type LabOrigin,type LabSample,type LabSources,type Project,type Wert} from './model';
+import {AUTO_PARAM,GRAU,allAreas,allMarkers,clone,typeFromArt,shapeForType,type LabData,type LabOrigin,type LabSample,type LabSources,type Project,type Wert} from './model';
 import type {LabReport} from './labreport';
 
 const idPattern=/^[\w-]{1,80}$/;
@@ -22,7 +22,7 @@ export function sourceText(sources:LabSources){return [sources.xml,sources.pdf].
 export function copyOrigin(r:LabOrigin):LabOrigin{return {id:r.id,bericht:r.bericht,labor:r.labor,auftragsreferenz:r.auftragsreferenz,...(r.batch!==undefined?{batch:r.batch}:{}),...(r.vorlaeufig===true?{vorlaeufig:true as const}:{}),sources:{...(r.sources.xml!==undefined?{xml:r.sources.xml}:{}),...(r.sources.pdf!==undefined?{pdf:r.sources.pdf}:{})}};}
 /** Prüfberichte, auf die Proben im Projekt verweisen (Marker und „Noch zu platzieren“). Ersetzte Berichte zählen nicht. */
 export function verwendeteBerichte(p:Project):LabOrigin[]{
- const used=new Set<string>();for(const m of allMarkers(p))if(m.lab?.reportId)used.add(m.lab.reportId);for(const r of p.pending||[])if(r.reportId)used.add(r.reportId);
+ const used=new Set<string>();for(const m of allMarkers(p))if(!m[GRAU]&&m.lab?.reportId)used.add(m.lab.reportId);for(const r of p.pending||[])if(r.reportId)used.add(r.reportId);
  return (p.labReports||[]).filter(r=>used.has(r.id));
 }
 /** Vorläufige Prüfberichte, aus denen Werte im Projekt stammen (nur tatsächlich verwendete Herkunft). */
@@ -36,7 +36,7 @@ export function berichtQuellen(p:Project):{name:string;origin:LabOrigin}[]{
 /** Vorläufige Berichte nur für die Werte, die eine Planseite zeigt: Proben dieser Seite (p.markers) mit Wert für den dargestellten Parameter.
  *  Nicht platzierte Proben, andere Geschosse und andere Parameter zählen hier nicht. */
 export function vorlaeufigeBerichteAufPlan(p:Project,parameter:string):LabOrigin[]{
- const used=new Set<string>();for(const m of p.markers||[])if(m.lab?.reportId&&(!parameter||parameter===AUTO_PARAM||(m.lab.werte||[]).some(w=>w.p===parameter)))used.add(m.lab.reportId);
+ const used=new Set<string>();for(const m of p.markers||[])if(!m[GRAU]&&m.lab?.reportId&&(!parameter||parameter===AUTO_PARAM||(m.lab.werte||[]).some(w=>w.p===parameter)))used.add(m.lab.reportId);
  return (p.labReports||[]).filter(r=>r.vorlaeufig&&used.has(r.id));
 }
 export const vorlaeufigText=(rs:LabOrigin[])=>rs.length?`Werte aus vorläufigem Prüfbericht ${rs.map(r=>r.bericht||'(ohne Nummer)').join(', ')} – sie können sich mit dem endgültigen Bericht ändern.`:'';

@@ -450,3 +450,6 @@ label.pflicht-offen>input,label.pflicht-offen>select{border-color:#d9a400!import
 #trace-item-name{font-size:12px;font-weight:600}
 #trace-actions #trace-join[aria-pressed=true]{background:var(--kit-accent);color:#fff;border-color:var(--kit-accent)}
 
+/* 2.7.0: Ortstermin je Zeile (nur bei mehreren Ortsterminen) */
+.pl-termin{flex:none;margin-left:6px;font-size:11px;color:var(--kit-muted);white-space:nowrap}
+.pl-termin.ohne{color:#6b5400;background:#fff3c4;border-radius:4px;padding:0 4px;font-weight:600}

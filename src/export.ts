@@ -1,5 +1,6 @@
 import {labeled,shownSVG,ensureInk} from './labels';
-import {bounds, floorName, markerSize, shapeOf, typeOf, starPath, trialOn, FIRE_RED, SHAPES, SHAPE_NAMES, SURFACE_NAMES, TYPE_ORDER, type Project, type Shape, type Surface} from './model';
+import {bounds, floorName, markerSize, shapeOf, typeOf, starPath, trialOn, FIRE_RED, GRAU, GRAU_FARBE, SHAPES, SHAPE_NAMES, SURFACE_NAMES, TERMIN, TYPE_ORDER, type Project, type Shape, type Surface} from './model';
+import {grauText} from './termine';
 import {loadImage} from './import';
 import {planMatrix,preparation} from './preparation';
 import {areaAnchor,areaCategories,areaSVG,palette} from './areas';
@@ -13,7 +14,7 @@ interface LegendVariant {color:string;opacity:number;outline:string;dash:readonl
 /** Legende der Formen: mehrere Formen im Plan → je Form die Probenarten (aus LabelKit). Probe/Brandherd stehen fest in der Fußzeile. */
 const DEFAULT_TYPE:Record<Shape,string>={circle:'PAK',square:'Chlorid',diamond:'Asbest'};
 export function markerLegend(p:Project):{name:string;variants:LegendVariant[]}|null{
-  const samples=p.markers.filter(m=>m.kind==='sample');
+  const samples=p.markers.filter(m=>m.kind==='sample'&&!m[GRAU]);   // Termin-Ansicht: nur die Proben des Tages
   const used=SHAPES.filter(f=>samples.some(m=>shapeOf(m)===f));
   const variants:LegendVariant[]=[];
   if(used.length>1)for(const f of used){
@@ -21,6 +22,11 @@ export function markerLegend(p:Project):{name:string;variants:LegendVariant[]}|n
     variants.push({color:'#ffffff',opacity:1,outline:'#17665e',dash:[],round:false,shape:f,text:(types.length?types.join(', '):DEFAULT_TYPE[f])+` (${SHAPE_NAMES[f]})`});
   }
   return variants.length?{name:'Probenarten',variants}:null;
+}
+/** Termin-Ansicht „frühere grau“: eine Legendenzeile „grau: Proben vom 12.08.2026“ (nur wenn der Plan graue Proben zeigt). */
+function grauLegende(p:Project):{name:string;variants:LegendVariant[]}|null{
+  const text=grauText(p.markers.filter(m=>m.kind==='sample'&&m[GRAU]).map(m=>m[GRAU]!));
+  return text?{name:'',variants:[{color:'#ffffff',opacity:1,outline:GRAU_FARBE,dash:[],round:false,shape:'circle',text}]}:null;
 }
 function legendBlocks(p:Project,rated?:Rated|null){
   const blocks:{name:string;variants:LegendVariant[]}[]=[];
@@ -30,7 +36,8 @@ function legendBlocks(p:Project,rated?:Rated|null){
     if(rated.unrated.length)blocks.push({name:'Ohne Bewertung',variants:[{color:UNRATED,opacity:1,outline:'#1d2a33',dash:[],round:true,text:`${rated.unrated.join(', ')} – kein Wert für ${shortParameter(rated.parameter)} oder keine anwendbare Skala / Zahl nicht eindeutig`}]});
   }
   const ml=markerLegend(p);if(ml)blocks.push(ml);
-  if(p.plan.surfaceBars!==false){const used=(['ceiling','wall','floor'] as Surface[]).map(s=>({s,labels:p.markers.filter(m=>m.kind==='sample'&&m.surface===s).map(m=>m.label)})).filter(x=>x.labels.length);
+  const grau=grauLegende(p);if(grau)blocks.push(grau);
+  if(p.plan.surfaceBars!==false){const used=(['ceiling','wall','floor'] as Surface[]).map(s=>({s,labels:p.markers.filter(m=>m.kind==='sample'&&!m[GRAU]&&m.surface===s).map(m=>m.label)})).filter(x=>x.labels.length);
     if(used.length)blocks.push({name:'Oberflächenart',variants:used.map(x=>({color:'#5b6773',opacity:1,outline:'#5b6773',dash:[],round:true,surface:x.s,text:`${SURFACE_NAMES[x.s]}: ${x.labels.sort((a,b)=>a.localeCompare(b,'de',{numeric:true})).join(', ')}`}))});}
   for(const c of areaCategories(p.areas||[]))blocks.push({name:c.name,variants:c.variants.map(v=>{const pal=palette(v.color);return {color:v.color,opacity:v.opacity,outline:pal.outline,dash:pal.dash,round:false,text:`${v.labels.join(', ')} · ${Math.round(v.opacity*100)} %`};})});
   return blocks;
@@ -41,7 +48,7 @@ export function legendLayout(p:Project,width:number,fs:number,rated?:Rated|null)
   let y=fs*2.7;
   const entries=legendBlocks(p,rated).map(c=>{const lines=wrap(ctx,c.name,width),top=y;y+=lines.length*fs*1.35+fs*.35;
     const variants=c.variants.map(v=>{ctx.font=`${fs*.85}px Arial`;const ids=wrap(ctx,v.text,width-fs*3.2),top=y;y+=Math.max(fs*1.2,ids.length*fs*1.15)+fs*.4;ctx.font=`bold ${fs}px Arial`;return{...v,ids,top};});y+=fs*.8;return{...c,lines,top,variants};});
-  const kinds=[!!rated,!!markerLegend(p),!!p.areas?.length].filter(Boolean).length;
+  const kinds=[!!rated,!!markerLegend(p)||!!grauLegende(p),!!p.areas?.length].filter(Boolean).length;
   const title=kinds>1?'Legende':rated?'Ergebnisse':p.areas?.length?'Flächenkennzeichnung':'Legende';
   return {entries,height:y,fs,title};
 }
@@ -83,7 +90,7 @@ export function drawLegend(ctx:CanvasRenderingContext2D,legend:LegendLayout,x:nu
 }
 export function exportLayout(p:Project,longSide:number,rated?:Rated|null){
   p=labeled(p,rated);
-  const hasLegend=!!(p.areas?.length||markerLegend(p)||(rated&&(rated.groups.some(g=>g.scale)||rated.unrated.length||qualifierGroups(rated).length)));
+  const hasLegend=!!(p.areas?.length||markerLegend(p)||grauLegende(p)||(rated&&(rated.groups.some(g=>g.scale)||rated.unrated.length||qualifierGroups(rated).length)));
   const b=contentBounds(p),unit=Math.max(b.width,b.height),pad=unit*.028;
   const footer=unit*(hasLegend ? .14 : .12);
   let width=Math.max(b.width+2*pad,unit*.6),height=b.height+2*pad+footer;
@@ -112,7 +119,7 @@ export async function exportImage(p:Project,longSide:number,format:'png'|'jpeg',
     ctx.strokeStyle='#a8b1ac';ctx.lineWidth=fs*.05;ctx.beginPath();ctx.moveTo(l.pad,y);ctx.lineTo(l.planWidth-l.pad,y);ctx.stroke();
     ctx.fillStyle='#263b35';ctx.font=`bold ${fs*1.2}px Arial`;const floor=floorName(p),heading=rated?'ERGEBNISKARTE':'PROBENPLAN';ctx.fillText(floor?`${heading} · ${floor}`:heading,l.pad,y+fs*1.9,l.planWidth-2*l.pad);
     ctx.font=`${fs}px Arial`;
-    const meta=[p.report?`Gutachten ${p.report}`:'',p.date?`Datum ${p.date.split('-').reverse().join('.')}`:'',extra].filter(Boolean).join('  ·  ');
+    const meta=[p.report?`Gutachten ${p.report}`:'',p.date?`Datum ${p.date.split('-').reverse().join('.')}`:'',p[TERMIN]?.titel||'',extra].filter(Boolean).join('  ·  ');
     ctx.fillText(meta,l.pad,y+fs*3.5,l.planWidth-2*l.pad);
     const ly=y+fs*5.6,r=fs*.6;ctx.strokeStyle='#17665e';ctx.lineWidth=fs*.13;ctx.beginPath();ctx.arc(l.pad+r,ly,r,0,2*Math.PI);ctx.stroke();
     ctx.fillText('P · Probenahmestelle',l.pad+fs*2,ly+fs*.35);

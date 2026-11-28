@@ -7,6 +7,7 @@
 //   #14    SPEKTRON-ORDNERNAME v1 (leseProjektordner)                               src/folder.ts ↔ Projektzentrale index.html (gleiche Ergebnisse)
 //   #15    Word-Schreiber DOCX                                                      src/docx.ts ↔ Projektzentrale index.html DOCX-START…DOCX-ENDE (gleiche Bytes)
 //   #16    F7-READER (_Projekt.json lesen)                                           src/project-data.js ↔ LabelKit index.html (wörtlich)
+//   #17    Ortstermine des Projekts (2.7.0, nur lesen)                              src/ortstermine.js ↔ Projektzentrale ortstermine.js (Byte für Byte)
 // Die Originale liegen daneben (../resultkit, ../aidkit, ../projektzentrale, ../labelkit). In der CI Pflicht (KOPIEN_PFLICHT=1), sonst SKIP je Original.
 import assert from 'node:assert/strict';
 import {readFileSync,existsSync} from 'node:fs';
@@ -100,5 +101,8 @@ await ok('#15 Word-Schreiber: gleiche Bytes wie die Projektzentrale (DOCX)',nebe
 await ok('#16 F7-READER wörtlich wie LabelKit',neben('labelkit','index.html'),()=>{
  const a='/* F7-READER-START',b='/* F7-READER-ENDE */';
  assert.equal(block(lies(hier('src/project-data.js')),a,b,'PlanKit project-data.js'),block(lies(neben('labelkit','index.html')),a,b,'LabelKit index.html'),'F7-READER weicht von LabelKit ab');
+});
+await ok('#17 ortstermine.js Byte für Byte wie die Projektzentrale',neben('projektzentrale','ortstermine.js'),()=>{
+ assert.ok(readFileSync(hier('src/ortstermine.js')).equals(readFileSync(neben('projektzentrale','ortstermine.js'))),'src/ortstermine.js ≠ Projektzentrale ortstermine.js');
 });
 console.log(`${n} Kopien gleich${skip?`, ${skip} übersprungen`:''}`);
