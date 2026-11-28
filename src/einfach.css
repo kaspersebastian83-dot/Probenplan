@@ -257,3 +257,11 @@ body.pk2 dialog:modal{font-family:var(--sp-font)}
 @media print{#pk-fuss,#pk-oben,#pk-plaene,#pk-hinweis{display:none!important}}
 .pk-vergleich{flex-basis:100%;text-align:left;justify-self:start;width:max-content;max-width:100%}
 .pk-vergleich[hidden]{display:none}
+/* 2.7.0: Termin-Wahl (nur bei mehreren Ortsterminen) – ③ über „Darstellung“, ② über der Probenliste */
+.pk-termin{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:flex-end;margin:0 0 10px}
+.pk-termin[hidden],.pk-termin [hidden]{display:none}
+.pk-termin>label{display:flex;flex-direction:column;gap:2px;font-size:12px;font-weight:600;min-width:0}
+.pk-termin select{max-width:100%}
+.pk-termin>p{flex-basis:100%;margin:0}
+.pk-termin-2{padding:8px 10px;border:1px solid var(--sp-line2);border-radius:var(--sp-radius-k)}
+.pk-termin #termin-hinweise{flex-basis:100%;margin:2px 0 0;font-weight:500}

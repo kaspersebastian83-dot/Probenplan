@@ -1,7 +1,7 @@
 import {labeled} from './labels';
 // Druckblatt A4/A3: Plan in genormtem Maßstab, Legende, Nordpfeil, Maßstabsleiste und Schriftfeld.
 // Alle Maße in Millimetern; gerendert wird mit fester Auflösung, sodass 1 mm auf dem Blatt exakt stimmt.
-import {floorName,metersPerUnit,northAngle,starPath,FIRE_RED,type Project} from './model';
+import {floorName,metersPerUnit,northAngle,starPath,FIRE_RED,TERMIN,type Project} from './model';
 import {contentBounds,drawLegend,drawPlanContent,legendLayout,wrap} from './export';
 import {loadImage} from './import';
 import type {Rated} from './results';
@@ -134,9 +134,12 @@ export async function renderSheet(p:Project,layout:SheetLayout,rated:Rated|null|
     text(floor?`${heading} · ${floor}`:heading,T.x+PAD,y+6.6,4.2,{bold:true,max:T.w-2*PAD-vw});
     if(vorl)text('VORLÄUFIG',T.x+T.w-PAD,y+6.4,2.9,{bold:true,color:VORLAEUFIG_ROT,align:'right'});
     y+=10;ctx.beginPath();ctx.moveTo(T.x*k,y*k);ctx.lineTo((T.x+T.w)*k,y*k);ctx.stroke();
-    const field=(label:string,value:string,x:number,top:number,width:number)=>{text(label,x+PAD,top+2.5,1.9,{color:muted});ctx.font=`${2.8*k}px Arial`;const lines=wrap(ctx,value||'–',(width-2*PAD)*k);text(lines.length>1?`${lines[0].replace(/\s*\S*$/,'')} …`:lines[0],x+PAD,top+6,2.8,{max:width-2*PAD});};
+    const field=(label:string,value:string,x:number,top:number,width:number)=>{text(label,x+PAD,top+2.5,1.9,{color:muted,max:width-2*PAD});ctx.font=`${2.8*k}px Arial`;const lines=wrap(ctx,value||'–',(width-2*PAD)*k);text(lines.length>1?`${lines[0].replace(/\s*\S*$/,'')} …`:lines[0],x+PAD,top+6,2.8,{max:width-2*PAD});};
     const half=T.w/2,rowH=7;
-    field('Objekt',info.objekt,T.x,y,T.w);y+=rowH;ctx.beginPath();ctx.moveTo(T.x*k,y*k);ctx.lineTo((T.x+T.w)*k,y*k);ctx.moveTo((T.x+half)*k,y*k);ctx.lineTo((T.x+half)*k,(T.y+T.h)*k);ctx.stroke();
+    // Termin-Ansicht (2.7.0): Objekt und Ortstermin teilen sich die Zeile; ein Termin: wie bisher die ganze Zeile fürs Objekt
+    const termin=p[TERMIN],tw=T.w*.45;
+    if(termin?.wert){field('Objekt',info.objekt,T.x,y,T.w-tw);field(termin.feld,termin.wert,T.x+T.w-tw,y,tw);ctx.beginPath();ctx.moveTo((T.x+T.w-tw)*k,y*k);ctx.lineTo((T.x+T.w-tw)*k,(y+rowH)*k);ctx.stroke();}
+    else field('Objekt',info.objekt,T.x,y,T.w);y+=rowH;ctx.beginPath();ctx.moveTo(T.x*k,y*k);ctx.lineTo((T.x+T.w)*k,y*k);ctx.moveTo((T.x+half)*k,y*k);ctx.lineTo((T.x+half)*k,(T.y+T.h)*k);ctx.stroke();
     field('Gutachten-Nr.',p.report,T.x,y,half);field('Datum',p.date?p.date.split('-').reverse().join('.'):'',T.x+half,y,half);y+=rowH;ctx.beginPath();ctx.moveTo(T.x*k,y*k);ctx.lineTo((T.x+T.w)*k,y*k);ctx.stroke();
     field('Maßstab',L.ratio?`M 1:${L.ratio.toLocaleString('de-DE')}${L.paper==='bild'?' (bei A4)':''}`:'ohne (nicht kalibriert)',T.x,y,half);
     field('Blatt',L.paper==='anlage'?`Anlage${info.pages>1?` · Plan ${info.page}/${info.pages}`:''}`:L.paper==='bild'?`Bild${info.pages>1?` · Plan ${info.page}/${info.pages}`:''}`:`${PAPERS[L.paper].label} ${L.landscape?'quer':'hoch'}${info.pages>1?` · ${info.page}/${info.pages}`:''}`,T.x+half,y,half);

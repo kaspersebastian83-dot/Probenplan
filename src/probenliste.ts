@@ -7,7 +7,7 @@ import {raumVergleich,raumVon,type RaumRef} from './weiter';
 
 export type Filter='offen'|'platziert'|'alle';
 export type ZeilenArt='offen'|'platziert'|'weitere';
-export interface Zeile{art:ZeilenArt;label:string;/** Marker-ID, bei offenen Proben leer */id:string;/** Plan (Index), bei offenen Proben −1 */sheet:number;raum:RaumRef;titel:string;probenart:string;shape:Shape;fire:boolean;wert:string;suche:string}
+export interface Zeile{/** Probenahmedatum (für den Termin, ab 2.7.0) */datum?:string;vonHand?:boolean;art:ZeilenArt;label:string;/** Marker-ID, bei offenen Proben leer */id:string;/** Plan (Index), bei offenen Proben −1 */sheet:number;raum:RaumRef;titel:string;probenart:string;shape:Shape;fire:boolean;wert:string;suche:string}
 export interface Gruppe{key:string;floor:string;name:string;ohne:boolean;weitere:boolean;alle:Zeile[];zeilen:Zeile[];offen:number;gesamt:number;fertig:boolean}
 export const WEITERE_KEY='~weitere',OHNE_KEY='~ohne';
 
@@ -26,7 +26,7 @@ export function zeilen(p:Project,wert:(m:Marker)=>string=()=>''):Zeile[]{
   for(const r of p.pending||[]){
     const raum=raumVon(r),shape=pendingShape(r),probenart=r.typ||typeFromArt(r.art)?.typ||(r.art||'').split(/\s*·\s*/)[0];
     const titel=titelVon(r.desc,r.raum||'',r.ref)||'Probe';
-    out.push({art:'offen',label:r.label,id:'',sheet:-1,raum,titel,probenart,shape,fire:false,wert:'',suche:suche(r.label,r.raum,titel,probenart,r.ref)});
+    out.push({datum:r.datum,art:'offen',label:r.label,id:'',sheet:-1,raum,titel,probenart,shape,fire:false,wert:'',suche:suche(r.label,r.raum,titel,probenart,r.ref)});
   }
   for(let i=0;i<sheetCount(p);i++){
     const floor=floorName(p,i);
@@ -34,10 +34,10 @@ export function zeilen(p:Project,wert:(m:Marker)=>string=()=>''):Zeile[]{
       const raum=raumVon(m,floor);
       if(m.kind==='sample'&&m.lab){
         const titel=titelVon(m.lab.desc,m.raum||'',m.lab.ref)||'Probenahmestelle',probenart=m.typ||typeFromArt(m.lab.art)?.typ||(m.lab.art||'').split(/\s*·\s*/)[0];
-        out.push({art:'platziert',label:m.label,id:m.id,sheet:i,raum,titel,probenart,shape:shapeOf(m),fire:false,wert:wert(m),suche:suche(m.label,m.raum,titel,probenart,m.lab.ref,m.note)});
+        out.push({datum:m.lab.datum,art:'platziert',label:m.label,id:m.id,sheet:i,raum,titel,probenart,shape:shapeOf(m),fire:false,wert:wert(m),suche:suche(m.label,m.raum,titel,probenart,m.lab.ref,m.note)});
       }else{
         const fire=m.kind==='fire',titel=fire?'Brandherd':(m.note||'Probenahmestelle');
-        out.push({art:'weitere',label:m.label,id:m.id,sheet:i,raum,titel,probenart:'',shape:shapeOf(m),fire,wert:'',suche:suche(m.label,m.raum,titel,m.note)});
+        out.push({vonHand:m.kind==='sample',art:'weitere',label:m.label,id:m.id,sheet:i,raum,titel,probenart:'',shape:shapeOf(m),fire,wert:'',suche:suche(m.label,m.raum,titel,m.note)});
       }
     }
   }
@@ -100,6 +100,7 @@ export interface ListeHooks{
   hover(id:string|null):void;remove(label:string):void;
   /** Punkt zurück in die offene Liste; `neu`: gleich zum Platzieren wählen */back(id:string,neu:boolean):void;del(id:string):void;clear():void;save():void;
   wert(m:Marker):string;
+  /** Ortstermin je Zeile (ab 2.7.0, nur bei mehreren Terminen); null = wie bisher */termin?(label:string,datum:string|undefined,vonHand:boolean):{text:string;ohne:boolean;title:string}|null;
 }
 const FILTER_TEXT:Record<Filter,string>={offen:'Offen',platziert:'Platziert',alle:'Alle'};
 export class Probenliste{
@@ -184,6 +185,8 @@ export class Probenliste{
     const text=el('span','','pl-text');text.append(r.fire?el('b',`${r.label} `):'',el('span',r.titel,'pl-titel'));
     b.append(badge,text);
     if(r.probenart||r.wert)b.append(el('small',r.wert||r.probenart,'pl-art'));
+    const termin=r.fire?null:this.hooks.termin?.(r.label,r.datum,!!r.vonHand);
+    if(termin){const t=el('small',termin.text,`pl-termin${termin.ohne?' ohne':''}`);t.title=termin.title;b.append(t);}
     const more=btn('⋯','pl-more');more.dataset.more=key;more.title=`Weitere Aktionen zu ${r.label}`;more.setAttribute('aria-label',`Weitere Aktionen zu ${r.label}`);more.setAttribute('aria-haspopup','menu');more.setAttribute('aria-expanded',String(this.menu===key));
     more.addEventListener('pointerdown',e=>e.stopPropagation());
     item.append(b,more);const out=[item];

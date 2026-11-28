@@ -11,9 +11,14 @@ import {berichtQuellen,vorlaeufigeBerichte,vorlaeufigText} from './lab-provenanc
 import {fileInfo,fileRevision,findSubdir,listFiles,projectFileName,planOrdner,planPfad,AUFTRAEGE,LABOR,type ProjectFolder} from './folder';
 import {ort,ortZumSchreiben} from './so';
 import {eigeneLabelkitDatei,keineLabelkitDateiText,labelkitDateiWaehlen} from './labelkit';
+import {annexFileName} from './anlage-name';
+export {annexFileName};
 
 export const ANNEX_DIR='Mitteilungen',ANNEX_LOG='_Anlagen-Protokoll.txt',FOTOS='Fotos',FOTOKIT_FILE='_Bildumbenenner.json';
-export interface AnnexOptions {title:string;maxPhotos:number;results:boolean;objekt:string;projectData:Record<string,unknown>;projectDataSource?:File|null;projectDataStale?:boolean;app:string;progress?:(text:string)=>void}
+/** termin (2.7.0, nur bei mehreren Ortsterminen; p ist dann schon die Termin-Ansicht): Deckblatt, Planseiten (nur diese Pläne – T7),
+ *  Zeilen fürs Prüfprotokoll und alle Probennummern des Projekts (Fotos von Proben anderer Termine gehören nicht in diese Anlage). */
+export interface AnnexTermin {kopf:{feld:string;wert:string};blaetter:number[];checks:AnnexCheck[];projektProben:Set<string>}
+export interface AnnexOptions {title:string;maxPhotos:number;results:boolean;objekt:string;projectData:Record<string,unknown>;projectDataSource?:File|null;projectDataStale?:boolean;app:string;progress?:(text:string)=>void;termin?:AnnexTermin}
 type Dir=ProjectFolder['dir'];
 
 const stand=(ms:number)=>{const d=new Date(ms),z=(n:number)=>String(n).padStart(2,'0');return `${z(d.getDate())}.${z(d.getMonth()+1)}.${d.getFullYear()} ${z(d.getHours())}:${z(d.getMinutes())}`;};
@@ -27,10 +32,10 @@ const release=(c:HTMLCanvasElement|null)=>{if(c){c.width=1;c.height=1;}};
 
 /** Je Geschoss eine maßstäbliche Planseite (Format „anlage“, 200 dpi). */
 async function planPages(p:Project,o:AnnexOptions):Promise<AnnexPlanPage[]>{
-  const n=sheetCount(p),out:AnnexPlanPage[]=[];
-  for(let i=0;i<n;i++){o.progress?.(`Plan ${i+1} von ${n} wird gezeichnet …`);
+  const blaetter=o.termin?o.termin.blaetter:Array.from({length:sheetCount(p)},(_,i)=>i),n=blaetter.length,out:AnnexPlanPage[]=[];
+  for(const [j,i] of blaetter.entries()){o.progress?.(`Plan ${j+1} von ${n} wird gezeichnet …`);
     const view=clone(sheetProject(p,i)),rated=o.results?rateMarkers(view):null,layout=sheetLayout(view,'anlage',rated);let canvas:HTMLCanvasElement|null=null;
-    try{canvas=await renderSheet(view,layout,rated,{objekt:o.objekt,page:i+1,pages:n},200);out.push({floor:floorName(p,i),image:await canvasBytes(canvas,'image/png'),widthMm:layout.width,heightMm:layout.height,ratio:layout.ratio,results:!!rated,vorlaeufig:vorlaeufigHinweis(view,rated)});}
+    try{canvas=await renderSheet(view,layout,rated,{objekt:o.objekt,page:j+1,pages:n},200);out.push({floor:floorName(p,i),image:await canvasBytes(canvas,'image/png'),widthMm:layout.width,heightMm:layout.height,ratio:layout.ratio,results:!!rated,vorlaeufig:vorlaeufigHinweis(view,rated)});}
     finally{release(canvas);}
   }
   return out;
@@ -99,13 +104,6 @@ async function hashSource(dir:Dir|null,folderName:string,name:string,role:string
   if(!file){missing.push(`${folderName}/${name}`);sources.push({role,name:`${folderName}/${name}`,stand:'–',sha:'nicht gefunden'});return;}
   sources.push({role,name:`${folderName}/${name}`,stand:stand(file.lastModified),sha:await sha(await file.arrayBuffer())});
 }
-export function annexFileName(nr:string,title:string,date:string,taken:string[]){
-  const s=(v:string)=>v.normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/ß/g,'ss').replace(/[^A-Za-z0-9_-]+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');
-  const base=[s(nr)||'Projekt',s(title)||'Anlage','Probenahme'].join('_').slice(0,64)+'_'+date,used=new Set(taken.map(n=>n.toLowerCase()));
-  for(let i=1;i<1000;i++){const n=`${base}${i>1?`_${i}`:''}.docx`;if(!used.has(n.toLowerCase()))return n;}
-  throw Error('Zu viele Anlagen mit gleichem Namen.');
-}
-
 /** Baut die Anlage. folder=null: ohne Fotos und Quelldateien (nur Projektstand), zum Herunterladen. */
 export async function createAnnex(p:Project,folder:ProjectFolder|null,o:AnnexOptions){
   const project=clone(p),created=new Date().toISOString(),sources:AnnexSource[]=[],missing:string[]=[],extra:AnnexCheck[]=[];
@@ -135,24 +133,27 @@ export async function createAnnex(p:Project,folder:ProjectFolder|null,o:AnnexOpt
     if(pj)sources.push({role:o.projectDataStale?'Projektdaten (möglicherweise veraltet; Verwendung bestätigt)':'Projektdaten (Projektzentrale)',name:'_Projekt.json',stand:stand(pj.lastModified),sha:await sha(await pj.arrayBuffer())});
     if(o.projectDataStale)extra.push({text:'Gemeinsame Projektdaten möglicherweise veraltet',ok:false,detail:'Die erneute Aktualisierung war nicht erfolgreich. Verwendung für diese Anlage ausdrücklich bestätigt.'});
     fotos=await photos(folder,o,samples,sources,bk);
+    // Termin-Anlage: Fotos, deren Proben alle zu einem anderen Termin gehören, kommen nicht hinein (sonst „unbekannte Probe-Nr.“)
+    const t=o.termin;if(t&&fotos){const hier=new Set(samples.map(x=>x.label));fotos=fotos.filter(f=>!f.labels.length||f.labels.some(l=>hier.has(l))||!f.labels.every(l=>t.projektProben.has(l)));}
   }else{
     sources.push({role:'PlanKit-Projekt (nicht im Projektordner gespeichert)',name:'Projektstand beim Erstellen',stand:stand(Date.now()),sha:await sha(new TextEncoder().encode(JSON.stringify(project)))});
   }
+  if(o.termin)extra.unshift(...o.termin.checks);
   if(missing.length)extra.push({text:'Laborbericht-Dateien nicht im Ordner „Laborergebnisse“ gefunden',ok:false,detail:missing.join(', ')});
   {const v=vorlaeufigeBerichte(project);if(v.length)extra.push({text:'Werte aus vorläufigem Prüfbericht – sie können sich mit dem endgültigen Bericht ändern',ok:false,detail:v.map(r=>r.bericht||'(ohne Nummer)').join(', ')});}
   const parameter=project.results?.parameter||'';
   const checks=annexChecks(samples,fotos||[],plans,parameter,!!fotos,extra);
   o.progress?.('Word-Datei wird erstellt …');
-  const blocks=annexBlocks({title:o.title,nr:folder?.nr||project.report||'',ort:folder?.ort||'',projectData:o.projectData,parameter,scaleNotes:scaleNotes(project),plans,samples,photos:fotos||[],sources,checks,created,app:o.app,maxPhotos:o.maxPhotos,photosIncluded:!!fotos,vorlaeufig:vorlaeufigText(vorlaeufigeBerichte(project))});
+  const blocks=annexBlocks({...(o.termin?{termin:o.termin.kopf}:{}),title:o.title,nr:folder?.nr||project.report||'',ort:folder?.ort||'',projectData:o.projectData,parameter,scaleNotes:scaleNotes(project),plans,samples,photos:fotos||[],sources,checks,created,app:o.app,maxPhotos:o.maxPhotos,photosIncluded:!!fotos,vorlaeufig:vorlaeufigText(vorlaeufigeBerichte(project))});
   const bytes=build({title:`${o.title}: Probenahme und Laborergebnisse${folder?` – Projekt ${folder.nr}`:''}`,author:o.app,application:o.app,created,blocks});
   return {bytes,checks,warnings:checks.filter(c=>!c.ok).length,created,source:sources[0]};
 }
 /** Im Projektordner speichern: „Mitteilungen“, datierter Name, nie überschreibend, zurücklesen, protokollieren. */
-export async function saveAnnex(folder:ProjectFolder,title:string,data:Uint8Array,source:AnnexSource,app:string,created:string){
+export async function saveAnnex(folder:ProjectFolder,title:string,data:Uint8Array,source:AnnexSource,app:string,created:string,termin=''){
   const bytes=new Uint8Array(data);   // eigener ArrayBuffer (für Dateischreiben und Prüfsumme)
   const dir=await findSubdir(folder.dir,ANNEX_DIR)||await folder.dir.getDirectoryHandle(ANNEX_DIR,{create:true}) as Dir;
   const names:string[]=[];for await(const h of dir.values())names.push(h.name);
-  const name=annexFileName(folder.nr,title,today(),names);
+  const name=annexFileName(folder.nr,title,today(),names,termin);
   try{await dir.getFileHandle(name);throw Error(`„${name}“ existiert bereits – nichts überschrieben.`);}catch(e){if((e as DOMException).name!=='NotFoundError')throw e;}
   const fh=await dir.getFileHandle(name,{create:true}),w=await fh.createWritable();await w.write(bytes);await w.close();
   const digest=await sha(bytes);if(await sha(await (await fh.getFile()).arrayBuffer())!==digest)throw Error(`„${name}“ wurde nicht vollständig geschrieben – bitte erneut erstellen.`);

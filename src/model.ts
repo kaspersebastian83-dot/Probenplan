@@ -23,7 +23,11 @@ export const SHAPES:readonly Shape[]=['circle','square','diamond'];
 export const SHAPE_NAMES:Record<Shape,string>={circle:'Kreis',square:'Quadrat',diamond:'Raute'};
 /** raum: Raum / Ort aus LabelKit oder von Hand (Proben und Brandherd) – Grundlage für das Raumbuch. */
 /** raumSkizze (ab 1.41): Kennung des Skizzenraums, aus dem „raum“ beim Setzen übernommen wurde – nur dann zieht ein Umbenennen des Raums mit. */
-export interface Marker { id: string; kind: Kind; label: string; note: string; x: number; y: number; lx: number; ly: number; lab?:LabData; shape?:Shape; typ?:string; surface?:Surface; raum?:string; raumSkizze?:string }
+/** Termin-Ansicht (PlanKit 2.7.0, nur im Speicher): Probe eines früheren Ortstermins grau – bzw. auf der Karte in ② blass, wenn sie in
+ *  der Ausgabe fehlt. Symbole stehen nie in einer Datei (JSON kennt sie nicht), Kopien mit {...m} behalten sie. */
+export const GRAU:unique symbol=Symbol('plankit-grau'),BLASS:unique symbol=Symbol('plankit-blass'),TERMIN:unique symbol=Symbol('plankit-termin');
+export const GRAU_FARBE='#9aa4ac';
+export interface Marker { /** Tag des früheren Termins (JJJJ-MM-TT) */[GRAU]?:string; [BLASS]?:true; id: string; kind: Kind; label: string; note: string; x: number; y: number; lx: number; ly: number; lab?:LabData; shape?:Shape; typ?:string; surface?:Surface; raum?:string; raumSkizze?:string }
 export const MAX_RAUM=80;
 /** LabelKit-Probenart („PAK · Wischprobe“) → Typ und Standardform: PAK Kreis, Chlorid Quadrat, Asbest Raute, Sonstige Kreis. */
 const TYPES:[RegExp,string,Shape][]=[[/^pak\b/i,'PAK','circle'],[/^chlorid\b/i,'Chlorid','square'],[/^asbest\b/i,'Asbest','diamond'],[/^sonstige\b/i,'Sonstige','circle']];
@@ -68,7 +72,8 @@ export type RaumStatus='unauffaellig'|'auffaellig'|'nicht_begangen';
 export const RAUM_STATUS:readonly RaumStatus[]=['unauffaellig','auffaellig','nicht_begangen'];
 export interface RaumEintrag {floor:string;name:string;status?:RaumStatus;massnahme?:string;bemerkung?:string}
 export interface Raumbuch {rooms:RaumEintrag[];alias?:Record<string,string>}
-export interface Project { format: 'probenplan'; version: Version; plan: Plan; markers: Marker[]; nextSample: number; nextFire: number; report: string; date: string; areas?:Area[]; nextArea?:number; pending?:LabSample[]; labReports?:LabOrigin[]; sheets?:Sheet[]; active?:number; results?:ResultSettings; trials?:Trials; raumbuch?:Raumbuch }
+export interface TerminKopf {titel:string;feld:string;wert:string}
+export interface Project { /** Termin-Ansicht: Ortstermin für Fußzeile und Schriftfeld, nur im Speicher */[TERMIN]?:TerminKopf; format: 'probenplan'; version: Version; plan: Plan; markers: Marker[]; nextSample: number; nextFire: number; report: string; date: string; areas?:Area[]; nextArea?:number; pending?:LabSample[]; labReports?:LabOrigin[]; sheets?:Sheet[]; active?:number; results?:ResultSettings; trials?:Trials; raumbuch?:Raumbuch }
 const clonePlan=(plan:Plan):Plan=>({...plan,...(plan.sketch?{sketch:structuredClone(plan.sketch)}:{}),...(plan.trace?{trace:structuredClone(plan.trace)}:{}),...(plan.calibration?{calibration:{...plan.calibration}}:{}),...(plan.preparation?{preparation:structuredClone(plan.preparation)}:{}),...(plan.pdf?{pdf:{...plan.pdf}}:{})});
 const cloneMarkers=(markers:Marker[])=>markers.map(m=>({...m,...(m.lab?{lab:{...m.lab}}:{})}));
 const cloneAreas=(areas:Area[])=>areas.map(a=>({...a,points:a.points.map(pt=>({...pt}))}));
@@ -111,7 +116,8 @@ export function bounds(p:Project) {
 }
 /** fill: Füllfarbe für die Ergebniskarte (sonst weiß). */
 export function markerSVG(p:Project,m:Marker,selected=false,minSize=0,fill?:string) {
-  const r=Math.max(markerSize(p),minSize),rx=r*Math.max(1,m.label.length*.34),color=m.kind==='sample'?'#17665e':FIRE_RED;
+  if(m[GRAU])fill=undefined;   // grau: ohne Ergebnisfarbe (T-Ansicht)
+  const r=Math.max(markerSize(p),minSize),rx=r*Math.max(1,m.label.length*.34),color=m.kind==='sample'?m[GRAU]?GRAU_FARBE:'#17665e':FIRE_RED;
   const n=fill?parseInt(fill.slice(1),16):0,text=fill?((n>>16)*299+(n>>8&255)*587+(n&255)*114)/1000>150?'#1d2a33':'#ffffff':color;
   const displaced=Math.hypot(m.x-m.lx,m.y-m.ly)>.01;
   const fire=m.kind==='fire',form=shapeOf(m),sq=Math.max(rx,r*1.05);
@@ -119,7 +125,7 @@ export function markerSVG(p:Project,m:Marker,selected=false,minSize=0,fill?:stri
     :form==='square'?`<rect x="${m.lx-sq}" y="${m.ly-r*1.05}" width="${sq*2}" height="${r*2.1}" rx="${r*.12}"/>`
     :form==='diamond'?`<path d="M ${m.lx} ${m.ly-r*1.3} L ${m.lx+rx*1.2} ${m.ly} L ${m.lx} ${m.ly+r*1.3} L ${m.lx-rx*1.2} ${m.ly} Z"/>`
     :`<ellipse cx="${m.lx}" cy="${m.ly}" rx="${rx}" ry="${r}"/>`;
-  return `<g data-id="${m.id}">${selected?`<ellipse cx="${m.lx}" cy="${m.ly}" rx="${rx+r*.6}" ry="${r*1.8}" fill="none" stroke="#e0ae42" stroke-width="${r*.2}" stroke-dasharray="${r*.3} ${r*.2}"/>`:''}${displaced?`<path d="M${m.x} ${m.y} L${m.lx} ${m.ly}" stroke="white" stroke-width="${r*.3}"/><path d="M${m.x} ${m.y} L${m.lx} ${m.ly}" stroke="${color}" stroke-width="${r*.12}"/><g data-drag="point"><circle cx="${m.x}" cy="${m.y}" r="${Math.max(r*.85,minSize*1.85)}" fill="transparent"/><circle cx="${m.x}" cy="${m.y}" r="${r*.24}" fill="${color}" stroke="white" stroke-width="${r*.1}"/><path d="M${m.x-r*.45} ${m.y}h${r*.9}M${m.x} ${m.y-r*.45}v${r*.9}" stroke="${color}" stroke-width="${r*.1}"/></g>`:''}<g data-drag="${displaced?'label':'point'}" fill="${fill||'white'}" stroke="${fill?'#1d2a33':color}" stroke-width="${r*.18}">${minSize?`<ellipse cx="${m.lx}" cy="${m.ly}" rx="${Math.max(rx,minSize*1.85)}" ry="${Math.max(r,minSize*1.85)}" fill="transparent" stroke="none"/>`:''}${shape}</g>${fire?'':`<text data-drag="${displaced?'label':'point'}" x="${m.lx}" y="${m.ly+r*.3}" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="${r*.87}" fill="${text}">${escape(m.label)}</text>`}</g>`;
+  return `<g data-id="${m.id}"${m[BLASS]?' opacity=".35"':''}>${selected?`<ellipse cx="${m.lx}" cy="${m.ly}" rx="${rx+r*.6}" ry="${r*1.8}" fill="none" stroke="#e0ae42" stroke-width="${r*.2}" stroke-dasharray="${r*.3} ${r*.2}"/>`:''}${displaced?`<path d="M${m.x} ${m.y} L${m.lx} ${m.ly}" stroke="white" stroke-width="${r*.3}"/><path d="M${m.x} ${m.y} L${m.lx} ${m.ly}" stroke="${color}" stroke-width="${r*.12}"/><g data-drag="point"><circle cx="${m.x}" cy="${m.y}" r="${Math.max(r*.85,minSize*1.85)}" fill="transparent"/><circle cx="${m.x}" cy="${m.y}" r="${r*.24}" fill="${color}" stroke="white" stroke-width="${r*.1}"/><path d="M${m.x-r*.45} ${m.y}h${r*.9}M${m.x} ${m.y-r*.45}v${r*.9}" stroke="${color}" stroke-width="${r*.1}"/></g>`:''}<g data-drag="${displaced?'label':'point'}" fill="${fill||'white'}" stroke="${fill?'#1d2a33':color}" stroke-width="${r*.18}">${minSize?`<ellipse cx="${m.lx}" cy="${m.ly}" rx="${Math.max(rx,minSize*1.85)}" ry="${Math.max(r,minSize*1.85)}" fill="transparent" stroke="none"/>`:''}${shape}</g>${fire?'':`<text data-drag="${displaced?'label':'point'}" x="${m.lx}" y="${m.ly+r*.3}" text-anchor="middle" font-family="Arial, sans-serif" font-weight="700" font-size="${r*.87}" fill="${text}">${escape(m.label)}</text>`}</g>`;
 }
 export class History {
   past:Project[]=[]; future:Project[]=[];

@@ -3,7 +3,7 @@
 // Gerichtsfest gedacht: Messwerte in der Schreibweise des Prüfberichts, keine Interpolation, keine Hochrechnung,
 // Einordnung nur in die Skala des Sachverständigen (mit Angabe der Skala) – jede Abweichung steht im Prüfprotokoll.
 // Dieser Teil ist rein: er rechnet nur mit den übergebenen Daten (Bilder, Prüfsummen und Dateien liefert annex-run.ts).
-import {allMarkers,floorName,sheetCount,sheetProject,type Project,type Wert} from './model';
+import {GRAU,allMarkers,floorName,sheetCount,sheetProject,type Project,type Wert} from './model';
 import {ASBEST_PARAM,AUTO_PARAM,rangeText,rateMarkers,scaleFor,shortParameter,valueOf,wertFuer,type Rated} from './results';
 import {STIL,type Block,type Cell,type Row} from './docx';
 
@@ -18,6 +18,7 @@ export interface AnnexSample {label:string;floor:string;placed:boolean;desc:stri
 export interface AnnexCheck {text:string;ok:boolean;detail?:string}
 export interface AnnexInput {
   title:string;nr:string;ort:string;projectData:Record<string,unknown>;parameter:string;scaleNotes:string[];
+  /** Termin-Wahl (2.7.0, nur bei mehreren Ortsterminen): Deckblatt nennt diesen Termin statt immer Termin 1 */termin?:{feld:string;wert:string};
   plans:AnnexPlanPage[];samples:AnnexSample[];photos:AnnexPhoto[];sources:AnnexSource[];checks:AnnexCheck[];
   created:string;app:string;maxPhotos:number;photosIncluded:boolean;
   /** Hinweis, wenn Werte aus einem vorläufigen Prüfbericht stammen (sonst leer) */
@@ -66,7 +67,7 @@ export function collectSamples(p:Project):AnnexSample[]{
   const rows:AnnexSample[]=[];
   for(let i=0;i<sheetCount(p);i++){
     const view=sheetProject(p,i),rated=parameter?rateMarkers(view):null,texts=rated?ratingTexts(rated):new Map<string,string>();
-    for(const m of view.markers){if(m.kind!=='sample')continue;const lab=m.lab,o=lab?.reportId?origins.get(lab.reportId):undefined,value=parameter?valueOf(m,parameter):undefined;
+    for(const m of view.markers){if(m.kind!=='sample'||m[GRAU])continue;const lab=m.lab,o=lab?.reportId?origins.get(lab.reportId):undefined,value=parameter?valueOf(m,parameter):undefined;
       rows.push({label:m.label,floor:floorName(p,i),placed:true,desc:t(lab?.desc),note:t(m.note)!==t(lab?.desc)?t(m.note):'',art:t(lab?.art),datum:t(lab?.datum),labNr:t(lab?.labNr),ref:t(lab?.ref),
         bericht:t(lab?.bericht),labor:t(o?.labor),werte:lab?.werte||[],value,rating:value?texts.get(m.label)||'ohne Bewertung':''});}
   }
@@ -123,7 +124,7 @@ export function annexBlocks(a:AnnexInput):Block[]{
   b.push(STIL.titel(`${a.title}: Probenahme und Laborergebnisse`));
   b.push(STIL.unterzeile(`Projekt ${a.nr}${a.ort?` · ${a.ort}`:''}`));
   const info:[string,string][]=([['Objekt',t(pd.objekt)],['Auftraggeber',t(pd.auftraggeber)],['Schaden-Nr. des Auftraggebers',t(pd.schadennummer)],['Schadenereignis',t(pd.schadenereignis)],
-    ['Schadendatum',deDate(t(pd.schadendatum))],['Ortstermin',deDate(t(pd.ortstermin))],['Sachverständiger',t(pd.sachverstaendiger)]] as [string,string][]).filter(([,v])=>v);
+    ['Schadendatum',deDate(t(pd.schadendatum))],a.termin?[a.termin.feld,a.termin.wert]:['Ortstermin',deDate(t(pd.ortstermin))],['Sachverständiger',t(pd.sachverstaendiger)]] as [string,string][]).filter(([,v])=>v);
   if(info.length)b.push({t:'table',widths:[3000,W-3000],size:10,rows:info.map(([k,v])=>({cells:[STIL.label(k),{text:v}]}))});
   const withValue=a.samples.filter(s=>s.value).length,photoCount=new Set(a.photos.filter(f=>f.labels.length).map(f=>f.file)).size;
   b.push(P(`${a.samples.length} Probe${a.samples.length===1?'':'n'} auf ${a.plans.length} Plan${a.plans.length===1?'':'seiten'}`+(param?` · ${withValue} mit Messwert für ${param}`:'')+(a.photosIncluded?` · ${photoCount} zugeordnete Foto${photoCount===1?'':'s'}`:''),{before:120,after:160}));

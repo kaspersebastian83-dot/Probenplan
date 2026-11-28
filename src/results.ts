@@ -3,7 +3,7 @@
 // kaspersebastian83-dot.github.io): je Parameter und Einheit eine Liste von Kategorien mit „ab“-Wert.
 // Für die Karte wird die Skala zusätzlich mit Farben im Projekt gespeichert, damit Kollegen dieselbe Karte sehen.
 import {skalaTeilen} from './skalen-archiv.js';
-import {AUTO_PARAM,allMarkers,type Category,type Marker,type Project,type ResultSettings,type Scale,type Wert} from './model';
+import {AUTO_PARAM,GRAU,allMarkers,type Category,type Marker,type Project,type ResultSettings,type Scale,type Wert} from './model';
 export {AUTO_PARAM};
 
 export const UNRATED='#c3ccd5';
@@ -92,7 +92,7 @@ export function ohneUeber<S extends {cats:{ueber?:boolean}[]}>(s:S):S{return {..
 /* ===== Ende KORROSION-CHLORID v2 ===== */
 export function shortParameter(p:string){if(p===AUTO_PARAM)return 'PAK/Chlorid/Asbest';return p.replace(/^Summe 16 EPA-PAK.*$/i,'Σ16 EPA-PAK').replace(/^Benzo\[a\]pyren$/i,'BaP');}
 
-const werte=(p:Project)=>[...allMarkers(p).flatMap(m=>m.lab?.werte||[]),...(p.pending||[]).flatMap(r=>r.werte||[])];
+const werte=(p:Project)=>[...allMarkers(p).filter(m=>!m[GRAU]).flatMap(m=>m.lab?.werte||[]),...(p.pending||[]).flatMap(r=>r.werte||[])];
 export function hasValues(p:Project){return werte(p).length>0;}
 /** Alle Parameter in Berichtsreihenfolge, auch reine BG-/unklare Ergebnisse. */
 export function parameters(p:Project){const seen:string[]=[];for(const w of werte(p))if(!seen.includes(w.p))seen.push(w.p);return seen;}
@@ -174,7 +174,7 @@ export interface Rated {fill:Map<string,string>;groups:{key:string;parameter:str
 /** Farben je Marker und Legende für die Marker des übergebenen (Teil-)Projekts. */
 export function rateMarkers(p:Project,markers:Marker[]=p.markers,settings:ResultSettings|undefined=p.results):Rated{
   const fill=new Map<string,string>(),unrated:string[]=[],below:string[]=[],notDetected:string[]=[],notDetermined:string[]=[],parameter=settings?.parameter||'';const groups=new Map<string,Rated['groups'][number]>();
-  for(const m of markers){if(m.kind!=='sample')continue;const w=valueOf(m,parameter);
+  for(const m of markers){if(m.kind!=='sample'||m[GRAU])continue;const w=valueOf(m,parameter);   // grau (früherer Termin): nicht bewertet, nicht in der Legende
     if(!w){unrated.push(m.label);fill.set(m.id,UNRATED);continue;}
     const key=scaleKey(w.p,w.u),scale=scaleFor(settings,w.p,w.u).scale;if(!groups.has(key))groups.set(key,{key,parameter:w.p,unit:w.u,scale,cats:(scale?.cats||[]).map(c=>({...c,labels:[]}))});
     if(w.p===ASBEST_PARAM&&!w.u&&scale){const i=asbestBefund(m.lab?.werte||[])?.gefunden?1:0,g=groups.get(key)!;g.cats[i].labels.push(m.label);fill.set(m.id,g.cats[i].color);continue;}

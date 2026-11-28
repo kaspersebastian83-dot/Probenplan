@@ -2,6 +2,7 @@
 // Wo liegen die App-Daten eines Projekts? Künftig in „<Projekt>/_Spektron/…“. Solange ein Projekt keinen „_Spektron“-Ordner
 // hat und UMSTELLUNG aus ist, liefert ort() überall den bisherigen Ort – also genau das bisherige Verhalten.
 import './spektron-ordner.js';
+import './ortstermine.js';   // 2.7.0: byte-gleich aus der Projektzentrale (Ortstermine des Projekts, nur lesen)
 import type {Dir} from './folder';
 export type Bereich='projekt'|'fotokit'|'fotokitPruefsummen'|'labelkit'|'labelkitAblage'|'resultkit'|'plankit'|'belegkit'|'buero'|'anlagenProtokoll';
 export interface Ort{dir:Dir|null;wo:'neu'|'alt';pfad:string;konflikt:boolean;umgezogen:boolean;unterbrochen?:boolean;bereich:Bereich}
