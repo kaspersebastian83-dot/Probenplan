@@ -52,7 +52,7 @@ ok('Datum je Probe (T2): LabelKit zuerst, sonst Datum am Punkt; kein Datum oder 
  const t=T.tage(ZWEI);
  assert.deepEqual(T.zuordnen('P1','2026-08-12',LK,t),{tag:'2026-08-12',datum:'2026-08-12',quelle:'labelkit',grund:'',abweichung:''});
  assert.deepEqual(T.zuordnen('P5','2026-08-20',LK,t),{tag:'2026-08-20',datum:'2026-08-20',quelle:'punkt',grund:'',abweichung:''},'nicht in LabelKit: Punkt');
- assert.deepEqual(T.zuordnen('P30','2026-08-20',LK,t).quelle,'punkt','LabelKit ohne Datum: Punkt');
+ {const z=T.zuordnen('P30','2026-08-20',LK,t);assert.equal(z.tag,null,'LabelKit kennt die Probe ohne Datum: nie das Datum am Punkt');assert.equal(z.grund,'kein Probenahmedatum in LabelKit');}
  const p22=T.zuordnen('P22',undefined,LK,t);assert.equal(p22.tag,null);assert.equal(p22.grund,'Probenahmedatum 21.08.2026 passt zu keinem Ortstermin');
  for(const d of ['2026-08-13','2026-08-19','2026-08-21','2027-08-20'])assert.equal(T.zuordnen('P9',d,null,t).tag,null,`${d}: nie der nächstgelegene`);
  assert.equal(T.zuordnen('P9',undefined,null,t).grund,'kein Probenahmedatum');

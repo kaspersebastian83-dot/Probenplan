@@ -56,10 +56,11 @@ export function labelkitDaten(data:unknown):Map<string,string>{
 const tagVon=(datum:string,t:readonly Tag[])=>datum?t.find(x=>x.datum===datum)?.datum??null:null;
 /** Termin (Tag) einer Probe. vonHand: Punkt ohne Labordaten (eigene Probe) – hat nie ein Datum (T16). */
 export function zuordnen(label:string,punkt:string|undefined,lk:LkDaten|null,t:readonly Tag[],vonHand=false):Zuordnung{
-  const p=gueltig(punkt)?punkt:'',l=vonHand?'':lk?.get(label)||'',datum=l||p,quelle=l?'labelkit':p?'punkt':'',tag=tagVon(datum,t);
+  // Kennt LabelKit die Probe, zählt nur ihr Datum dort – auch wenn es fehlt (dann „ohne Termin“, nie das ältere Datum am Punkt; Codex #99)
+  const imLk=!vonHand&&!!lk?.has(label),p=gueltig(punkt)?punkt:'',l=imLk?lk!.get(label)||'':'',datum=imLk?l:p,quelle=l?'labelkit':datum?'punkt':'',tag=tagVon(datum,t);
   let abweichung='';
   if(l&&p&&l!==p){const a=tagVon(l,t),b=tagVon(p,t);if(a!==b)abweichung=`${label}: laut LabelKit ${kurz(l)}, am Punkt ${kurz(p)} – Proben übernehmen`;}
-  const grund=tag?'':!datum?(vonHand?'von Hand gesetzt – kein Probenahmedatum':'kein Probenahmedatum'):`Probenahmedatum ${lang(datum)} passt zu keinem Ortstermin`;
+  const grund=tag?'':!datum?(vonHand?'von Hand gesetzt – kein Probenahmedatum':imLk?'kein Probenahmedatum in LabelKit':'kein Probenahmedatum'):`Probenahmedatum ${lang(datum)} passt zu keinem Ortstermin`;
   return {tag,datum,quelle,grund,abweichung};
 }
 

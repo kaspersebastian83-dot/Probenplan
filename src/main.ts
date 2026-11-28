@@ -50,16 +50,17 @@ const PROJEKT_URL = (() => {
   // 2.7.0 (T11): „mitteilung=m2“ aus der Projektzentrale – nur lesen, nur für das Projekt aus demselben Link; bleibt im Link stehen
   const mitteilung = new URLSearchParams(start.hash.slice(1)).get('mitteilung') ?? start.searchParams.get('mitteilung') ?? '';
   function setzen(name: string | null){
-    const url = new URL(location.href);
+    const url = new URL(location.href), anderes = (name ?? '').normalize('NFC') !== (projekt ?? '').normalize('NFC');
     // Fremde Fragmentbestandteile (auch reine Anker wie #fotos) unverändert erhalten.
     // 2.7.0 (P12): „mitteilung=“ gehört zum Projekt aus dem Link – beim Wechsel in ein anderes Projekt fällt es weg
-    const teile = url.hash.slice(1).split('&').filter(t => t && !new URLSearchParams(t).has('projekt') && !(new URLSearchParams(t).has('mitteilung') && name !== projekt));
+    const teile = url.hash.slice(1).split('&').filter(t => t && !new URLSearchParams(t).has('projekt') && !(new URLSearchParams(t).has('mitteilung') && anderes));
     if (name !== null) teile.push('projekt=' + encodeURIComponent(name));
     if (name !== null && url.searchParams.has('aktion')){
       if (!new URLSearchParams(url.hash.slice(1)).has('aktion')) teile.push('aktion=' + encodeURIComponent(url.searchParams.get('aktion')!));
       url.searchParams.delete('aktion');
     }
     url.searchParams.delete('projekt');
+    if (anderes) url.searchParams.delete('mitteilung');   // 2.7.0 (P12, Codex #99): auch die alte Form im Suchteil
     url.hash = teile.join('&');
     if (url.href !== location.href) try{ window.history.replaceState(window.history.state, '', url); }catch(e){}
   }
