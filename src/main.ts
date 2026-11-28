@@ -52,7 +52,8 @@ const PROJEKT_URL = (() => {
   function setzen(name: string | null){
     const url = new URL(location.href);
     // Fremde Fragmentbestandteile (auch reine Anker wie #fotos) unverändert erhalten.
-    const teile = url.hash.slice(1).split('&').filter(t => t && !new URLSearchParams(t).has('projekt'));
+    // 2.7.0 (P12): „mitteilung=“ gehört zum Projekt aus dem Link – beim Wechsel in ein anderes Projekt fällt es weg
+    const teile = url.hash.slice(1).split('&').filter(t => t && !new URLSearchParams(t).has('projekt') && !(new URLSearchParams(t).has('mitteilung') && name !== projekt));
     if (name !== null) teile.push('projekt=' + encodeURIComponent(name));
     if (name !== null && url.searchParams.has('aktion')){
       if (!new URLSearchParams(url.hash.slice(1)).has('aktion')) teile.push('aktion=' + encodeURIComponent(url.searchParams.get('aktion')!));
@@ -698,9 +699,11 @@ async function runAnnex(){
     const checks:AnnexCheck[]=[{text:`Ortstermin: ${w.tag==='alle'?'alle Termine':kopf.titel.replace(/^Ortstermin /,'')}${w.tag!=='alle'&&andere.some(x=>x.z.tag!<w.tag)?` – frühere Termine im Lageplan ${w.frueher==='grau'?'grau':'ausgeblendet'}`:''}`,ok:true}];
     if(andere.length)checks.push({text:'Proben anderer Ortstermine nicht im Probenverzeichnis',ok:true,detail:andere.map(x=>`${x.label} (${datumLang(x.z.tag!)})`).join(', ')});
     if(fehlt.length)checks.push({text:'Proben ohne Ortstermin – nicht in dieser Anlage',ok:false,detail:fehlt.map(x=>`${x.label} (${x.grund})`).join(', ')});
-    if(bl.weg.length)checks.push({text:'Pläne ohne Probe dieses Ortstermins – keine Planseite',ok:true,detail:bl.weg.map(i=>floorName(project!,i)||`Plan ${i+1}`).join(', ')});
-    termin={kopf:{feld:kopf.feld.split(' · ')[0],wert:w.tag==='alle'?kopf.wert:kopf.titel.replace(/^Ortstermin /,'')},blaetter:bl.drin,checks,projektProben:new Set(terminUI.proben(project).map(x=>x.label))};
-    if(!bl.drin.length)throw Error(`Für den ${datumLang(w.tag)} gibt es keine Probe im Plan – Anlage nicht erstellt. Oben einen anderen Ortstermin oder „Alle Termine“ wählen.`);}
+    if(bl.weg.length&&bl.drin.length)checks.push({text:'Pläne ohne Probe dieses Ortstermins – keine Planseite',ok:true,detail:bl.weg.map(i=>floorName(project!,i)||`Plan ${i+1}`).join(', ')});
+    // Nur offene Proben des Tages (noch nicht gesetzt): Lagepläne aller Pläne, damit die Anlage nicht ohne Plan bleibt
+    const offenDesTags=(aus.pending||[]).length,blaetter=bl.drin.length||!offenDesTags?bl.drin:Array.from({length:sheetCount(aus)},(_,i)=>i);
+    if(!bl.drin.length&&!offenDesTags)throw Error(`Für den ${datumLang(w.tag)} gibt es keine Probe – Anlage nicht erstellt. Oben einen anderen Ortstermin oder „Alle Termine“ wählen.`);
+    termin={kopf:{feld:kopf.feld.split(' · ')[0],wert:w.tag==='alle'?kopf.wert:kopf.titel.replace(/^Ortstermin /,'')},blaetter,checks,projektProben:new Set(terminUI.proben(project).map(x=>x.label))};}
   const r=await createAnnex(aus,folder,{title,maxPhotos:Number(input('annex-photos').value),results:resultsView,objekt:String(projectData.objekt||'').trim(),projectData,projectDataSource:projectReader.state.file,projectDataStale:projectReader.state.stale,app,progress:t=>{$('export').textContent=t;},...(termin?{termin}:{})});
   const hint=r.warnings?` · ${r.warnings} Hinweis${r.warnings===1?'':'e'} im Prüfprotokoll`:'';
   const blob=new Blob([r.bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
@@ -708,9 +711,13 @@ async function runAnnex(){
   else{const d=new Date(),z=(n:number)=>String(n).padStart(2,'0'),name=annexFileName(project.report||'Probenplan',title,`${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())}`,[]);
     if(exportURL)URL.revokeObjectURL(exportURL);exportURL=URL.createObjectURL(blob);const a=$<HTMLAnchorElement>('export-link');a.hidden=false;a.href=exportURL;a.download=name;a.textContent='Anlage erneut herunterladen';$('export-result').hidden=false;a.click();toast(`Anlage erstellt (ohne Fotos – dafür das Projekt aus der Projektzentrale öffnen)${hint}.`,!!r.warnings);}
 }
-async function runExport(){if(!project||busy||!requireFinished())return;
+/** 2.7.0: Die Termin-Wahl gilt vom Start bis zum Ende einer Ausgabe (Inhalt, Name und „erledigt“ passen immer zusammen). */
+async function runExport(){try{await ausgabeLauf();}finally{if(terminUI.loslassen())render();}}
+async function ausgabeLauf(){if(!project||busy||!requireFinished())return;
   const exporting=project,origin=folder;busy=true;$<HTMLButtonElement>('export').disabled=true;
   try{if(!await projectDataForExport()||project!==exporting||folder!==origin)return;
+    await labelkitLesen();if(project!==exporting||folder!==origin)return;   // 2.7.0: Probenahmedaten aus LabelKit frisch für die Zuordnung
+    terminUI.festhalten();
     // Schilder werden anhand des Planbilds platziert: vor Layout und Zeichnen für alle Pläne laden, damit Maße und Bild übereinstimmen.
     for(let i=0;i<sheetCount(project);i++)await ensureInk(sheetProject(project,i).plan);}finally{busy=false;$<HTMLButtonElement>('export').disabled=false;}
   if(exportFormat()==='anlage'){if(!terminRueckfrage(Array.from({length:sheetCount(project)},(_,i)=>i),true,'der Anlage Probenahme'))return;
@@ -719,6 +726,7 @@ async function runExport(){if(!project||busy||!requireFinished())return;
   // 2.7.0: Termin-Ansicht (ein Termin: das Projekt selbst) und die Pläne der Ausgabe (T7)
   const aus=terminUI.ansicht(project),bl=all?terminUI.blaetter(aus):{drin:[project.active??0],weg:[]};
   if(all&&!bl.drin.length){toast(`Kein Plan hat eine Probe vom ${datumLang(terminUI.wahl()?.tag||'')} – oben einen anderen Ortstermin oder „Alle Termine“ wählen.`,true);return;}
+  {const w=terminUI.wahl();if(!all&&w&&w.tag!=='alle'&&!terminUI.blaetter(aus).drin.includes(project.active??0)&&!window.confirm(`${floorName(project)||'Dieser Plan'} hat keine Probe vom ${datumLang(w.tag)} – die Ausgabe zeigt nur ${w.frueher==='grau'?'frühere Proben grau':'den Plan ohne Proben'}.\n\nOK = trotzdem ausgeben\nAbbrechen = nicht ausgeben`))return;}
   // Rückfrage über alle Pläne der Ausgabe – auch über die, die mangels Probe des Tages wegfallen (deren Proben „ohne Termin“ fehlen ebenso)
   if(!terminRueckfrage(all?Array.from({length:sheetCount(project)},(_,i)=>i):bl.drin,false,resultsView?'der Ergebniskarte':'dem Plan'))return;
   busy=true;$<HTMLButtonElement>('export').disabled=true;$('smaller').hidden=true;
@@ -1414,11 +1422,12 @@ async function enterFolder(dir:Parameters<typeof openFolder>[0]){
    const selected=await chooseStoredVersion(target,canonical,currentRevision,!!next,preservedBrowserDraft);if(selected===null)return;
    if(selected){next=selected;recovered=true;}
   }
-  const transition=()=>{if(entering!==folderOpening)throw Error('Ein neuerer Projektwechsel ist bereits aktiv.');folder=target;folderRevision=currentRevision;folderDirty=recovered;folderBlocked=false;ortGewechselt=false;projectReader.select(target);};
+  const transition=()=>{if(entering!==folderOpening)throw Error('Ein neuerer Projektwechsel ist bereits aktiv.');folder=target;folderRevision=currentRevision;folderDirty=recovered;folderBlocked=false;ortGewechselt=false;projectReader.select(target);
+    // 2.7.0: Termin-Wahl dieses Ordners laden, bevor zum ersten Mal gezeichnet wird; „mitteilung=“ nur für das Projekt aus dem Link (T11, P12)
+    const link=!linkVerbraucht&&PROJEKT_URL.mitteilung&&PROJEKT_URL.projekt!==null&&PROJEKT_URL.projekt.normalize('NFC')===target.name.normalize('NFC')?PROJEKT_URL.mitteilung:'';if(link)linkVerbraucht=true;terminUI.ordnerGeoeffnet(target.name,link);lkDaten=null;};
   if(entering!==folderOpening)return;
   if(next){if(!next.report)next.report=target.name;await install(next,true,transition);$('saved').textContent=recovered?'Wiederhergestellt – bitte prüfen und „Speichern“ klicken':`✓ Aus „${planPfad(target)}“ geladen`;}
   else{await preserveUnsavedProject();transition();labUI?.reset();project=null;history.clear();render();$('saved').textContent=`Projekt ${target.name}`;}
-  {const link=!linkVerbraucht&&PROJEKT_URL.mitteilung&&PROJEKT_URL.projekt!==null&&PROJEKT_URL.projekt.normalize('NFC')===target.name.normalize('NFC')?PROJEKT_URL.mitteilung:'';linkVerbraucht=true;terminUI.ordnerGeoeffnet(target.name,link);lkDaten=null;}
   showFolder();void zweiOrteZeigen();void refreshProjectData();resultkitStand=null;void resultkitLesen();stornoStand=null;void labelkitLesen();$('folder-prompt').hidden=true;await renderFolderPlans();
   PROJEKT_URL.setzen(target.name);
   (window as any).MosaikLeiste?.aktualisieren();

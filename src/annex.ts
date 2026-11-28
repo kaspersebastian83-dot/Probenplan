@@ -78,7 +78,7 @@ export function collectSamples(p:Project):AnnexSample[]{
 /** Beschreibung der verwendeten Skalen (je Einheit), damit die Einordnung nachvollziehbar ist. */
 export function scaleNotes(p:Project):string[]{
   const s=p.results;if(!s?.parameter)return [];const seen=new Set<string>(),notes:string[]=[];
-  for(const m of allMarkers(p)){const w=valueOf(m,s.parameter);if(!w||seen.has(`${w.p}|${w.u}`))continue;seen.add(`${w.p}|${w.u}`);
+  for(const m of allMarkers(p)){if(m[GRAU])continue;const w=valueOf(m,s.parameter);if(!w||seen.has(`${w.p}|${w.u}`))continue;seen.add(`${w.p}|${w.u}`);
     const eff=scaleFor(s,w.p,w.u),scale=eff.scale,was=`${shortParameter(w.p)}${w.u?` in ${w.u}`:''}`;
     if(!scale?.cats.length){notes.push(`${was}: keine Skala hinterlegt – Werte ohne Einordnung.`);continue;}
     if(w.p===ASBEST_PARAM&&!w.u){notes.push(`${was}: Befund wie im Prüfbericht – „Asbest nachgewiesen“ hellrot, sonst grün.`);continue;}

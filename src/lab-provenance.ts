@@ -22,7 +22,7 @@ export function sourceText(sources:LabSources){return [sources.xml,sources.pdf].
 export function copyOrigin(r:LabOrigin):LabOrigin{return {id:r.id,bericht:r.bericht,labor:r.labor,auftragsreferenz:r.auftragsreferenz,...(r.batch!==undefined?{batch:r.batch}:{}),...(r.vorlaeufig===true?{vorlaeufig:true as const}:{}),sources:{...(r.sources.xml!==undefined?{xml:r.sources.xml}:{}),...(r.sources.pdf!==undefined?{pdf:r.sources.pdf}:{})}};}
 /** Prüfberichte, auf die Proben im Projekt verweisen (Marker und „Noch zu platzieren“). Ersetzte Berichte zählen nicht. */
 export function verwendeteBerichte(p:Project):LabOrigin[]{
- const used=new Set<string>();for(const m of allMarkers(p))if(m.lab?.reportId)used.add(m.lab.reportId);for(const r of p.pending||[])if(r.reportId)used.add(r.reportId);
+ const used=new Set<string>();for(const m of allMarkers(p))if(!m[GRAU]&&m.lab?.reportId)used.add(m.lab.reportId);for(const r of p.pending||[])if(r.reportId)used.add(r.reportId);
  return (p.labReports||[]).filter(r=>used.has(r.id));
 }
 /** Vorläufige Prüfberichte, aus denen Werte im Projekt stammen (nur tatsächlich verwendete Herkunft). */

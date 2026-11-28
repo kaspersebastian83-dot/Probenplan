@@ -45,7 +45,7 @@ const LISTEN=['proben','chloridProben','asbestProben','sonstigeProben'];
 export function labelkitDaten(data:unknown):Map<string,string>{
   const out=new Map<string,string>(),d=data as Record<string,unknown>|null;if(!d||typeof d!=='object')return out;
   for(const key of LISTEN)for(const raw of (Array.isArray(d[key])?d[key] as Record<string,unknown>[]:[])){
-    if(!raw||typeof raw!=='object')continue;
+    if(!raw||typeof raw!=='object'||raw.storniert)continue;   // storniert: keine Probe mehr (wie labelkitReport)
     let n=0;for(const v of [raw._nr,raw.chloridNr,raw.id]){const x=Number(v);if(Number.isSafeInteger(x)&&x>0&&x<1e9){n=x;break;}}
     if(!n||out.has(`P${n}`))continue;
     const s=text(raw.datum),m=/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/.exec(s),iso=m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:s;

@@ -34,11 +34,17 @@ export class TerminUI{
  }
  /** Projektordner gewechselt oder geöffnet: gemerkte Wahl laden; link = Kennung aus „mitteilung=…“ (oder leer). */
  ordnerGeoeffnet(name:string|null,link=''){
+  if(name===this.ordner&&!link)return;   // derselbe Ordner noch einmal (z. B. Neuladen der Projektdaten): Wahl bleibt
   this.ordner=name;this.eigen=null;this.link=link;this.linkAktiv=!!link;
   if(name)try{const raw=localStorage.getItem(KEY(name));if(raw)this.eigen=JSON.parse(raw);}catch{/* ohne Speicher: nur Vorwahl */}
  }
  /** Gültige Wahl oder null (ein Termin). */
+ /** Während einer Ausgabe gilt die Wahl vom Start – ein Wechsel der Auswahl oder neu gelesene Daten ändern Inhalt und Namen nicht mittendrin. */
+ private fest:{wahl:Wahl|null}|null=null;
+ festhalten(){this.fest={wahl:this.wahl()};for(const f of this.felder){f.tag.disabled=true;f.frueher.disabled=true;}}
+ loslassen(){const war=!!this.fest;this.fest=null;for(const f of this.felder){f.tag.disabled=false;f.frueher.disabled=false;}return war;}
  wahl():Wahl|null{
+  if(this.fest)return this.fest.wahl;
   const p=this.hooks.project(),t=this.tage();if(!p||!mehrere(t))return null;
   if(this.linkAktiv){const a=ausMitteilung(this.hooks.projectData(),this.link,t);if(a)return a.wahl;}
   return gueltigeWahl(this.eigen,t)||vorwahl(t,this.proben(p).map(x=>x.z));
